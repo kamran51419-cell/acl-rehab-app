@@ -283,9 +283,52 @@ function TabButton({ active, onClick, children }) {
 
 function SetsInput({ title, data, setData }) {
   const updateSet = (i, key, val) => {
-    const next = data.sets.map((s, idx) => (idx === i ? { ...s, [key]: val } : s));
-    setData({ sets: next });
+  const next = data.sets.map((s, idx) => (idx === i ? { ...s, [key]: val } : s));
+  setData({ sets: next });
   };
+
+  const addSet = () => setData({ sets: [...data.sets, blankSet()] });
+
+  const removeSet = (i) => {
+    const filtered = data.sets.filter((_, idx) => idx !== i);
+    setData({ sets: filtered.length ? filtered : defaultSets() });
+  };
+
+  return (
+    <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="font-semibold text-slate-900">{title}</div>
+      {data.sets.map((set, i) => (
+        <div key={i} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+          <div className="mb-2 text-sm text-slate-500">Set {i + 1}</div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_40px] sm:items-center">
+            <Input
+              placeholder="Reps"
+              value={set.reps}
+              onChange={(e) => updateSet(i, "reps", e.target.value)}
+              inputMode="numeric"
+            />
+            <Input
+              placeholder="Weight (kg)"
+              value={set.weight}
+              onChange={(e) => updateSet(i, "weight", e.target.value)}
+              inputMode="decimal"
+            />
+            <button
+              type="button"
+              onClick={() => removeSet(i)}
+              className="inline-flex h-10 w-full items-center justify-center rounded-md border border-slate-200 bg-white hover:bg-slate-50 sm:w-10"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      ))}
+      <Button type="button" variant="outline" size="sm" onClick={addSet}>
+        <Plus className="mr-1 h-4 w-4" /> Add set
+      </Button>
+    </div>
+  );
+}
 
   const addSet = () => setData({ sets: [...data.sets, blankSet()] });
   const removeSet = (i) => {

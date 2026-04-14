@@ -43,6 +43,34 @@ const blankForm = {
 
 function cls(...parts) {
   return parts.filter(Boolean).join(" ");
+}function Button({ children, variant = "default", size = "default", className = "", ...props }) {
+  const base = "inline-flex items-center justify-center rounded-xl border text-sm font-medium transition focus:outline-none disabled:opacity-50 disabled:pointer-events-none";
+  const variants = {
+    default: "bg-slate-900 text-white border-slate-900 hover:bg-slate-800",
+    outline: "bg-white text-slate-700 border-slate-200 hover:bg-slate-50",
+    destructive: "bg-red-600 text-white border-red-600 hover:bg-red-700",
+  };
+  const sizes = {
+    default: "h-10 px-4 py-2",
+    sm: "h-9 px-3 py-2 text-xs",
+  };
+  return (
+    <button className={cls(base, variants[variant], sizes[size], className)} {...props}>
+      {children}
+    </button>
+  );
+}
+
+function Input(props) {
+  return <input className={cls("h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm", props.className)} {...props} />;
+}
+
+function Label({ children, className = "", ...props }) {
+  return (
+    <label className={cls("mb-1 block text-sm font-medium text-slate-700", className)} {...props}>
+      {children}
+    </label>
+  );
 }
 
 function setVolume(set) {
@@ -984,6 +1012,3 @@ export default function ACLTrackerApp() {
     </div>
   );
 }
-
-
-

@@ -436,7 +436,8 @@ export default function ACLTrackerApp() {
   const latestLPRight = latestBestSetForExercise(weeks, "lp", "rightSets");
   const latestLELeft = latestBestSetForExercise(weeks, "le", "leftSets");
   const latestLERight = latestBestSetForExercise(weeks, "le", "rightSets");
-
+  const latestHCLeft = latestBestSetForExercise(weeks, "hc", "leftSets");
+  const latestHCRight = latestBestSetForExercise(weeks, "hc", "rightSets");
   const builtInTabs = DEFAULT_EXERCISES.filter((e) => exerciseKeys.some((x) => x.id === e.id));
 
   const graphData = weeks.map((week) => {
@@ -574,19 +575,26 @@ export default function ACLTrackerApp() {
         {activeTab === "home" && (
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 md:gap-4">
-              <SummaryCard title="Leg Press symmetry" value={latestLPSym != null ? `${latestLPSym}%` : "—"} subtitle="Latest" />
-              <SummaryCard title="Leg Extension symmetry" value={latestLESym != null ? `${latestLESym}%` : "—"} subtitle="Latest" />
-              <SummaryCard title="Hamstring Curl symmetry" value={latestHCSym != null ? `${latestHCSym}%` : "—"} subtitle="Latest" />
               <SummaryCard
-                title="Leg Press"
-                value={`${latestLPLeft ? `${latestLPLeft.reps} x ${latestLPLeft.weight}kg` : "—"} / ${latestLPRight ? `${latestLPRight.reps} x ${latestLPRight.weight}kg` : "—"}`}
-                subtitle="L / R"
-              />
-              <SummaryCard
-                title="Leg Extension"
-                value={`${latestLELeft ? `${latestLELeft.reps} x ${latestLELeft.weight}kg` : "—"} / ${latestLERight ? `${latestLERight.reps} x ${latestLERight.weight}kg` : "—"}`}
-                subtitle="L / R"
-              />
+  title="Leg Press"
+  value={`${latestLPLeft ? `${latestLPLeft.reps} x ${latestLPLeft.weight}kg` : "—"} / ${latestLPRight ? `${latestLPRight.reps} x ${latestLPRight.weight}kg` : "—"}`}
+  subtitle="L / R"
+/>
+<SummaryCard title="Leg Press symmetry" value={latestLPSym != null ? `${latestLPSym}%` : "—"} />
+
+<SummaryCard
+  title="Leg Extension"
+  value={`${latestLELeft ? `${latestLELeft.reps} x ${latestLELeft.weight}kg` : "—"} / ${latestLERight ? `${latestLERight.reps} x ${latestLERight.weight}kg` : "—"}`}
+  subtitle="L / R"
+/>
+<SummaryCard title="Leg Extension symmetry" value={latestLESym != null ? `${latestLESym}%` : "—"} />
+
+<SummaryCard
+  title="Hamstring Curl"
+  value={`${latestHCLeft ? `${latestHCLeft.reps} x ${latestHCLeft.weight}kg` : "—"} / ${latestHCRight ? `${latestHCRight.reps} x ${latestHCRight.weight}kg` : "—"}`}
+  subtitle="L / R"
+/>
+<SummaryCard title="Hamstring Curl symmetry" value={latestHCSym != null ? `${latestHCSym}%` : "—"} />
             </div>
 
             <CardShell title="Setup">

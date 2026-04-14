@@ -985,13 +985,5 @@ export default function ACLTrackerApp() {
   );
 }
 
-export const __testables = {
-  setVolume,
-  bestSet,
-  bestSetSym,
-  setsSummaryLines,
-  calculateWeekFromSurgeryDate,
-  calculateDaysSinceSurgery,
-  formatDate,
-  sessionSummary,
-};
+
+

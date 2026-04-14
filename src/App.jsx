@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Home, Table2, LineChart as LineChartIcon, Plus, Trash2, X, Hash } from "lucide-react";
+import { Home, Table2, LineChart as LineChartIcon, Plus, Trash2, X } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -43,8 +43,11 @@ const blankForm = {
 
 function cls(...parts) {
   return parts.filter(Boolean).join(" ");
-}function Button({ children, variant = "default", size = "default", className = "", ...props }) {
-  const base = "inline-flex items-center justify-center rounded-xl border text-sm font-medium transition focus:outline-none disabled:opacity-50 disabled:pointer-events-none";
+}
+
+function Button({ children, variant = "default", size = "default", className = "", ...props }) {
+  const base =
+    "inline-flex items-center justify-center rounded-xl border text-sm font-medium transition focus:outline-none disabled:opacity-50 disabled:pointer-events-none";
   const variants = {
     default: "bg-slate-900 text-white border-slate-900 hover:bg-slate-800",
     outline: "bg-white text-slate-700 border-slate-200 hover:bg-slate-50",
@@ -62,7 +65,12 @@ function cls(...parts) {
 }
 
 function Input(props) {
-  return <input className={cls("h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm", props.className)} {...props} />;
+  return (
+    <input
+      className={cls("h-10 w-full min-w-0 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm", props.className)}
+      {...props}
+    />
+  );
 }
 
 function Label({ children, className = "", ...props }) {
@@ -246,8 +254,8 @@ function sessionSummary(session) {
 
 function CardShell({ title, right, children }) {
   return (
-    <div className="rounded-3xl bg-white shadow-md border border-slate-200">
-      <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-slate-100">
+    <div className="rounded-3xl border border-slate-200 bg-white shadow-md">
+      <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-4">
         <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
         {right}
       </div>
@@ -258,7 +266,7 @@ function CardShell({ title, right, children }) {
 
 function SummaryCard({ title, value, subtitle }) {
   return (
-    <div className="rounded-2xl bg-white shadow-sm border border-slate-200 p-4 space-y-1">
+    <div className="space-y-1 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="text-sm text-slate-500">{title}</div>
       <div className="text-xl font-semibold leading-tight text-slate-900">{value}</div>
       <div className="text-xs text-slate-500">{subtitle}</div>
@@ -272,8 +280,8 @@ function TabButton({ active, onClick, children }) {
       type="button"
       onClick={onClick}
       className={cls(
-        "px-3 py-2 rounded-xl text-sm border transition",
-        active ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+        "rounded-xl border px-3 py-2 text-sm transition",
+        active ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
       )}
     >
       {children}
@@ -304,7 +312,7 @@ function SetsInput({ title, data, setData }) {
         <div key={i} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
           <div className="mb-2 text-sm text-slate-500">Set {i + 1}</div>
 
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_40px] sm:items-center">
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_40px] items-center gap-2">
             <Input
               placeholder="Reps"
               value={set.reps}
@@ -322,7 +330,7 @@ function SetsInput({ title, data, setData }) {
             <button
               type="button"
               onClick={() => removeSet(i)}
-              className="inline-flex h-10 w-full items-center justify-center rounded-md border border-slate-200 bg-white hover:bg-slate-50 sm:w-10"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white hover:bg-slate-50"
             >
               <X className="h-4 w-4" />
             </button>
@@ -330,7 +338,7 @@ function SetsInput({ title, data, setData }) {
         </div>
       ))}
 
-           <Button type="button" variant="outline" size="sm" onClick={addSet}>
+      <Button type="button" variant="outline" size="sm" onClick={addSet}>
         <Plus className="mr-1 h-4 w-4" /> Add set
       </Button>
     </div>
@@ -362,7 +370,7 @@ export default function ACLTrackerApp() {
   const [form, setForm] = useState(blankForm);
   const [editing, setEditing] = useState(null);
   const [showAllRows, setShowAllRows] = useState(false);
-  const [activeTab, setActiveTab] = useState("log");
+  const [activeTab, setActiveTab] = useState("home");
   const [progressTab, setProgressTab] = useState("all");
   const [graphsTab, setGraphsTab] = useState("combined");
   const [surgeryDate, setSurgeryDate] = useState("");
@@ -535,7 +543,7 @@ export default function ACLTrackerApp() {
   function deleteSession(weekValue, sessionId) {
     setWeeks((prev) =>
       prev
-        .map((w) => String(w.week) === String(weekValue) ? { ...w, sessions: (w.sessions || []).filter((s) => s.id !== sessionId) } : w)
+        .map((w) => (String(w.week) === String(weekValue) ? { ...w, sessions: (w.sessions || []).filter((s) => s.id !== sessionId) } : w))
         .filter((w) => (w.sessions || []).length > 0)
     );
     if (editing?.sessionId === sessionId) {
@@ -546,7 +554,7 @@ export default function ACLTrackerApp() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8 pb-24 md:pb-8">
+    <div className="min-h-screen bg-slate-50 p-4 pb-24 md:p-8 md:pb-8">
       <div className="mx-auto max-w-7xl space-y-6">
         <div className="space-y-2">
           <div className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm">
@@ -556,160 +564,202 @@ export default function ACLTrackerApp() {
           <p className="text-slate-600">Weekly overview in one line, with drill-down tabs for full exercise detail.</p>
         </div>
 
-        <div className="grid gap-3 md:gap-4 grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
-          <SummaryCard title="Leg Press symmetry" value={latestLPSym != null ? `${latestLPSym}%` : "—"} subtitle="Latest" />
-          <SummaryCard title="Leg Extension symmetry" value={latestLESym != null ? `${latestLESym}%` : "—"} subtitle="Latest" />
-          <SummaryCard title="Hamstring Curl symmetry" value={latestHCSym != null ? `${latestHCSym}%` : "—"} subtitle="Latest" />
-          <SummaryCard
-            title="Leg Press"
-            value={`${latestLPLeft ? `${latestLPLeft.reps} x ${latestLPLeft.weight}kg` : "—"} / ${latestLPRight ? `${latestLPRight.reps} x ${latestLPRight.weight}kg` : "—"}`}
-            subtitle="L / R"
-          />
-          <SummaryCard
-            title="Leg Extension"
-            value={`${latestLELeft ? `${latestLELeft.reps} x ${latestLELeft.weight}kg` : "—"} / ${latestLERight ? `${latestLERight.reps} x ${latestLERight.weight}kg` : "—"}`}
-            subtitle="L / R"
-          />
-        </div>
-
-        <CardShell title="Setup">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <Label className="text-sm font-medium text-slate-700">Surgery date (optional)</Label>
-              <Input type="date" value={surgeryDate} onChange={(e) => { setSurgeryDate(e.target.value); setWeekManuallyEdited(false); }} />
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              {surgeryDate
-                ? "Week auto-calculates from Date by default, but you can still type over it manually if needed."
-                : "No surgery date set. Week starts manual, then defaults to the next week after a save."}
-            </div>
-          </div>
-        </CardShell>
-
-        <CardShell title="Custom exercises">
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-[1fr_180px_120px]">
-              <div>
-                <Label className="text-sm font-medium text-slate-700">New exercise name</Label>
-                <Input value={newExerciseName} onChange={(e) => setNewExerciseName(e.target.value)} placeholder="e.g. Squat" />
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-slate-700">Single leg</Label>
-                <div className="mt-2 flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setNewExerciseSingleLeg(true)}
-                    className={cls("rounded-md border px-3 py-2 text-sm", newExerciseSingleLeg ? "bg-slate-900 text-white border-slate-900" : "bg-white border-slate-200")}
-                  >
-                    On
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setNewExerciseSingleLeg(false)}
-                    className={cls("rounded-md border px-3 py-2 text-sm", !newExerciseSingleLeg ? "bg-slate-900 text-white border-slate-900" : "bg-white border-slate-200")}
-                  >
-                    Off
-                  </button>
-                </div>
-              </div>
-              <div className="flex items-end">
-                <Button onClick={addCustomExercise} className="w-full">Add exercise</Button>
-              </div>
-            </div>
-
-            {customExercises.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {customExercises.map((exercise) => (
-                  <div key={exercise.id} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm">
-                    <span>{exercise.label}</span>
-                    <span className="text-slate-400">•</span>
-                    <span className="text-slate-500">{exercise.singleLeg ? "Single leg" : "Both legs"}</span>
-                    <button
-                      type="button"
-                      onClick={() => deleteCustomExercise(exercise.id)}
-                      className="inline-flex items-center justify-center rounded-full border border-slate-200 p-1 hover:bg-slate-50"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </CardShell>
-
-        <div className="hidden md:flex gap-2 flex-wrap">
+        <div className="hidden md:flex flex-wrap gap-2">
+          <TabButton active={activeTab === "home"} onClick={() => setActiveTab("home")}>Home</TabButton>
           <TabButton active={activeTab === "log"} onClick={() => setActiveTab("log")}>Log Session</TabButton>
           <TabButton active={activeTab === "table"} onClick={() => setActiveTab("table")}>Progress</TabButton>
           <TabButton active={activeTab === "graphs"} onClick={() => setActiveTab("graphs")}>Graphs</TabButton>
-          <TabButton active={activeTab === "counter"} onClick={() => setActiveTab("counter")}>Counter</TabButton>
         </div>
 
-        {activeTab === "log" && (
-          <CardShell title={editing ? `Edit session — Week ${editing.week}` : "Add Session"}>
-            <div className="space-y-5">
-              <div className="grid gap-4 md:grid-cols-3">
+        {activeTab === "home" && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 md:gap-4">
+              <SummaryCard title="Leg Press symmetry" value={latestLPSym != null ? `${latestLPSym}%` : "—"} subtitle="Latest" />
+              <SummaryCard title="Leg Extension symmetry" value={latestLESym != null ? `${latestLESym}%` : "—"} subtitle="Latest" />
+              <SummaryCard title="Hamstring Curl symmetry" value={latestHCSym != null ? `${latestHCSym}%` : "—"} subtitle="Latest" />
+              <SummaryCard
+                title="Leg Press"
+                value={`${latestLPLeft ? `${latestLPLeft.reps} x ${latestLPLeft.weight}kg` : "—"} / ${latestLPRight ? `${latestLPRight.reps} x ${latestLPRight.weight}kg` : "—"}`}
+                subtitle="L / R"
+              />
+              <SummaryCard
+                title="Leg Extension"
+                value={`${latestLELeft ? `${latestLELeft.reps} x ${latestLELeft.weight}kg` : "—"} / ${latestLERight ? `${latestLERight.reps} x ${latestLERight.weight}kg` : "—"}`}
+                subtitle="L / R"
+              />
+            </div>
+
+            <CardShell title="Setup">
+              <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <Label className="text-sm font-medium text-slate-700">Week</Label>
+                  <Label className="text-sm font-medium text-slate-700">Surgery date (optional)</Label>
                   <Input
-                    value={form.week}
+                    type="date"
+                    value={surgeryDate}
                     onChange={(e) => {
-                      setWeekManuallyEdited(true);
-                      setForm({ ...form, week: e.target.value });
+                      setSurgeryDate(e.target.value);
+                      setWeekManuallyEdited(false);
                     }}
-                    placeholder={surgeryDate ? "Auto" : "Enter week"}
-                    inputMode="numeric"
                   />
                 </div>
-                <div>
-                  <Label className="text-sm font-medium text-slate-700">Date</Label>
-                  <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                  {surgeryDate
+                    ? "Week auto-calculates from Date by default, but you can still type over it manually if needed."
+                    : "No surgery date set. Week starts manual, then defaults to the next week after a save."}
                 </div>
-                <div>
-                  <Label className="text-sm font-medium text-slate-700">Exercise</Label>
-                  <select
-                    value={form.exerciseId}
-                    onChange={(e) => setForm({ ...form, exerciseId: e.target.value })}
-                    className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                  >
-                    {exerciseKeys.map((ex) => (
-                      <option key={ex.id} value={ex.id}>{ex.label}</option>
+              </div>
+            </CardShell>
+
+            <CardShell title="Recovery home">
+              <div className="grid gap-4 md:grid-cols-2">
+                <SummaryCard
+                  title="Days since surgery"
+                  value={daysSinceSurgery != null ? String(daysSinceSurgery) : "—"}
+                  subtitle={surgeryDate ? "Based on today" : "Add surgery date"}
+                />
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                  This updates from the surgery date using today’s date. Add or change the surgery date above.
+                </div>
+              </div>
+            </CardShell>
+          </div>
+        )}
+
+        {activeTab === "log" && (
+          <div className="space-y-6">
+            <CardShell title="Custom exercises">
+              <div className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-[1fr_180px_120px]">
+                  <div>
+                    <Label className="text-sm font-medium text-slate-700">New exercise name</Label>
+                    <Input value={newExerciseName} onChange={(e) => setNewExerciseName(e.target.value)} placeholder="e.g. Squat" />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-slate-700">Single leg</Label>
+                    <div className="mt-2 flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setNewExerciseSingleLeg(true)}
+                        className={cls(
+                          "rounded-md border px-3 py-2 text-sm",
+                          newExerciseSingleLeg ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white"
+                        )}
+                      >
+                        On
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewExerciseSingleLeg(false)}
+                        className={cls(
+                          "rounded-md border px-3 py-2 text-sm",
+                          !newExerciseSingleLeg ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white"
+                        )}
+                      >
+                        Off
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex items-end">
+                    <Button onClick={addCustomExercise} className="w-full">Add exercise</Button>
+                  </div>
+                </div>
+
+                {customExercises.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {customExercises.map((exercise) => (
+                      <div key={exercise.id} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm">
+                        <span>{exercise.label}</span>
+                        <span className="text-slate-400">•</span>
+                        <span className="text-slate-500">{exercise.singleLeg ? "Single leg" : "Both legs"}</span>
+                        <button
+                          type="button"
+                          onClick={() => deleteCustomExercise(exercise.id)}
+                          className="inline-flex items-center justify-center rounded-full border border-slate-200 p-1 hover:bg-slate-50"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     ))}
-                  </select>
-                </div>
-              </div>
-
-              {selectedExercise?.singleLeg ? (
-                <>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <SetsInput title="Left" data={form.left} setData={(v) => setForm({ ...form, left: v })} />
-                    <SetsInput title="Right" data={form.right} setData={(v) => setForm({ ...form, right: v })} />
                   </div>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
-                    <span className="font-medium">Symmetry: </span>
-                    {currentSymmetry ?? "—"}
-                    {currentSymmetry != null ? "%" : ""}
-                  </div>
-                </>
-              ) : (
-                <SetsInput title="Sets" data={form.bilateral} setData={(v) => setForm({ ...form, bilateral: v })} />
-              )}
-
-              <div>
-                <Label className="text-sm font-medium text-slate-700">Notes</Label>
-                <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Optional notes for this session" />
-              </div>
-
-              <div className="flex gap-3">
-                <Button onClick={() => { saveSession(); setActiveTab("table"); }}>{editing ? "Update Session" : "Save Session"}</Button>
-                {editing && (
-                  <Button variant="outline" onClick={() => { setEditing(null); setForm({ ...blankForm, date: todayString(), exerciseId: form.exerciseId }); setWeekManuallyEdited(false); setActiveTab("table"); }}>
-                    Cancel
-                  </Button>
                 )}
               </div>
-            </div>
-          </CardShell>
+            </CardShell>
+
+            <CardShell title={editing ? `Edit session — Week ${editing.week}` : "Add Session"}>
+              <div className="space-y-5">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div>
+                    <Label className="text-sm font-medium text-slate-700">Week</Label>
+                    <Input
+                      value={form.week}
+                      onChange={(e) => {
+                        setWeekManuallyEdited(true);
+                        setForm({ ...form, week: e.target.value });
+                      }}
+                      placeholder={surgeryDate ? "Auto" : "Enter week"}
+                      inputMode="numeric"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-slate-700">Date</Label>
+                    <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-slate-700">Exercise</Label>
+                    <select
+                      value={form.exerciseId}
+                      onChange={(e) => setForm({ ...form, exerciseId: e.target.value })}
+                      className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+                    >
+                      {exerciseKeys.map((ex) => (
+                        <option key={ex.id} value={ex.id}>{ex.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {selectedExercise?.singleLeg ? (
+                  <>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <SetsInput title="Left" data={form.left} setData={(v) => setForm({ ...form, left: v })} />
+                      <SetsInput title="Right" data={form.right} setData={(v) => setForm({ ...form, right: v })} />
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                      <span className="font-medium">Symmetry: </span>
+                      {currentSymmetry ?? "—"}
+                      {currentSymmetry != null ? "%" : ""}
+                    </div>
+                  </>
+                ) : (
+                  <SetsInput title="Sets" data={form.bilateral} setData={(v) => setForm({ ...form, bilateral: v })} />
+                )}
+
+                <div>
+                  <Label className="text-sm font-medium text-slate-700">Notes</Label>
+                  <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Optional notes for this session" />
+                </div>
+
+                <div className="flex gap-3">
+                  <Button onClick={() => { saveSession(); setActiveTab("table"); }}>
+                    {editing ? "Update Session" : "Save Session"}
+                  </Button>
+                  {editing && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setEditing(null);
+                        setForm({ ...blankForm, date: todayString(), exerciseId: form.exerciseId });
+                        setWeekManuallyEdited(false);
+                        setActiveTab("table");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardShell>
+          </div>
         )}
 
         {activeTab === "table" && (
@@ -727,13 +777,16 @@ export default function ACLTrackerApp() {
             </div>
 
             {progressTab === "all" && (
-              <CardShell title="Weekly Overview" right={<Button variant="outline" onClick={() => setShowAllRows((v) => !v)}>{showAllRows ? "Show last 8 weeks" : "Show all weeks"}</Button>}>
-                <div className="md:hidden space-y-4">
+              <CardShell
+                title="Weekly Overview"
+                right={<Button variant="outline" onClick={() => setShowAllRows((v) => !v)}>{showAllRows ? "Show last 8 weeks" : "Show all weeks"}</Button>}
+              >
+                <div className="space-y-4 md:hidden">
                   {displayedWeeks.length === 0 ? (
                     <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-500">No sessions saved yet.</div>
                   ) : (
                     displayedWeeks.map((week) => (
-                      <div key={week.week} className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
+                      <div key={week.week} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
                         <div className="flex items-center justify-between gap-3">
                           <div className="text-lg font-semibold text-slate-900">Week {week.week}</div>
                           <div className="text-xs text-slate-500">{compactDate(week.sessions || [])}</div>
@@ -743,14 +796,14 @@ export default function ACLTrackerApp() {
                             const summary = compactExerciseSummary(week, exercise);
                             if (!summary) return null;
                             return (
-                              <div key={`${week.week}-${exercise.id}-mobile`} className="rounded-xl bg-slate-50 p-3 border border-slate-100">
+                              <div key={`${week.week}-${exercise.id}-mobile`} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
                                 <div className="text-sm font-semibold text-slate-900">{exercise.label}</div>
-                                <div className="text-xs text-slate-500 mt-1">{summary.dates}</div>
+                                <div className="mt-1 text-xs text-slate-500">{summary.dates}</div>
                                 {summary.type === "single" ? (
                                   <>
                                     <div className="mt-2 flex items-center justify-between gap-3 text-sm">
                                       <span>L: {summary.left}</span>
-                                      <span className="rounded-full bg-white px-2 py-1 text-xs font-medium text-slate-600 border border-slate-200">
+                                      <span className="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600">
                                         {summary.symmetry != null ? `${summary.symmetry}%` : "—"}
                                       </span>
                                     </div>
@@ -768,7 +821,7 @@ export default function ACLTrackerApp() {
                   )}
                 </div>
 
-                <div className="hidden md:block overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+                <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white md:block">
                   <table className="w-full min-w-[1200px] border-collapse text-sm">
                     <thead className="bg-slate-100">
                       <tr>
@@ -784,7 +837,9 @@ export default function ACLTrackerApp() {
                     <tbody>
                       {displayedWeeks.length === 0 ? (
                         <tr>
-                          <td colSpan={1 + exerciseKeys.length + exerciseKeys.filter((e) => e.singleLeg).length} className="p-8 text-center text-slate-500">No sessions saved yet.</td>
+                          <td colSpan={1 + exerciseKeys.length + exerciseKeys.filter((e) => e.singleLeg).length} className="p-8 text-center text-slate-500">
+                            No sessions saved yet.
+                          </td>
                         </tr>
                       ) : (
                         displayedWeeks.map((week, idx) => (
@@ -830,7 +885,11 @@ export default function ACLTrackerApp() {
             )}
 
             {builtInTabs.map((exercise) => progressTab === exercise.id && (
-              <CardShell key={exercise.id} title={exercise.label} right={<Button variant="outline" onClick={() => setShowAllRows((v) => !v)}>{showAllRows ? "Show last 8 weeks" : "Show all weeks"}</Button>}>
+              <CardShell
+                key={exercise.id}
+                title={exercise.label}
+                right={<Button variant="outline" onClick={() => setShowAllRows((v) => !v)}>{showAllRows ? "Show last 8 weeks" : "Show all weeks"}</Button>}
+              >
                 <div className="space-y-4">
                   {displayedWeeks.length === 0 ? (
                     <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-500">No sessions saved yet.</div>
@@ -839,12 +898,12 @@ export default function ACLTrackerApp() {
                       const exSessions = aggregateWeekExerciseSessions(week, exercise.id);
                       if (!exSessions.length) return null;
                       return (
-                        <div key={`${exercise.id}-${week.week}`} className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
+                        <div key={`${exercise.id}-${week.week}`} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
                           <div className="text-lg font-semibold">Week {week.week}</div>
                           {exSessions.map((session, idx) => {
                             const sum = sessionSummary(session);
                             return (
-                              <div key={session.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-3">
+                              <div key={session.id} className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
                                 <div className="flex flex-wrap items-center justify-between gap-3">
                                   <div className="text-sm font-medium">Session {idx + 1} • {sum.date}</div>
                                   <div className="flex gap-2">
@@ -879,7 +938,10 @@ export default function ACLTrackerApp() {
             ))}
 
             {progressTab === "custom" && (
-              <CardShell title="Custom exercises" right={<Button variant="outline" onClick={() => setShowAllRows((v) => !v)}>{showAllRows ? "Show last 8 weeks" : "Show all weeks"}</Button>}>
+              <CardShell
+                title="Custom exercises"
+                right={<Button variant="outline" onClick={() => setShowAllRows((v) => !v)}>{showAllRows ? "Show last 8 weeks" : "Show all weeks"}</Button>}
+              >
                 <div className="space-y-6">
                   {customExercisesPresent.length === 0 ? (
                     <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-500">No custom exercise sessions saved yet.</div>
@@ -893,12 +955,12 @@ export default function ACLTrackerApp() {
                         const exSessions = aggregateWeekExerciseSessions(week, exercise.id);
                         if (!exSessions.length) return null;
                         return (
-                          <div key={`${exercise.id}-${week.week}`} className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
+                          <div key={`${exercise.id}-${week.week}`} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
                             <div className="text-base font-semibold">Week {week.week}</div>
                             {exSessions.map((session, idx) => {
                               const sum = sessionSummary(session);
                               return (
-                                <div key={session.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-3">
+                                <div key={session.id} className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
                                   <div className="flex flex-wrap items-center justify-between gap-3">
                                     <div className="text-sm font-medium">Session {idx + 1} • {sum.date}</div>
                                     <div className="flex gap-2">
@@ -980,36 +1042,41 @@ export default function ACLTrackerApp() {
             ))}
           </div>
         )}
-
-        {activeTab === "counter" && (
-          <CardShell title="Recovery counter">
-            <div className="grid gap-4 md:grid-cols-2">
-              <SummaryCard title="Days since surgery" value={daysSinceSurgery != null ? String(daysSinceSurgery) : "—"} subtitle={surgeryDate ? "Based on today" : "Add surgery date"} />
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                This updates from the surgery date using today’s date. Add or change the surgery date in Setup.
-              </div>
-            </div>
-          </CardShell>
-        )}
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-slate-200 bg-white/95 backdrop-blur md:hidden">
         <div className="mx-auto grid max-w-md grid-cols-4 p-2">
-          <button type="button" onClick={() => setActiveTab("log")} className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "log" ? "bg-slate-100 font-medium" : "text-slate-500")}>
+          <button
+            type="button"
+            onClick={() => setActiveTab("home")}
+            className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "home" ? "bg-slate-100 font-medium" : "text-slate-500")}
+          >
             <Home className="h-4 w-4" />
+            Home
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("log")}
+            className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "log" ? "bg-slate-100 font-medium" : "text-slate-500")}
+          >
+            <Plus className="h-4 w-4" />
             Log
           </button>
-          <button type="button" onClick={() => setActiveTab("table")} className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "table" ? "bg-slate-100 font-medium" : "text-slate-500")}>
+          <button
+            type="button"
+            onClick={() => setActiveTab("table")}
+            className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "table" ? "bg-slate-100 font-medium" : "text-slate-500")}
+          >
             <Table2 className="h-4 w-4" />
             Progress
           </button>
-          <button type="button" onClick={() => setActiveTab("graphs")} className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "graphs" ? "bg-slate-100 font-medium" : "text-slate-500")}>
+          <button
+            type="button"
+            onClick={() => setActiveTab("graphs")}
+            className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "graphs" ? "bg-slate-100 font-medium" : "text-slate-500")}
+          >
             <LineChartIcon className="h-4 w-4" />
             Graphs
-          </button>
-          <button type="button" onClick={() => setActiveTab("counter")} className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "counter" ? "bg-slate-100 font-medium" : "text-slate-500")}>
-            <Hash className="h-4 w-4" />
-            Counter
           </button>
         </div>
       </div>

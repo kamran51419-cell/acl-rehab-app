@@ -17,6 +17,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
@@ -484,7 +485,19 @@ async function handleLogout() {
     console.error("Failed to sign out", error);
   }
 }
+async function handleResetPassword() {
+  if (!email) {
+    setAuthError("Enter your email first");
+    return;
+  }
 
+  try {
+    await sendPasswordResetEmail(auth, email);
+    setAuthError("Password reset email sent");
+  } catch (error) {
+    setAuthError(error.message);
+  }
+}
 const exerciseKeys = useMemo(() => [...DEFAULT_EXERCISES, ...customExercises], [customExercises]);
 const selectedExercise = exerciseKeys.find((e) => e.id === form.exerciseId) || exerciseKeys[0];
 const singleLegExercises = exerciseKeys.filter((e) => e.singleLeg);
@@ -696,6 +709,15 @@ if (!user) {
           <Button type="submit" className="w-full">
             {authMode === "signup" ? "Create account" : "Log in"}
           </Button>
+
+          <Button
+  type="button"
+  variant="outline"
+  className="w-full"
+  onClick={handleResetPassword}
+>
+  Forgot password
+</Button>
         </form>
       </div>
     </div>

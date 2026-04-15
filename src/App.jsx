@@ -391,125 +391,137 @@ export default function ACLTrackerApp() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false);
+  const [hasLoadedUserData, setHasLoadedUserData] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [authMode, setAuthMode] = useState("login");
   const [authError, setAuthError] = useState("");
-useEffect(() => {
-  const unsub = onAuthStateChanged(auth, (firebaseUser) => {
-    setUser(firebaseUser || null);
-    setAuthLoading(false);
-  });
 
-  return () => unsub();
-}, []);
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser || null);
+      setAuthLoading(false);
+    });
 
-useEffect(() => {
-  async function loadUserData() {
-    if (!user) {
-      setWeeks([]);
-      setCustomExercises([]);
-      setSurgeryDate("");
-      setDataLoading(false);
-      return;
-    }
+    return () => unsub();
+  }, []);
 
-    setDataLoading(true);
-
-    try {
-      const ref = doc(db, "rehabData", user.uid);
-      const snap = await getDoc(ref);
-
-      if (snap.exists()) {
-        const saved = snap.data();
-        setWeeks(Array.isArray(saved.weeks) ? saved.weeks : []);
-        setCustomExercises(Array.isArray(saved.customExercises) ? saved.customExercises : []);
-        setSurgeryDate(typeof saved.surgeryDate === "string" ? saved.surgeryDate : "");
-      } else {
+  useEffect(() => {
+    async function loadUserData() {
+      if (!user) {
         setWeeks([]);
         setCustomExercises([]);
         setSurgeryDate("");
+        setDataLoading(false);
+        setHasLoadedUserData(false);
+        return;
       }
-    } catch (error) {
-      console.error("Failed to load rehab data from Firestore", error);
-    } finally {
-      setDataLoading(false);
+
+      setDataLoading(true);
+      setHasLoadedUserData(false);
+
+      try {
+        const ref = doc(db, "rehabData", user.uid);
+        const snap = await getDoc(ref);
+
+        if (snap.exists()) {
+          const saved = snap.data();
+          setWeeks(Array.isArray(saved.weeks) ? saved.weeks : []);
+          setCustomExercises(Array.isArray(saved.customExercises) ? saved.customExercises : []);
+          setSurgeryDate(typeof saved.surgeryDate === "string" ? saved.surgeryDate : "");
+        } else {
+          setWeeks([]);
+          setCustomExercises([]);
+          setSurgeryDate("");
+        }
+
+        setHasLoadedUserData(true);
+      } catch (error) {
+        console.error("Failed to load rehab data from Firestore", error);
+      } finally {
+        setDataLoading(false);
+      }
     }
-  }
 
-  if (!authLoading) {
-    loadUserData();
-  }
-}, [user, authLoading]);
+    if (!authLoading) {
+      loadUserData();
+    }
+  }, [user, authLoading]);
 
-useEffect(() => {
-  async function saveUserData() {
-    if (!user || authLoading || dataLoading) return;
+  useEffect(() => {
+    async function saveUserData() {
+      if (!user || authLoading || dataLoading || !hasLoadedUserData) return;
+
+      try {
+        await setDoc(
+          doc(db, "rehabData", user.uid),
+          {
+            weeks,
+            customExercises,
+            surgeryDate,
+          },
+          { merge: true }
+        );
+      } catch (error) {
+        console.error("Failed to save rehab data to Firestore", error);
+      }
+    }
+
+    saveUserData();
+  }, [user, authLoading, dataLoading, hasLoadedUserData, weeks, customExercises, surgeryDate]);
+
+  async function handleAuthSubmit(e) {
+    e.preventDefault();
+    setAuthError("");
 
     try {
-      await setDoc(doc(db, "rehabData", user.uid), {
-        weeks,
-        customExercises,
-        surgeryDate,
-      });
+      if (authMode === "signup") {
+        await createUserWithEmailAndPassword(auth, email, password);
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
+
+      setEmail("");
+      setPassword("");
     } catch (error) {
-      console.error("Failed to save rehab data to Firestore", error);
+      setAuthError(error.message || "Authentication failed");
     }
   }
 
-  saveUserData();
-}, [user, authLoading, dataLoading, weeks, customExercises, surgeryDate]);
+  async function handleLogout() {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Failed to sign out", error);
+    }
+  }
 
-async function handleAuthSubmit(e) {
-  e.preventDefault();
-  setAuthError("");
-
-  try {
-    if (authMode === "signup") {
-      await createUserWithEmailAndPassword(auth, email, password);
-    } else {
-      await signInWithEmailAndPassword(auth, email, password);
+  async function handleResetPassword() {
+    if (!email) {
+      setAuthError("Enter your email first");
+      return;
     }
 
-    setEmail("");
-    setPassword("");
-  } catch (error) {
-    setAuthError(error.message || "Authentication failed");
-  }
-}
-
-async function handleLogout() {
-  try {
-    await signOut(auth);
-  } catch (error) {
-    console.error("Failed to sign out", error);
-  }
-}
-async function handleResetPassword() {
-  if (!email) {
-    setAuthError("Enter your email first");
-    return;
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setAuthError("Password reset email sent");
+    } catch (error) {
+      setAuthError(error.message);
+    }
   }
 
-  try {
-    await sendPasswordResetEmail(auth, email);
-    setAuthError("Password reset email sent");
-  } catch (error) {
-    setAuthError(error.message);
-  }
-}
-const exerciseKeys = useMemo(() => [...DEFAULT_EXERCISES, ...customExercises], [customExercises]);
-const selectedExercise = exerciseKeys.find((e) => e.id === form.exerciseId) || exerciseKeys[0];
-const singleLegExercises = exerciseKeys.filter((e) => e.singleLeg);
-const customExercisesPresent = customExercises.filter((e) =>
-  weeks.some((w) => (w.sessions || []).some((s) => s.exerciseId === e.id))
-);
-const daysSinceSurgery = calculateDaysSinceSurgery(surgeryDate);
+  const exerciseKeys = useMemo(() => [...DEFAULT_EXERCISES, ...customExercises], [customExercises]);
+  const selectedExercise = exerciseKeys.find((e) => e.id === form.exerciseId) || exerciseKeys[0];
+  const singleLegExercises = exerciseKeys.filter((e) => e.singleLeg);
+  const customExercisesPresent = customExercises.filter((e) =>
+    weeks.some((w) => (w.sessions || []).some((s) => s.exerciseId === e.id))
+  );
+  const daysSinceSurgery = calculateDaysSinceSurgery(surgeryDate);
 
-const currentSymmetry = useMemo(() => {
-  if (!selectedExercise?.singleLeg) return null;
-  return bestSetSym(form.left.sets, form.right.sets);
-}, [selectedExercise, form.left.sets, form.right.sets]);
+  const currentSymmetry = useMemo(() => {
+    if (!selectedExercise?.singleLeg) return null;
+    return bestSetSym(form.left.sets, form.right.sets);
+  }, [selectedExercise, form.left.sets, form.right.sets]);
 
   useEffect(() => {
     if (surgeryDate && !weekManuallyEdited) {
@@ -644,101 +656,103 @@ const currentSymmetry = useMemo(() => {
       setWeekManuallyEdited(false);
     }
   }
-if (authLoading) {
-  return (
-    <div className="min-h-screen bg-slate-50 p-4 flex items-center justify-center">
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-md text-center">
-        Loading...
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 p-4 flex items-center justify-center">
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-md text-center">
+          Loading...
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
-if (!user) {
-  return (
-    <div className="min-h-screen bg-slate-50 p-4 flex items-center justify-center">
-      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-md">
-        <div className="mb-6">
-          <div className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm">
-            Rehab logging dashboard
-          </div>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight">ACL Rehab Tracker</h1>
-          <p className="mt-2 text-sm text-slate-500">
-            Sign in to access your rehab data on phone and laptop.
-          </p>
-        </div>
-
-        <div className="mb-4 flex gap-2">
-          <TabButton active={authMode === "login"} onClick={() => setAuthMode("login")}>
-            Log in
-          </TabButton>
-          <TabButton active={authMode === "signup"} onClick={() => setAuthMode("signup")}>
-            Sign up
-          </TabButton>
-        </div>
-
-        <form onSubmit={handleAuthSubmit} className="space-y-4">
-          <div>
-            <Label>Email</Label>
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email"
-              autoComplete="email"
-            />
-          </div>
-
-          <div>
-            <Label>Password</Label>
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password"
-              autoComplete={authMode === "login" ? "current-password" : "new-password"}
-            />
-          </div>
-
-          {authError ? (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {authError}
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-slate-50 p-4 flex items-center justify-center">
+        <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-md">
+          <div className="mb-6">
+            <div className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm">
+              Rehab logging dashboard
             </div>
-          ) : null}
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight">ACL Rehab Tracker</h1>
+            <p className="mt-2 text-sm text-slate-500">
+              Sign in to access your rehab data on phone and laptop.
+            </p>
+          </div>
 
-          <Button type="submit" className="w-full">
-            {authMode === "signup" ? "Create account" : "Log in"}
-          </Button>
+          <div className="mb-4 flex gap-2">
+            <TabButton active={authMode === "login"} onClick={() => setAuthMode("login")}>
+              Log in
+            </TabButton>
+            <TabButton active={authMode === "signup"} onClick={() => setAuthMode("signup")}>
+              Sign up
+            </TabButton>
+          </div>
 
-          <Button
-  type="button"
-  variant="outline"
-  className="w-full"
-  onClick={handleResetPassword}
->
-  Forgot password
-</Button>
-        </form>
+          <form onSubmit={handleAuthSubmit} className="space-y-4">
+            <div>
+              <Label>Email</Label>
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Email"
+                autoComplete="email"
+              />
+            </div>
+
+            <div>
+              <Label>Password</Label>
+              <Input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Password"
+                autoComplete={authMode === "login" ? "current-password" : "new-password"}
+              />
+            </div>
+
+            {authError ? (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {authError}
+              </div>
+            ) : null}
+
+            <Button type="submit" className="w-full">
+              {authMode === "signup" ? "Create account" : "Log in"}
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={handleResetPassword}
+            >
+              Forgot password
+            </Button>
+          </form>
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 p-4 pb-24 md:p-8 md:pb-8">
       <div className="mx-auto max-w-7xl space-y-6">
         <div className="flex items-start justify-between gap-4">
-  <div className="space-y-2">
-    <div className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm">
-      Rehab logging dashboard
-    </div>
-    <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">ACL Rehab Tracker</h1>
-    <div className="text-sm text-slate-500">{user.email}</div>
-  </div>
+          <div className="space-y-2">
+            <div className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm">
+              Rehab logging dashboard
+            </div>
+            <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">ACL Rehab Tracker</h1>
+            <div className="text-sm text-slate-500">{user.email}</div>
+          </div>
 
-  <Button variant="outline" onClick={handleLogout}>
-    Log out
-  </Button>
-</div>
+          <Button variant="outline" onClick={handleLogout}>
+            Log out
+          </Button>
+        </div>
 
         <div className="hidden md:flex flex-wrap gap-2">
           <TabButton active={activeTab === "home"} onClick={() => setActiveTab("home")}>Home</TabButton>
@@ -751,25 +765,25 @@ if (!user) {
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 md:gap-4">
               <SummaryCard
-  title="Leg Press"
-  value={`${latestLPLeft ? `${latestLPLeft.reps} x ${latestLPLeft.weight}kg` : "—"} / ${latestLPRight ? `${latestLPRight.reps} x ${latestLPRight.weight}kg` : "—"}`}
-  subtitle="L / R"
-/>
-<SummaryCard title="Leg Press symmetry" value={latestLPSym != null ? `${latestLPSym}%` : "—"} />
+                title="Leg Press"
+                value={`${latestLPLeft ? `${latestLPLeft.reps} x ${latestLPLeft.weight}kg` : "—"} / ${latestLPRight ? `${latestLPRight.reps} x ${latestLPRight.weight}kg` : "—"}`}
+                subtitle="L / R"
+              />
+              <SummaryCard title="Leg Press symmetry" value={latestLPSym != null ? `${latestLPSym}%` : "—"} />
 
-<SummaryCard
-  title="Leg Extension"
-  value={`${latestLELeft ? `${latestLELeft.reps} x ${latestLELeft.weight}kg` : "—"} / ${latestLERight ? `${latestLERight.reps} x ${latestLERight.weight}kg` : "—"}`}
-  subtitle="L / R"
-/>
-<SummaryCard title="Leg Extension symmetry" value={latestLESym != null ? `${latestLESym}%` : "—"} />
+              <SummaryCard
+                title="Leg Extension"
+                value={`${latestLELeft ? `${latestLELeft.reps} x ${latestLELeft.weight}kg` : "—"} / ${latestLERight ? `${latestLERight.reps} x ${latestLERight.weight}kg` : "—"}`}
+                subtitle="L / R"
+              />
+              <SummaryCard title="Leg Extension symmetry" value={latestLESym != null ? `${latestLESym}%` : "—"} />
 
-<SummaryCard
-  title="Hamstring Curl"
-  value={`${latestHCLeft ? `${latestHCLeft.reps} x ${latestHCLeft.weight}kg` : "—"} / ${latestHCRight ? `${latestHCRight.reps} x ${latestHCRight.weight}kg` : "—"}`}
-  subtitle="L / R"
-/>
-<SummaryCard title="Hamstring Curl symmetry" value={latestHCSym != null ? `${latestHCSym}%` : "—"} />
+              <SummaryCard
+                title="Hamstring Curl"
+                value={`${latestHCLeft ? `${latestHCLeft.reps} x ${latestHCLeft.weight}kg` : "—"} / ${latestHCRight ? `${latestHCRight.reps} x ${latestHCRight.weight}kg` : "—"}`}
+                subtitle="L / R"
+              />
+              <SummaryCard title="Hamstring Curl symmetry" value={latestHCSym != null ? `${latestHCSym}%` : "—"} />
             </div>
 
             <CardShell title="Setup">

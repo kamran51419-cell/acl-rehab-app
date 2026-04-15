@@ -12,6 +12,15 @@ import {
   ReferenceLine,
 } from "recharts";
 
+import {
+  onAuthStateChanged,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+} from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { auth, db } from "./firebase";
+
 const DEFAULT_EXERCISES = [
   { id: "lp", label: "Leg Press", singleLeg: true, builtIn: true },
   { id: "le", label: "Leg Extension", singleLeg: true, builtIn: true },
@@ -29,7 +38,6 @@ const todayString = () => {
   return `${yyyy}-${mm}-${dd}`;
 };
 const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-const STORAGE_KEY = "acl-rehab-tracker-v1";
 
 const blankForm = {
   week: "",
@@ -379,46 +387,116 @@ export default function ACLTrackerApp() {
   const [newExerciseSingleLeg, setNewExerciseSingleLeg] = useState(true);
   const [weekManuallyEdited, setWeekManuallyEdited] = useState(false);
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const saved = JSON.parse(raw);
-      if (Array.isArray(saved.weeks)) setWeeks(saved.weeks);
-      if (Array.isArray(saved.customExercises)) setCustomExercises(saved.customExercises);
-      if (typeof saved.surgeryDate === "string") setSurgeryDate(saved.surgeryDate);
-    } catch (error) {
-      console.error("Failed to load saved rehab data", error);
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authMode, setAuthMode] = useState("login");
+  const [authError, setAuthError] = useState("");
+useEffect(() => {
+  const unsub = onAuthStateChanged(auth, (firebaseUser) => {
+    setUser(firebaseUser || null);
+    setAuthLoading(false);
+  });
+
+  return () => unsub();
+}, []);
+
+useEffect(() => {
+  async function loadUserData() {
+    if (!user) {
+      setWeeks([]);
+      setCustomExercises([]);
+      setSurgeryDate("");
+      setDataLoading(false);
+      return;
     }
-  }, []);
 
-  useEffect(() => {
+    setDataLoading(true);
+
     try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({
-          weeks,
-          customExercises,
-          surgeryDate,
-        })
-      );
+      const ref = doc(db, "rehabData", user.uid);
+      const snap = await getDoc(ref);
+
+      if (snap.exists()) {
+        const saved = snap.data();
+        setWeeks(Array.isArray(saved.weeks) ? saved.weeks : []);
+        setCustomExercises(Array.isArray(saved.customExercises) ? saved.customExercises : []);
+        setSurgeryDate(typeof saved.surgeryDate === "string" ? saved.surgeryDate : "");
+      } else {
+        setWeeks([]);
+        setCustomExercises([]);
+        setSurgeryDate("");
+      }
     } catch (error) {
-      console.error("Failed to save rehab data", error);
+      console.error("Failed to load rehab data from Firestore", error);
+    } finally {
+      setDataLoading(false);
     }
-  }, [weeks, customExercises, surgeryDate]);
+  }
 
-  const exerciseKeys = useMemo(() => [...DEFAULT_EXERCISES, ...customExercises], [customExercises]);
-  const selectedExercise = exerciseKeys.find((e) => e.id === form.exerciseId) || exerciseKeys[0];
-  const singleLegExercises = exerciseKeys.filter((e) => e.singleLeg);
-  const customExercisesPresent = customExercises.filter((e) =>
-    weeks.some((w) => (w.sessions || []).some((s) => s.exerciseId === e.id))
-  );
-  const daysSinceSurgery = calculateDaysSinceSurgery(surgeryDate);
+  if (!authLoading) {
+    loadUserData();
+  }
+}, [user, authLoading]);
 
-  const currentSymmetry = useMemo(() => {
-    if (!selectedExercise?.singleLeg) return null;
-    return bestSetSym(form.left.sets, form.right.sets);
-  }, [selectedExercise, form.left.sets, form.right.sets]);
+useEffect(() => {
+  async function saveUserData() {
+    if (!user || authLoading || dataLoading) return;
+
+    try {
+      await setDoc(doc(db, "rehabData", user.uid), {
+        weeks,
+        customExercises,
+        surgeryDate,
+      });
+    } catch (error) {
+      console.error("Failed to save rehab data to Firestore", error);
+    }
+  }
+
+  saveUserData();
+}, [user, authLoading, dataLoading, weeks, customExercises, surgeryDate]);
+
+async function handleAuthSubmit(e) {
+  e.preventDefault();
+  setAuthError("");
+
+  try {
+    if (authMode === "signup") {
+      await createUserWithEmailAndPassword(auth, email, password);
+    } else {
+      await signInWithEmailAndPassword(auth, email, password);
+    }
+
+    setEmail("");
+    setPassword("");
+  } catch (error) {
+    setAuthError(error.message || "Authentication failed");
+  }
+}
+
+async function handleLogout() {
+  try {
+    await signOut(auth);
+  } catch (error) {
+    console.error("Failed to sign out", error);
+  }
+}
+
+const exerciseKeys = useMemo(() => [...DEFAULT_EXERCISES, ...customExercises], [customExercises]);
+const selectedExercise = exerciseKeys.find((e) => e.id === form.exerciseId) || exerciseKeys[0];
+const singleLegExercises = exerciseKeys.filter((e) => e.singleLeg);
+const customExercisesPresent = customExercises.filter((e) =>
+  weeks.some((w) => (w.sessions || []).some((s) => s.exerciseId === e.id))
+);
+const daysSinceSurgery = calculateDaysSinceSurgery(surgeryDate);
+
+const currentSymmetry = useMemo(() => {
+  if (!selectedExercise?.singleLeg) return null;
+  return bestSetSym(form.left.sets, form.right.sets);
+}, [selectedExercise, form.left.sets, form.right.sets]);
 
   useEffect(() => {
     if (surgeryDate && !weekManuallyEdited) {
@@ -553,17 +631,92 @@ export default function ACLTrackerApp() {
       setWeekManuallyEdited(false);
     }
   }
-
+if (authLoading) {
   return (
-    <div className="min-h-screen bg-slate-50 p-4 pb-24 md:p-8 md:pb-8">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <div className="space-y-2">
+    <div className="min-h-screen bg-slate-50 p-4 flex items-center justify-center">
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-md text-center">
+        Loading...
+      </div>
+    </div>
+  );
+}
+
+if (!user) {
+  return (
+    <div className="min-h-screen bg-slate-50 p-4 flex items-center justify-center">
+      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-md">
+        <div className="mb-6">
           <div className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm">
             Rehab logging dashboard
           </div>
-          <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">ACL Rehab Tracker</h1>
-         
+          <h1 className="mt-3 text-3xl font-semibold tracking-tight">ACL Rehab Tracker</h1>
+          <p className="mt-2 text-sm text-slate-500">
+            Sign in to access your rehab data on phone and laptop.
+          </p>
         </div>
+
+        <div className="mb-4 flex gap-2">
+          <TabButton active={authMode === "login"} onClick={() => setAuthMode("login")}>
+            Log in
+          </TabButton>
+          <TabButton active={authMode === "signup"} onClick={() => setAuthMode("signup")}>
+            Sign up
+          </TabButton>
+        </div>
+
+        <form onSubmit={handleAuthSubmit} className="space-y-4">
+          <div>
+            <Label>Email</Label>
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email"
+              autoComplete="email"
+            />
+          </div>
+
+          <div>
+            <Label>Password</Label>
+            <Input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password"
+              autoComplete={authMode === "login" ? "current-password" : "new-password"}
+            />
+          </div>
+
+          {authError ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {authError}
+            </div>
+          ) : null}
+
+          <Button type="submit" className="w-full">
+            {authMode === "signup" ? "Create account" : "Log in"}
+          </Button>
+        </form>
+      </div>
+    </div>
+  );
+}
+  return (
+    <div className="min-h-screen bg-slate-50 p-4 pb-24 md:p-8 md:pb-8">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <div className="flex items-start justify-between gap-4">
+  <div className="space-y-2">
+    <div className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm">
+      Rehab logging dashboard
+    </div>
+    <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">ACL Rehab Tracker</h1>
+    <div className="text-sm text-slate-500">{user.email}</div>
+  </div>
+
+  <Button variant="outline" onClick={handleLogout}>
+    Log out
+  </Button>
+</div>
 
         <div className="hidden md:flex flex-wrap gap-2">
           <TabButton active={activeTab === "home"} onClick={() => setActiveTab("home")}>Home</TabButton>

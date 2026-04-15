@@ -449,26 +449,35 @@ export default function ACLTrackerApp() {
   }, [user, authLoading]);
 
   useEffect(() => {
-    async function saveUserData() {
-      if (!user || authLoading || dataLoading || !hasLoadedUserData) return;
+  async function saveUserData() {
+    if (!user || authLoading || dataLoading || !hasLoadedUserData) return;
 
-      try {
-        await setDoc(
-          doc(db, "rehabData", user.uid),
-          {
-            weeks,
-            customExercises,
-            surgeryDate,
-          },
-          { merge: true }
-        );
-      } catch (error) {
-        console.error("Failed to save rehab data to Firestore", error);
-      }
+    console.log("SAVING DATA", {
+      uid: user.uid,
+      weeks,
+      customExercises,
+      surgeryDate,
+    });
+
+    try {
+      await setDoc(
+        doc(db, "rehabData", user.uid),
+        {
+          weeks,
+          customExercises,
+          surgeryDate,
+        },
+        { merge: true }
+      );
+
+      console.log("SAVE SUCCESS");
+    } catch (error) {
+      console.error("SAVE FAILED", error);
     }
+  }
 
-    saveUserData();
-  }, [user, authLoading, dataLoading, hasLoadedUserData, weeks, customExercises, surgeryDate]);
+  saveUserData();
+}, [user, authLoading, dataLoading, hasLoadedUserData, weeks, customExercises, surgeryDate]);
 
   async function handleAuthSubmit(e) {
     e.preventDefault();

@@ -562,16 +562,21 @@ export default function ACLTrackerApp() {
     return row;
   });
 
-  function addCustomExercise() {
-    const name = newExerciseName.trim();
-    if (!name) return;
-    const id = `custom-${Date.now()}`;
-    const item = { id, label: name, singleLeg: newExerciseSingleLeg, builtIn: false };
-    setCustomExercises((prev) => [...prev, item]);
-    setForm((prev) => ({ ...prev, exerciseId: id }));
-    setNewExerciseName("");
-    setNewExerciseSingleLeg(true);
-  }
+  async function addCustomExercise() {
+  const name = newExerciseName.trim();
+  if (!name) return;
+
+  const id = `custom-${Date.now()}`;
+  const item = { id, label: name, singleLeg: newExerciseSingleLeg, builtIn: false };
+  const nextCustomExercises = [...customExercises, item];
+
+  setCustomExercises(nextCustomExercises);
+  setForm((prev) => ({ ...prev, exerciseId: id }));
+  setNewExerciseName("");
+  setNewExerciseSingleLeg(true);
+
+  await saveAllData(weeks, nextCustomExercises, surgeryDate);
+}
 
   function deleteCustomExercise(exerciseId) {
     setCustomExercises((prev) => prev.filter((e) => e.id !== exerciseId));
@@ -584,57 +589,82 @@ export default function ACLTrackerApp() {
     if (graphsTab === exerciseId) setGraphsTab("combined");
     if (progressTab === exerciseId || progressTab === "custom") setProgressTab("all");
   }
+async function saveAllData(nextWeeks = weeks, nextCustomExercises = customExercises, nextSurgeryDate = surgeryDate) {
+  if (!user?.uid) return;
 
-  function saveSession() {
-    if (!form.week) return;
-    setWeeks((prev) => {
-      const existing = prev.find((w) => String(w.week) === String(form.week));
-      const base = existing ? { ...existing, sessions: [...(existing.sessions || [])] } : emptyWeek(String(form.week));
-      base.week = String(form.week);
+  try {
+    await setDoc(
+      doc(db, "rehabData", user.uid),
+      {
+        weeks: nextWeeks,
+        customExercises: nextCustomExercises,
+        surgeryDate: nextSurgeryDate,
+      },
+      { merge: true }
+    );
+  } catch (error) {
+    console.error("Failed to save rehab data to Firestore", error);
+  }
+}
+async function saveSession() {
+  if (!form.week || !user?.uid) return;
 
-      if (editing) {
-        base.sessions = base.sessions.map((session) => {
-          if (session.id !== editing.sessionId) return session;
-          if (selectedExercise?.singleLeg) {
-            return {
-              ...session,
-              exerciseId: form.exerciseId,
-              date: form.date,
-              singleLeg: true,
-              leftSets: form.left.sets,
-              rightSets: form.right.sets,
-              notes: form.notes,
-            };
-          }
+  let nextWeeks = [];
+
+  setWeeks((prev) => {
+    const existing = prev.find((w) => String(w.week) === String(form.week));
+    const base = existing ? { ...existing, sessions: [...(existing.sessions || [])] } : emptyWeek(String(form.week));
+    base.week = String(form.week);
+
+    if (editing) {
+      base.sessions = base.sessions.map((session) => {
+        if (session.id !== editing.sessionId) return session;
+        if (selectedExercise?.singleLeg) {
           return {
             ...session,
             exerciseId: form.exerciseId,
             date: form.date,
-            singleLeg: false,
-            sets: form.bilateral.sets,
+            singleLeg: true,
+            leftSets: form.left.sets,
+            rightSets: form.right.sets,
             notes: form.notes,
           };
-        });
-      } else {
-        const session = selectedExercise?.singleLeg
-          ? makeSingleLegSession(form.exerciseId, form.date, form.left.sets, form.right.sets, form.notes)
-          : makeBilateralSession(form.exerciseId, form.date, form.bilateral.sets, form.notes);
-        base.sessions.push(session);
-      }
+        }
+        return {
+          ...session,
+          exerciseId: form.exerciseId,
+          date: form.date,
+          singleLeg: false,
+          sets: form.bilateral.sets,
+          notes: form.notes,
+        };
+      });
+    } else {
+      const session = selectedExercise?.singleLeg
+        ? makeSingleLegSession(form.exerciseId, form.date, form.left.sets, form.right.sets, form.notes)
+        : makeBilateralSession(form.exerciseId, form.date, form.bilateral.sets, form.notes);
+      base.sessions.push(session);
+    }
 
-      const filtered = prev.filter((w) => String(w.week) !== String(form.week));
-      return [...filtered, base].sort((a, b) => Number(a.week) - Number(b.week));
-    });
+    const filtered = prev.filter((w) => String(w.week) !== String(form.week));
+    nextWeeks = [...filtered, base].sort((a, b) => Number(a.week) - Number(b.week));
+    return nextWeeks;
+  });
 
-    setEditing(null);
-    setWeekManuallyEdited(false);
-    setForm((prev) => ({
-      ...blankForm,
-      week: surgeryDate ? calculateWeekFromSurgeryDate(surgeryDate, todayString()) : prev.week ? String(Number(prev.week) + 1) : "",
-      date: todayString(),
-      exerciseId: prev.exerciseId,
-    }));
-  }
+  setEditing(null);
+  setWeekManuallyEdited(false);
+
+  const nextExerciseId = form.exerciseId;
+
+  setForm((prev) => ({
+    ...blankForm,
+    week: surgeryDate ? calculateWeekFromSurgeryDate(surgeryDate, todayString()) : prev.week ? String(Number(prev.week) + 1) : "",
+    date: todayString(),
+    exerciseId: nextExerciseId,
+  }));
+
+  await saveAllData(nextWeeks, customExercises, surgeryDate);
+}
 
   function editSession(weekData, session) {
     const nextDate = session.date || todayString();
@@ -802,10 +832,12 @@ export default function ACLTrackerApp() {
                   <Input
                     type="date"
                     value={surgeryDate}
-                    onChange={(e) => {
-                      setSurgeryDate(e.target.value);
-                      setWeekManuallyEdited(false);
-                    }}
+                    onChange={async (e) => {
+  const newDate = e.target.value;
+  setSurgeryDate(newDate);
+  setWeekManuallyEdited(false);
+  await saveAllData(weeks, customExercises, newDate);
+}}
                   />
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">

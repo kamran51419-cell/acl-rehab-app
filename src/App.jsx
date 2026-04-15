@@ -19,7 +19,7 @@ import {
   signOut,
   sendPasswordResetEmail,
 } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
 
 const DEFAULT_EXERCISES = [
@@ -407,15 +407,47 @@ export default function ACLTrackerApp() {
   }, []);
 
   useEffect(() => {
-    async function loadUserData() {
-      if (!user) {
+  if (authLoading) return;
+
+  if (!user) {
+    setWeeks([]);
+    setCustomExercises([]);
+    setSurgeryDate("");
+    setDataLoading(false);
+    setHasLoadedUserData(false);
+    return;
+  }
+
+  setDataLoading(true);
+  setHasLoadedUserData(false);
+
+  const ref = doc(db, "rehabData", user.uid);
+
+  const unsub = onSnapshot(
+    ref,
+    (snap) => {
+      if (snap.exists()) {
+        const saved = snap.data();
+        setWeeks(Array.isArray(saved.weeks) ? saved.weeks : []);
+        setCustomExercises(Array.isArray(saved.customExercises) ? saved.customExercises : []);
+        setSurgeryDate(typeof saved.surgeryDate === "string" ? saved.surgeryDate : "");
+      } else {
         setWeeks([]);
         setCustomExercises([]);
         setSurgeryDate("");
-        setDataLoading(false);
-        setHasLoadedUserData(false);
-        return;
       }
+
+      setHasLoadedUserData(true);
+      setDataLoading(false);
+    },
+    (error) => {
+      console.error("Failed to load rehab data from Firestore", error);
+      setDataLoading(false);
+    }
+  );
+
+  return () => unsub();
+}, [user, authLoading]);
 
       setDataLoading(true);
       setHasLoadedUserData(false);
@@ -447,37 +479,6 @@ export default function ACLTrackerApp() {
       loadUserData();
     }
   }, [user, authLoading]);
-
-  useEffect(() => {
-  async function saveUserData() {
-    if (!user || authLoading || dataLoading || !hasLoadedUserData) return;
-
-    console.log("SAVING DATA", {
-      uid: user.uid,
-      weeks,
-      customExercises,
-      surgeryDate,
-    });
-
-    try {
-      await setDoc(
-        doc(db, "rehabData", user.uid),
-        {
-          weeks,
-          customExercises,
-          surgeryDate,
-        },
-        { merge: true }
-      );
-
-      console.log("SAVE SUCCESS");
-    } catch (error) {
-      console.error("SAVE FAILED", error);
-    }
-  }
-
-  saveUserData();
-}, [user, authLoading, dataLoading, hasLoadedUserData, weeks, customExercises, surgeryDate]);
 
   async function handleAuthSubmit(e) {
     e.preventDefault();

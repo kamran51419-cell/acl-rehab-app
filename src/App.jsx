@@ -562,7 +562,7 @@ export default function ACLTrackerApp() {
             Rehab logging dashboard
           </div>
           <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">ACL Rehab Tracker</h1>
-          <p className="text-slate-600">Weekly overview in one line, with drill-down tabs for full exercise detail.</p>
+         
         </div>
 
         <div className="hidden md:flex flex-wrap gap-2">

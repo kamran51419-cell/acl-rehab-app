@@ -2,7 +2,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Plus, Search, Trash2 } from "lucide-react";
 import { db } from "../../firebase";
 import {
+  EXERCISE_LOGGING_METHOD,
+  EXERCISE_LOGGING_METHOD_OPTIONS,
   EXERCISE_TYPE,
+  EXERCISE_TYPE_OPTIONS,
   REP_TARGET_TYPE,
   TARGET_WEIGHT_MODE,
   createBlankPlan,
@@ -11,6 +14,7 @@ import {
   createPlanExercise,
   createPlanSession,
   createStrengthBlock,
+  defaultLoggingMethodForExerciseType,
   duplicatePlanExercise,
   duplicatePlan,
   filterExerciseLibrary,
@@ -46,14 +50,31 @@ function token() {
 
 const EXERCISE_TYPE_LABELS = {
   [EXERCISE_TYPE.STRENGTH]: "Strength",
-  [EXERCISE_TYPE.TIMED_HOLD]: "Timed hold",
   [EXERCISE_TYPE.CARDIO]: "Cardio",
+  [EXERCISE_TYPE.PLYOMETRIC]: "Plyometric",
+  [EXERCISE_TYPE.BALANCE]: "Balance",
   [EXERCISE_TYPE.MOBILITY]: "Mobility",
+  [EXERCISE_TYPE.STRETCH]: "Stretch",
+  [EXERCISE_TYPE.OTHER]: "Other",
+  [EXERCISE_TYPE.TIMED_HOLD]: "Timed",
   [EXERCISE_TYPE.FOAM_ROLLING]: "Foam rolling",
+};
+
+const LOGGING_METHOD_LABELS = {
+  [EXERCISE_LOGGING_METHOD.REPS]: "Reps",
+  [EXERCISE_LOGGING_METHOD.REPS_WEIGHT]: "Reps + Weight",
+  [EXERCISE_LOGGING_METHOD.TIME]: "Time",
+  [EXERCISE_LOGGING_METHOD.DISTANCE]: "Distance",
+  [EXERCISE_LOGGING_METHOD.TIME_DISTANCE]: "Time + Distance",
+  [EXERCISE_LOGGING_METHOD.COMPLETED]: "Completed",
 };
 
 function exerciseTypeLabel(type) {
   return EXERCISE_TYPE_LABELS[type] || "Strength";
+}
+
+function loggingMethodLabel(method) {
+  return LOGGING_METHOD_LABELS[method] || "Completed";
 }
 
 function friendlyErrorMessage(error, fallback) {
@@ -150,7 +171,7 @@ function PlanCard({ plan, onEdit, onDuplicate, onToggleActive, onArchive, onRest
 
 function PrescriptionEditor({ exercise, onChange }) {
   const updatePrescription = (prescription) => onChange({ ...exercise, prescription });
-  if (exercise.exerciseType === EXERCISE_TYPE.STRENGTH) {
+  if (exercise.exerciseType === EXERCISE_TYPE.STRENGTH || exercise.exerciseType === EXERCISE_TYPE.PLYOMETRIC) {
     const blocks = exercise.prescription?.blocks || [];
     const updateBlock = (index, patch) => updatePrescription({ blocks: blocks.map((block, idx) => (idx === index ? { ...block, ...patch } : block)) });
     const updateReps = (index, patch) => updateBlock(index, { targetReps: { ...blocks[index].targetReps, ...patch } });
@@ -211,7 +232,7 @@ function PrescriptionEditor({ exercise, onChange }) {
     );
   }
 
-  if (exercise.exerciseType === EXERCISE_TYPE.TIMED_HOLD) {
+  if (exercise.exerciseType === EXERCISE_TYPE.TIMED_HOLD || exercise.exerciseType === EXERCISE_TYPE.BALANCE) {
     const p = exercise.prescription || {};
     return (
       <div className="grid gap-3 md:grid-cols-4">
@@ -236,6 +257,10 @@ function PrescriptionEditor({ exercise, onChange }) {
     );
   }
 
+  if (exercise.exerciseType === EXERCISE_TYPE.OTHER) {
+    return <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">No prescription details needed. Mark this exercise completed when it is done.</div>;
+  }
+
   const items = exercise.prescription?.items || [];
   return (
     <div className="space-y-3">
@@ -247,7 +272,7 @@ function PrescriptionEditor({ exercise, onChange }) {
           <Button size="sm" variant="danger" onClick={() => updatePrescription({ ...exercise.prescription, items: items.filter((_, idx) => idx !== index).map((row, idx) => ({ ...row, sortOrder: idx })) })}>Remove</Button>
         </div>
       ))}
-      <Button variant="outline" onClick={() => updatePrescription({ ...exercise.prescription, items: [...items, { id: `item-${makeId()}`, name: "", sortOrder: items.length }] })}>Add {exercise.exerciseType === EXERCISE_TYPE.MOBILITY ? "stretch" : "area"}</Button>
+      <Button variant="outline" onClick={() => updatePrescription({ ...exercise.prescription, items: [...items, { id: `item-${makeId()}`, name: "", sortOrder: items.length }] })}>Add {exercise.exerciseType === EXERCISE_TYPE.FOAM_ROLLING ? "area" : "stretch"}</Button>
     </div>
   );
 }
@@ -275,6 +300,7 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
       exerciseType,
       sortOrder: session.exercises.length,
       prescription: createDefaultPrescription(exerciseType),
+      loggingMethod: libraryExercise.loggingMethod || defaultLoggingMethodForExerciseType(exerciseType),
     });
     updateSession(sessionIndex, { exercises: [...session.exercises, planExercise] });
   }
@@ -334,7 +360,7 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
               <div className="rounded-xl border border-dashed border-slate-300 bg-white p-3">
                 <div className="grid gap-3 md:grid-cols-[1fr_160px_auto]">
                   <Field label="Find exercise"><Input value={exerciseQuery} onChange={(e) => setExerciseQuery(e.target.value)} placeholder="Search library" /></Field>
-                  <Field label="Type"><Select value={selectedType} onChange={(e) => setSelectedType(e.target.value)}>{Object.values(EXERCISE_TYPE).map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}</Select></Field>
+                  <Field label="Type"><Select value={selectedType} onChange={(e) => setSelectedType(e.target.value)}>{EXERCISE_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}</Select></Field>
                   <label className="flex items-end gap-2 pb-2 text-sm"><input type="checkbox" checked={includeArchived} onChange={(e) => setIncludeArchived(e.target.checked)} /> Include archived</label>
                 </div>
                 <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto]">
@@ -356,6 +382,8 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
 function ExerciseLibrary({ user, exercises, onChanged }) {
   const [name, setName] = useState("");
   const [exerciseType, setExerciseType] = useState(EXERCISE_TYPE.STRENGTH);
+  const [loggingMethod, setLoggingMethod] = useState(defaultLoggingMethodForExerciseType(EXERCISE_TYPE.STRENGTH));
+  const [loggingMethodTouched, setLoggingMethodTouched] = useState(false);
   const [notes, setNotes] = useState("");
   const [query, setQuery] = useState("");
   const [includeArchived, setIncludeArchived] = useState(false);
@@ -371,9 +399,11 @@ function ExerciseLibrary({ user, exercises, onChanged }) {
     setSaving(true);
     setMessage("");
     try {
-      await saveExerciseDefinition(db, user.uid, createLibraryExercise({ name, exerciseType, notes }), { updatedAtToken: token() });
+      await saveExerciseDefinition(db, user.uid, createLibraryExercise({ name, exerciseType, loggingMethod, notes }), { updatedAtToken: token() });
       setName("");
       setNotes("");
+      setLoggingMethod(defaultLoggingMethodForExerciseType(exerciseType));
+      setLoggingMethodTouched(false);
       setMessage("Exercise added to your library.");
       onChanged?.();
     } catch (error) {
@@ -381,6 +411,16 @@ function ExerciseLibrary({ user, exercises, onChanged }) {
     } finally {
       setSaving(false);
     }
+  }
+
+  function updateExerciseType(nextType) {
+    setExerciseType(nextType);
+    if (!loggingMethodTouched) setLoggingMethod(defaultLoggingMethodForExerciseType(nextType));
+  }
+
+  function updateLoggingMethod(nextMethod) {
+    setLoggingMethod(nextMethod);
+    setLoggingMethodTouched(true);
   }
 
   async function toggleArchive(exercise) {
@@ -408,9 +448,10 @@ function ExerciseLibrary({ user, exercises, onChanged }) {
 
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
         <div className="mb-3 font-medium text-slate-900">Add an exercise</div>
-        <div className="grid gap-3 md:grid-cols-[1fr_170px]">
+        <div className="grid gap-3 md:grid-cols-[1fr_170px_190px]">
           <Field label="Exercise name"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Leg extension" /></Field>
-          <Field label="Default type"><Select value={exerciseType} onChange={(e) => setExerciseType(e.target.value)}>{Object.values(EXERCISE_TYPE).map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}</Select></Field>
+          <Field label="Exercise type"><Select value={exerciseType} onChange={(e) => updateExerciseType(e.target.value)}>{EXERCISE_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}</Select></Field>
+          <Field label="Recording"><Select value={loggingMethod} onChange={(e) => updateLoggingMethod(e.target.value)}>{EXERCISE_LOGGING_METHOD_OPTIONS.map((method) => <option key={method} value={method}>{loggingMethodLabel(method)}</option>)}</Select></Field>
         </div>
         <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto]">
           <Field label="Exercise notes"><Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Slow eccentric, pause at top, physio cue…" /></Field>

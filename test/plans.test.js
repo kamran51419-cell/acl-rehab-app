@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   EXERCISE_TYPE,
   EXERCISE_LOGGING_METHOD,
+  LIBRARY_EXERCISE_TYPE_OPTIONS,
   createBlankPlan,
   createCardioPrescription,
   createDefaultPrescription,
@@ -12,6 +13,7 @@ import {
   createPlanExercise,
   createPlanSession,
   createStrengthBlock,
+  createStrengthPrescription,
   createTimedHoldPrescription,
   duplicatePlanExercise,
   duplicatePlan,
@@ -225,6 +227,8 @@ test("exercise definitions stay lean and recording methods are programme-specifi
   assert.deepEqual(loggingMethodsForExerciseType(EXERCISE_TYPE.STRENGTH), [EXERCISE_LOGGING_METHOD.REPS, EXERCISE_LOGGING_METHOD.REPS_WEIGHT]);
   assert.deepEqual(loggingMethodsForExerciseType(EXERCISE_TYPE.CARDIO), [EXERCISE_LOGGING_METHOD.TIME, EXERCISE_LOGGING_METHOD.DISTANCE, EXERCISE_LOGGING_METHOD.INTERVALS]);
   assert.equal(loggingMethodsForExerciseType(EXERCISE_TYPE.CARDIO).includes(EXERCISE_LOGGING_METHOD.TIME_DISTANCE), false);
+  assert.equal(LIBRARY_EXERCISE_TYPE_OPTIONS.includes(EXERCISE_TYPE.PLYOMETRIC), false);
+  assert.throws(() => createLibraryExercise({ name: "Pogos", exerciseType: EXERCISE_TYPE.PLYOMETRIC }), /supported exercise type/);
 });
 
 test("cardio intervals use ordered work and rest stages", () => {
@@ -242,7 +246,18 @@ test("prescription summaries are human readable", () => {
   const cardio = createPlanExercise({ exerciseId: "bike", exerciseNameSnapshot: "Bike", exerciseType: EXERCISE_TYPE.CARDIO, prescription: createCardioPrescription({ targetDurationSeconds: 900 }) });
   assert.equal(planPrescriptionSummary(cardio), "15 min");
   const mobility = createPlanExercise({ exerciseId: "mob", exerciseNameSnapshot: "Mobility", exerciseType: EXERCISE_TYPE.MOBILITY, prescription: createDefaultPrescription(EXERCISE_TYPE.MOBILITY) });
-  assert.equal(planPrescriptionSummary(mobility), "1 stretches");
+  assert.equal(planPrescriptionSummary(mobility), "30 sec");
+});
+
+test("new strength exercises use one prescription and can repeat in a session", () => {
+  const first = createPlanExercise({ exerciseId: "press", exerciseNameSnapshot: "Leg Press", exerciseType: EXERCISE_TYPE.STRENGTH, prescription: createStrengthPrescription({ side: SIDE.BOTH, targetSets: 2, targetReps: fixedReps(10) }) });
+  const second = duplicatePlanExercise(first, { sortOrder: 1 });
+  second.prescription.side = SIDE.LEFT;
+  assert.equal(first.prescription.blocks, undefined);
+  assert.equal(second.exerciseId, first.exerciseId);
+  assert.notEqual(second.id, first.id);
+  assert.equal(planPrescriptionSummary(first), "2 × 10 both");
+  assert.equal(planPrescriptionSummary(second), "2 × 10 left");
 });
 
 test("plan repository helpers strip undefined fields and use v2 paths only", () => {

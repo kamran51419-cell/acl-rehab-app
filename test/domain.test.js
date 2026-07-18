@@ -5,6 +5,7 @@ import { calculateWeekFromSurgeryDate, formatDate } from "../src/lib/domain/date
 import { bestSet, bestSetSym, setsSummaryLines, setVolume } from "../src/lib/domain/sets.js";
 import { compactExerciseSummary, sessionSummary } from "../src/lib/domain/legacyWorkouts.js";
 import { normalizeLegacyRehabData } from "../src/lib/firebase/legacyRehabRepository.js";
+import { createWorkout } from "../src/lib/domain/v2Models.js";
 
 test("calculateWeekFromSurgeryDate returns 1-indexed rehab weeks", () => {
   assert.equal(calculateWeekFromSurgeryDate("2026-01-01", "2026-01-01"), "1");
@@ -14,9 +15,15 @@ test("calculateWeekFromSurgeryDate returns 1-indexed rehab weeks", () => {
 });
 
 test("formatDate preserves invalid or blank values safely", () => {
-  assert.equal(formatDate("2026-07-18"), "18/07/2026");
+  assert.equal(formatDate("2026-07-18"), "18-07-26");
   assert.equal(formatDate(""), "—");
   assert.equal(formatDate("not-a-date"), "not-a-date");
+});
+
+test("workout date remains independent from creation time", () => {
+  const workout = createWorkout({ id: "workout-1", date: "2026-07-18", createdAt: "2026-07-20T12:00:00Z" });
+  assert.equal(workout.date, "2026-07-18");
+  assert.equal(workout.createdAt, "2026-07-20T12:00:00Z");
 });
 
 test("set helpers calculate best sets and symmetry from legacy set values", () => {
@@ -56,7 +63,7 @@ test("legacy summaries preserve single-leg and bilateral output shapes", () => {
   };
 
   assert.deepEqual(sessionSummary(single), {
-    date: "18/07/2026",
+    date: "18-07-26",
     notes: "steady",
     left: ["1. 10 reps, 10 kg"],
     right: ["1. 8 reps, 10 kg"],
@@ -67,9 +74,9 @@ test("legacy summaries preserve single-leg and bilateral output shapes", () => {
 
   assert.deepEqual(compactExerciseSummary({ week: "1", sessions: [single] }, { id: "lp", singleLeg: true }), {
     type: "single",
-    dates: "18/07/2026",
-    left: "10 x 10kg",
-    right: "8 x 10kg",
+    dates: "18-07-26",
+    left: "10 × 10 kg",
+    right: "8 × 10 kg",
     symmetry: 80,
   });
 });

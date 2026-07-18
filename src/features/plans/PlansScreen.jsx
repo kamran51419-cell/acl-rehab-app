@@ -3,13 +3,12 @@ import { Plus, Search, Trash2 } from "lucide-react";
 import { db } from "../../firebase";
 import {
   EXERCISE_LOGGING_METHOD,
-  EXERCISE_LOGGING_METHOD_OPTIONS,
   EXERCISE_TYPE,
-  EXERCISE_TYPE_OPTIONS,
+  INTERVAL_PHASE,
   REP_TARGET_TYPE,
-  TARGET_WEIGHT_MODE,
   createBlankPlan,
   createDefaultPrescription,
+  createIntervalStage,
   createLibraryExercise,
   createPlanExercise,
   createPlanSession,
@@ -19,6 +18,7 @@ import {
   duplicatePlan,
   filterExerciseLibrary,
   fixedReps,
+  loggingMethodsForExerciseType,
   nextPlanForSave,
   planPrescriptionSummary,
   reorderItems,
@@ -27,6 +27,7 @@ import {
 } from "../../lib/domain/plans";
 import { SIDE } from "../../lib/domain/v2Models";
 import { makeId } from "../../lib/domain/legacyWorkouts";
+import { formatDate } from "../../lib/domain/date";
 import {
   archiveExerciseDefinition,
   archivePlan,
@@ -65,11 +66,14 @@ const LOGGING_METHOD_LABELS = {
   [EXERCISE_LOGGING_METHOD.REPS_WEIGHT]: "Reps + Weight",
   [EXERCISE_LOGGING_METHOD.TIME]: "Time",
   [EXERCISE_LOGGING_METHOD.DISTANCE]: "Distance",
-  [EXERCISE_LOGGING_METHOD.TIME_DISTANCE]: "Time + Distance",
   [EXERCISE_LOGGING_METHOD.COMPLETED]: "Task",
+  [EXERCISE_LOGGING_METHOD.INTERVALS]: "Intervals",
 };
 
+const LIBRARY_EXERCISE_TYPES = [EXERCISE_TYPE.STRENGTH, EXERCISE_TYPE.CARDIO, EXERCISE_TYPE.BALANCE, EXERCISE_TYPE.MOBILITY];
+
 function exerciseTypeLabel(type) {
+  if (type === EXERCISE_TYPE.MOBILITY) return "Mobility / Stretch";
   return EXERCISE_TYPE_LABELS[type] || "Strength";
 }
 
@@ -133,8 +137,8 @@ function sectionPlans(plans, predicate) {
 
 function dateLabel(value) {
   if (!value) return "—";
-  if (typeof value === "string") return value;
-  if (value?.toDate) return value.toDate().toLocaleDateString("en-GB");
+  if (typeof value === "string") return formatDate(value.slice(0, 10));
+  if (value?.toDate) return formatDate(value.toDate().toISOString().slice(0, 10));
   return "—";
 }
 
@@ -171,12 +175,18 @@ function PlanCard({ plan, onEdit, onDuplicate, onToggleActive, onArchive, onRest
 
 function PrescriptionEditor({ exercise, onChange }) {
   const updatePrescription = (prescription) => onChange({ ...exercise, prescription });
+  const methods = loggingMethodsForExerciseType(exercise.exerciseType);
+  const selectedMethod = methods.includes(exercise.loggingMethod) ? exercise.loggingMethod : defaultLoggingMethodForExerciseType(exercise.exerciseType);
+  const changeLoggingMethod = (loggingMethod) => onChange({ ...exercise, loggingMethod, prescription: createDefaultPrescription(exercise.exerciseType, loggingMethod) });
+  const recordingField = <Field label="Record during workout"><Select value={selectedMethod} onChange={(event) => changeLoggingMethod(event.target.value)}>{methods.map((method) => <option key={method} value={method}>{loggingMethodLabel(method)}</option>)}</Select></Field>;
+
   if (exercise.exerciseType === EXERCISE_TYPE.STRENGTH || exercise.exerciseType === EXERCISE_TYPE.PLYOMETRIC) {
     const blocks = exercise.prescription?.blocks || [];
     const updateBlock = (index, patch) => updatePrescription({ blocks: blocks.map((block, idx) => (idx === index ? { ...block, ...patch } : block)) });
     const updateReps = (index, patch) => updateBlock(index, { targetReps: { ...blocks[index].targetReps, ...patch } });
     return (
       <div className="space-y-3">
+        <div className="max-w-xs">{recordingField}</div>
         {blocks.map((block, index) => (
           <div key={block.id} className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
             <div className="flex items-center justify-between gap-2">
@@ -212,17 +222,7 @@ function PrescriptionEditor({ exercise, onChange }) {
                 <Field label="Reps"><Input inputMode="numeric" value={block.targetReps?.value || ""} onChange={(e) => updateReps(index, { value: Number(e.target.value) })} /></Field>
               )}
             </div>
-            <div className="grid gap-3 md:grid-cols-4">
-              <Field label="Weight mode">
-                <Select value={block.targetWeight?.mode || TARGET_WEIGHT_MODE.NONE} onChange={(e) => updateBlock(index, { targetWeight: { mode: e.target.value } })}>
-                  <option value={TARGET_WEIGHT_MODE.PREVIOUS}>Previous</option>
-                  <option value={TARGET_WEIGHT_MODE.MANUAL}>Manual</option>
-                  <option value={TARGET_WEIGHT_MODE.NONE}>None</option>
-                </Select>
-              </Field>
-              {block.targetWeight?.mode === TARGET_WEIGHT_MODE.MANUAL ? <Field label="Weight"><Input inputMode="decimal" value={block.targetWeight?.value || ""} onChange={(e) => updateBlock(index, { targetWeight: { ...block.targetWeight, value: Number(e.target.value) } })} /></Field> : null}
-              <Field label="Unit"><Select value={block.unit || "kg"} onChange={(e) => updateBlock(index, { unit: e.target.value })}><option value="kg">kg</option><option value="lb">lb</option></Select></Field>
-              <Field label="Rest (seconds)"><Input inputMode="numeric" value={block.restSeconds ?? ""} onChange={(e) => updateBlock(index, { restSeconds: e.target.value === "" ? undefined : Number(e.target.value) })} /></Field>
+            <div>
               <Field label="Notes"><Input value={block.notes || ""} onChange={(e) => updateBlock(index, { notes: e.target.value })} /></Field>
             </div>
           </div>
@@ -235,35 +235,38 @@ function PrescriptionEditor({ exercise, onChange }) {
   if (exercise.exerciseType === EXERCISE_TYPE.TIMED_HOLD || exercise.exerciseType === EXERCISE_TYPE.BALANCE) {
     const p = exercise.prescription || {};
     return (
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="space-y-3"><div className="max-w-xs">{recordingField}</div><div className="grid gap-3 md:grid-cols-3">
         <Field label="Side"><Select value={p.side || SIDE.BOTH} onChange={(e) => updatePrescription({ ...p, side: e.target.value })}><option value={SIDE.BOTH}>Both sides</option><option value={SIDE.LEFT}>Left only</option><option value={SIDE.RIGHT}>Right only</option></Select></Field>
         <Field label="Sets"><Input inputMode="numeric" value={p.targetSets || ""} onChange={(e) => updatePrescription({ ...p, targetSets: Number(e.target.value) })} /></Field>
-        <Field label="Duration (seconds)"><Input inputMode="numeric" value={p.targetDurationSeconds || ""} onChange={(e) => updatePrescription({ ...p, targetDurationSeconds: Number(e.target.value) })} /></Field>
-        <Field label="Rest (seconds)"><Input inputMode="numeric" value={p.restSeconds ?? ""} onChange={(e) => updatePrescription({ ...p, restSeconds: e.target.value === "" ? undefined : Number(e.target.value) })} /></Field>
-      </div>
+        {selectedMethod === EXERCISE_LOGGING_METHOD.TIME ? <Field label="Duration (seconds)"><Input inputMode="numeric" value={p.targetDurationSeconds || ""} onChange={(e) => updatePrescription({ ...p, targetDurationSeconds: Number(e.target.value) })} /></Field> : null}
+      </div></div>
     );
   }
 
   if (exercise.exerciseType === EXERCISE_TYPE.CARDIO) {
     const p = exercise.prescription || {};
+    if (selectedMethod === EXERCISE_LOGGING_METHOD.INTERVALS) {
+      const stages = p.stages || [];
+      const updateStages = (next) => updatePrescription({ ...p, stages: next.map((stage, index) => ({ ...stage, sortOrder: index })) });
+      return <div className="space-y-3"><div className="max-w-xs">{recordingField}</div>{stages.map((stage, index) => <div key={stage.id} className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 md:grid-cols-[140px_1fr_1fr_auto]">
+        <Field label="Stage"><Select value={stage.phase} onChange={(event) => updateStages(stages.map((item, itemIndex) => itemIndex === index ? { ...item, phase: event.target.value } : item))}><option value={INTERVAL_PHASE.WORK}>Work</option><option value={INTERVAL_PHASE.REST}>Rest</option></Select></Field>
+        <Field label="Duration (seconds)"><Input inputMode="numeric" value={stage.durationSeconds} onChange={(event) => updateStages(stages.map((item, itemIndex) => itemIndex === index ? { ...item, durationSeconds: Number(event.target.value) } : item))} /></Field>
+        <Field label="Label (optional)"><Input value={stage.label || ""} onChange={(event) => updateStages(stages.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item))} /></Field>
+        <div className="flex items-end"><Button size="sm" variant="danger" onClick={() => updateStages(stages.filter((_, itemIndex) => itemIndex !== index))}>Remove</Button></div>
+      </div>)}<div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => updateStages([...stages, createIntervalStage({ phase: INTERVAL_PHASE.WORK, sortOrder: stages.length })])}>Add work</Button><Button variant="outline" onClick={() => updateStages([...stages, createIntervalStage({ phase: INTERVAL_PHASE.REST, sortOrder: stages.length })])}>Add rest</Button></div><p className="text-xs text-slate-500">Stages run in order and are ready for future timer controls.</p></div>;
+    }
     return (
-      <div className="grid gap-3 md:grid-cols-3">
-        <Field label="Duration minutes"><Input inputMode="numeric" value={Math.round((p.targetDurationSeconds || 0) / 60)} onChange={(e) => updatePrescription({ ...p, targetDurationSeconds: Number(e.target.value) * 60 })} /></Field>
-        <Field label="Resistance"><Input value={p.resistance ?? ""} onChange={(e) => updatePrescription({ ...p, resistance: e.target.value || undefined })} /></Field>
-        <Field label="Incline"><Input value={p.incline ?? ""} onChange={(e) => updatePrescription({ ...p, incline: e.target.value || undefined })} /></Field>
-        <Field label="Distance"><Input value={p.distance ?? ""} onChange={(e) => updatePrescription({ ...p, distance: e.target.value || undefined })} /></Field>
-        <Field label="Effort target"><Input value={p.effortTarget || ""} onChange={(e) => updatePrescription({ ...p, effortTarget: e.target.value })} /></Field>
-      </div>
+      <div className="space-y-3"><div className="max-w-xs">{recordingField}</div>{selectedMethod === EXERCISE_LOGGING_METHOD.DISTANCE ? <Field label="Distance (km)"><Input inputMode="decimal" value={p.targetDistance ?? p.distance ?? ""} onChange={(e) => updatePrescription({ ...p, targetDistance: Number(e.target.value) })} /></Field> : <Field label="Duration (minutes)"><Input inputMode="numeric" value={Math.round((p.targetDurationSeconds || 0) / 60)} onChange={(e) => updatePrescription({ ...p, targetDurationSeconds: Number(e.target.value) * 60 })} /></Field>}</div>
     );
   }
 
   if (exercise.exerciseType === EXERCISE_TYPE.OTHER) {
-    return <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">No prescription details needed. Mark this exercise completed when it is done.</div>;
+    return <div className="space-y-3"><div className="max-w-xs">{recordingField}</div><div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">No prescription details needed. Mark this task when it is done.</div></div>;
   }
 
   const items = exercise.prescription?.items || [];
   return (
-    <div className="space-y-3">
+    <div className="space-y-3"><div className="max-w-xs">{recordingField}</div>
       {items.map((item, index) => (
         <div key={item.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-2">
           <Input value={item.name} onChange={(e) => updatePrescription({ ...exercise.prescription, items: items.map((row, idx) => (idx === index ? { ...row, name: e.target.value } : row)) })} />
@@ -283,7 +286,7 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
   const [creatingExercise, setCreatingExercise] = useState(false);
   const [pickerMessage, setPickerMessage] = useState("");
   const [activePrescriptionId, setActivePrescriptionId] = useState("");
-  const [newExercise, setNewExercise] = useState({ name: "", exerciseType: EXERCISE_TYPE.STRENGTH, loggingMethod: defaultLoggingMethodForExerciseType(EXERCISE_TYPE.STRENGTH), notes: "" });
+  const [newExercise, setNewExercise] = useState({ name: "", exerciseType: EXERCISE_TYPE.STRENGTH });
   const validation = validatePlan(draft);
   const filteredExercises = filterExerciseLibrary(exercises, { query: exerciseQuery });
 
@@ -300,7 +303,7 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
       exerciseType,
       sortOrder: session.exercises.length,
       prescription: createDefaultPrescription(exerciseType),
-      loggingMethod: libraryExercise.loggingMethod || defaultLoggingMethodForExerciseType(exerciseType),
+      loggingMethod: defaultLoggingMethodForExerciseType(exerciseType),
     });
     updateSession(sessionIndex, { exercises: [...session.exercises, planExercise] });
     setActivePrescriptionId(planExercise.id);
@@ -315,7 +318,7 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
       const libraryExercise = createLibraryExercise(newExercise);
       await saveExerciseDefinition(db, draft.userId, libraryExercise, { updatedAtToken: token() });
       addExerciseToSession(sessionIndex, libraryExercise);
-      setNewExercise({ name: "", exerciseType: EXERCISE_TYPE.STRENGTH, loggingMethod: defaultLoggingMethodForExerciseType(EXERCISE_TYPE.STRENGTH), notes: "" });
+      setNewExercise({ name: "", exerciseType: EXERCISE_TYPE.STRENGTH });
       setCreatingExercise(false);
     } catch (error) {
       setPickerMessage(friendlyErrorMessage(error, "We could not save and add that exercise. Please try again.", "exercise library"));
@@ -380,12 +383,10 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
                 <div className="mb-3 flex items-center justify-between"><strong>Exercise Picker</strong><Button size="sm" variant="outline" onClick={() => setPickerSession(null)}>Close</Button></div>
                 {pickerMessage ? <div className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{pickerMessage}</div> : null}
                 {creatingExercise ? <div className="space-y-3">
-                  <div className="grid gap-3 md:grid-cols-3">
+                  <div className="grid gap-3 md:grid-cols-2">
                     <Field label="Exercise name"><Input autoFocus value={newExercise.name} onChange={(e) => setNewExercise({ ...newExercise, name: e.target.value })} /></Field>
-                    <Field label="Exercise type"><Select value={newExercise.exerciseType} onChange={(e) => { const exerciseType = e.target.value; setNewExercise({ ...newExercise, exerciseType, loggingMethod: defaultLoggingMethodForExerciseType(exerciseType) }); }}>{EXERCISE_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}</Select></Field>
-                    <Field label="Recording"><Select value={newExercise.loggingMethod} onChange={(e) => setNewExercise({ ...newExercise, loggingMethod: e.target.value })}>{EXERCISE_LOGGING_METHOD_OPTIONS.map((method) => <option key={method} value={method}>{loggingMethodLabel(method)}</option>)}</Select></Field>
+                    <Field label="Exercise type"><Select value={newExercise.exerciseType} onChange={(e) => setNewExercise({ ...newExercise, exerciseType: e.target.value })}>{LIBRARY_EXERCISE_TYPES.map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}</Select></Field>
                   </div>
-                  <Field label="Notes"><Textarea value={newExercise.notes} onChange={(e) => setNewExercise({ ...newExercise, notes: e.target.value })} /></Field>
                   <div className="flex gap-2"><Button onClick={() => createAndAddExercise(sessionIndex)}>Save and add to session</Button><Button variant="outline" onClick={() => setCreatingExercise(false)}>Back to library</Button></div>
                 </div> : <>
                 <Field label="Search exercises"><Input autoFocus value={exerciseQuery} onChange={(e) => setExerciseQuery(e.target.value)} placeholder="Search by exercise name" /></Field>
@@ -406,9 +407,7 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
 function ExerciseLibrary({ user, exercises, onChanged }) {
   const [name, setName] = useState("");
   const [exerciseType, setExerciseType] = useState(EXERCISE_TYPE.STRENGTH);
-  const [loggingMethod, setLoggingMethod] = useState(defaultLoggingMethodForExerciseType(EXERCISE_TYPE.STRENGTH));
-  const [loggingMethodTouched, setLoggingMethodTouched] = useState(false);
-  const [notes, setNotes] = useState("");
+  const [editingExercise, setEditingExercise] = useState(null);
   const [query, setQuery] = useState("");
   const [includeArchived, setIncludeArchived] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -423,11 +422,8 @@ function ExerciseLibrary({ user, exercises, onChanged }) {
     setSaving(true);
     setMessage("");
     try {
-      await saveExerciseDefinition(db, user.uid, createLibraryExercise({ name, exerciseType, loggingMethod, notes }), { updatedAtToken: token() });
+      await saveExerciseDefinition(db, user.uid, createLibraryExercise({ name, exerciseType }), { updatedAtToken: token() });
       setName("");
-      setNotes("");
-      setLoggingMethod(defaultLoggingMethodForExerciseType(exerciseType));
-      setLoggingMethodTouched(false);
       setMessage("Exercise added to your library.");
       onChanged?.();
     } catch (error) {
@@ -435,16 +431,6 @@ function ExerciseLibrary({ user, exercises, onChanged }) {
     } finally {
       setSaving(false);
     }
-  }
-
-  function updateExerciseType(nextType) {
-    setExerciseType(nextType);
-    if (!loggingMethodTouched) setLoggingMethod(defaultLoggingMethodForExerciseType(nextType));
-  }
-
-  function updateLoggingMethod(nextMethod) {
-    setLoggingMethod(nextMethod);
-    setLoggingMethodTouched(true);
   }
 
   async function toggleArchive(exercise) {
@@ -456,12 +442,11 @@ function ExerciseLibrary({ user, exercises, onChanged }) {
     }
   }
 
-  async function editExercise(exercise) {
-    const name = window.prompt("Exercise name", exercise.name);
-    if (!name?.trim()) return;
-    const notes = window.prompt("Exercise notes", exercise.notes || "");
+  async function saveEditedExercise() {
+    if (!editingExercise?.name.trim()) return;
     try {
-      await saveExerciseDefinition(db, user.uid, { ...exercise, name: name.trim(), notes: notes ?? exercise.notes }, { updatedAtToken: token() });
+      await saveExerciseDefinition(db, user.uid, { ...editingExercise, name: editingExercise.name.trim(), exerciseType: editingExercise.exerciseType, trackingType: editingExercise.exerciseType }, { updatedAtToken: token() });
+      setEditingExercise(null);
       setMessage("Exercise updated.");
     } catch (error) {
       setMessage(friendlyErrorMessage(error, "We could not update that exercise. Please try again."));
@@ -473,7 +458,7 @@ function ExerciseLibrary({ user, exercises, onChanged }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-slate-900">Exercise library</h2>
-          <p className="text-sm text-slate-500">Save exercises once, then reuse them in any workout plan.</p>
+          <p className="text-sm text-slate-500">Define what an exercise is. Configure how to perform it inside a programme.</p>
         </div>
         <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
           {activeCount} active{archivedCount ? ` · ${archivedCount} archived` : ""}
@@ -484,13 +469,9 @@ function ExerciseLibrary({ user, exercises, onChanged }) {
 
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
         <div className="mb-3 font-medium text-slate-900">Add an exercise</div>
-        <div className="grid gap-3 md:grid-cols-[1fr_170px_190px]">
+        <div className="grid gap-3 md:grid-cols-[1fr_220px_auto]">
           <Field label="Exercise name"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Leg extension" /></Field>
-          <Field label="Exercise type"><Select value={exerciseType} onChange={(e) => updateExerciseType(e.target.value)}>{EXERCISE_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}</Select></Field>
-          <Field label="Recording"><Select value={loggingMethod} onChange={(e) => updateLoggingMethod(e.target.value)}>{EXERCISE_LOGGING_METHOD_OPTIONS.map((method) => <option key={method} value={method}>{loggingMethodLabel(method)}</option>)}</Select></Field>
-        </div>
-        <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto]">
-          <Field label="Exercise notes"><Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Slow eccentric, pause at top, physio cue…" /></Field>
+          <Field label="Exercise type"><Select value={exerciseType} onChange={(e) => setExerciseType(e.target.value)}>{LIBRARY_EXERCISE_TYPES.map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}</Select></Field>
           <div className="flex items-end"><Button onClick={saveNewExercise} disabled={saving || !name.trim()}>{saving ? "Saving…" : "Add exercise"}</Button></div>
         </div>
       </div>
@@ -521,12 +502,11 @@ function ExerciseLibrary({ user, exercises, onChanged }) {
             {visibleExercises.map((exercise) => (
               <div key={exercise.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3">
                 <div className="min-w-0">
-                  <div className="truncate font-medium text-slate-900">{exercise.name}</div>
-                  <div className="text-xs text-slate-500">{exerciseTypeLabel(exercise.exerciseType || exercise.trackingType)}{exercise.notes ? ` · ${exercise.notes}` : ""}</div>
+                  {editingExercise?.id === exercise.id ? <div className="grid gap-2 md:grid-cols-2"><Input value={editingExercise.name} onChange={(event) => setEditingExercise({ ...editingExercise, name: event.target.value })} /><Select value={editingExercise.exerciseType || editingExercise.trackingType} onChange={(event) => setEditingExercise({ ...editingExercise, exerciseType: event.target.value })}>{LIBRARY_EXERCISE_TYPES.map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}</Select></div> : <><div className="truncate font-medium text-slate-900">{exercise.name}</div><div className="text-xs text-slate-500">{exerciseTypeLabel(exercise.exerciseType || exercise.trackingType)}</div></>}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   {exercise.isArchived ? <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-500">Archived</span> : null}
-                  <Button size="sm" variant="outline" onClick={() => editExercise(exercise)}>Edit</Button>
+                  {editingExercise?.id === exercise.id ? <><Button size="sm" onClick={saveEditedExercise}>Save</Button><Button size="sm" variant="outline" onClick={() => setEditingExercise(null)}>Cancel</Button></> : <Button size="sm" variant="outline" onClick={() => setEditingExercise({ ...exercise, exerciseType: exercise.exerciseType || exercise.trackingType || EXERCISE_TYPE.STRENGTH })}>Edit</Button>}
                   <Button size="sm" variant="outline" onClick={() => toggleArchive(exercise)}>{exercise.isArchived ? "Restore" : "Archive"}</Button>
                 </div>
               </div>

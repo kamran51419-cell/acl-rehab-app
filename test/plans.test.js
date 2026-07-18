@@ -3,10 +3,11 @@ import test from "node:test";
 
 import {
   EXERCISE_TYPE,
-  TARGET_WEIGHT_MODE,
+  EXERCISE_LOGGING_METHOD,
   createBlankPlan,
   createCardioPrescription,
   createDefaultPrescription,
+  createIntervalPrescription,
   createLibraryExercise,
   createPlanExercise,
   createPlanSession,
@@ -17,6 +18,7 @@ import {
   filterExerciseLibrary,
   fixedReps,
   isMeaningfulPlanChange,
+  loggingMethodsForExerciseType,
   nextPlanForSave,
   planPrescriptionSummary,
   reorderItems,
@@ -74,10 +76,6 @@ test("plan validation covers type-specific prescriptions", () => {
   const badRange = mixedStrengthPlan();
   badRange.sessions[0].exercises[0].prescription.blocks[0].targetReps = repRange(12, 8);
   assert.equal(validatePlan(badRange).valid, false);
-
-  const badWeight = mixedStrengthPlan();
-  badWeight.sessions[0].exercises[0].prescription.blocks[0].targetWeight = { mode: TARGET_WEIGHT_MODE.MANUAL, value: -1 };
-  assert.equal(validatePlan(badWeight).valid, false);
 
   const holdPlan = createBlankPlan({ name: "Hold", isActive: true });
   holdPlan.sessions = [createPlanSession({ name: "Balance", exercises: [createPlanExercise({ exerciseId: "bal", exerciseNameSnapshot: "Balance", exerciseType: EXERCISE_TYPE.TIMED_HOLD, prescription: createTimedHoldPrescription({ targetDurationSeconds: 0 }) })] })];
@@ -194,7 +192,7 @@ test("duplicating one plan exercise refreshes nested IDs and preserves values", 
   assert.deepEqual(holdCopy.prescription, hold.prescription);
   assert.notEqual(holdCopy.prescription, hold.prescription);
 
-  const cardio = createPlanExercise({ exerciseId: "bike", exerciseNameSnapshot: "Bike", exerciseType: EXERCISE_TYPE.CARDIO, prescription: createCardioPrescription({ targetDurationSeconds: 900, resistance: 5 }) });
+  const cardio = createPlanExercise({ exerciseId: "bike", exerciseNameSnapshot: "Bike", exerciseType: EXERCISE_TYPE.CARDIO, prescription: createCardioPrescription({ targetDurationSeconds: 900 }) });
   const cardioCopy = duplicatePlanExercise(cardio, { sortOrder: 5 });
   assert.notEqual(cardioCopy.id, cardio.id);
   assert.deepEqual(cardioCopy.prescription, cardio.prescription);
@@ -214,11 +212,35 @@ test("exercise archive filtering keeps archived references available when reques
   assert.deepEqual(filterExerciseLibrary([archived, active], { includeArchived: true }).map((exercise) => exercise.id), ["archived", "active"]);
 });
 
+test("exercise definitions stay lean and recording methods are programme-specific", () => {
+  const exercise = createLibraryExercise({ id: "squat", name: "Squat", exerciseType: EXERCISE_TYPE.STRENGTH });
+  assert.deepEqual(exercise, {
+    id: "squat",
+    userId: null,
+    name: "Squat",
+    exerciseType: EXERCISE_TYPE.STRENGTH,
+    trackingType: EXERCISE_TYPE.STRENGTH,
+    isArchived: false,
+  });
+  assert.deepEqual(loggingMethodsForExerciseType(EXERCISE_TYPE.STRENGTH), [EXERCISE_LOGGING_METHOD.REPS, EXERCISE_LOGGING_METHOD.REPS_WEIGHT]);
+  assert.deepEqual(loggingMethodsForExerciseType(EXERCISE_TYPE.CARDIO), [EXERCISE_LOGGING_METHOD.TIME, EXERCISE_LOGGING_METHOD.DISTANCE, EXERCISE_LOGGING_METHOD.INTERVALS]);
+  assert.equal(loggingMethodsForExerciseType(EXERCISE_TYPE.CARDIO).includes(EXERCISE_LOGGING_METHOD.TIME_DISTANCE), false);
+});
+
+test("cardio intervals use ordered work and rest stages", () => {
+  const prescription = createIntervalPrescription();
+  assert.deepEqual(prescription.stages.map((stage) => [stage.phase, stage.durationSeconds, stage.sortOrder]), [["work", 240, 0], ["rest", 60, 1]]);
+  const plan = createBlankPlan({ name: "Running", isActive: true });
+  plan.sessions = [createPlanSession({ name: "Intervals", exercises: [createPlanExercise({ exerciseId: "run", exerciseNameSnapshot: "Run", exerciseType: EXERCISE_TYPE.CARDIO, loggingMethod: EXERCISE_LOGGING_METHOD.INTERVALS, prescription })] })];
+  assert.equal(validatePlan(plan).valid, true);
+  assert.equal(planPrescriptionSummary(plan.sessions[0].exercises[0]), "2 intervals");
+});
+
 test("prescription summaries are human readable", () => {
   const strength = mixedStrengthPlan().sessions[0].exercises[0];
   assert.match(planPrescriptionSummary(strength), /2 × 10 both/);
-  const cardio = createPlanExercise({ exerciseId: "bike", exerciseNameSnapshot: "Bike", exerciseType: EXERCISE_TYPE.CARDIO, prescription: createCardioPrescription({ targetDurationSeconds: 900, resistance: 5 }) });
-  assert.equal(planPrescriptionSummary(cardio), "15 min · Resistance 5");
+  const cardio = createPlanExercise({ exerciseId: "bike", exerciseNameSnapshot: "Bike", exerciseType: EXERCISE_TYPE.CARDIO, prescription: createCardioPrescription({ targetDurationSeconds: 900 }) });
+  assert.equal(planPrescriptionSummary(cardio), "15 min");
   const mobility = createPlanExercise({ exerciseId: "mob", exerciseNameSnapshot: "Mobility", exerciseType: EXERCISE_TYPE.MOBILITY, prescription: createDefaultPrescription(EXERCISE_TYPE.MOBILITY) });
   assert.equal(planPrescriptionSummary(mobility), "1 stretches");
 });

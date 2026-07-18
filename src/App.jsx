@@ -575,21 +575,21 @@ async function saveSession() {
             <div className="grid grid-cols-2 gap-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 md:gap-4">
               <SummaryCard
                 title="Leg Press"
-                value={`${latestLPLeft ? `${latestLPLeft.reps} x ${latestLPLeft.weight}kg` : "—"} / ${latestLPRight ? `${latestLPRight.reps} x ${latestLPRight.weight}kg` : "—"}`}
+                value={`${latestLPLeft ? `${latestLPLeft.reps} × ${latestLPLeft.weight} kg` : "—"} / ${latestLPRight ? `${latestLPRight.reps} × ${latestLPRight.weight} kg` : "—"}`}
                 subtitle="L / R"
               />
               <SummaryCard title="Leg Press symmetry" value={latestLPSym != null ? `${latestLPSym}%` : "—"} />
 
               <SummaryCard
                 title="Leg Extension"
-                value={`${latestLELeft ? `${latestLELeft.reps} x ${latestLELeft.weight}kg` : "—"} / ${latestLERight ? `${latestLERight.reps} x ${latestLERight.weight}kg` : "—"}`}
+                value={`${latestLELeft ? `${latestLELeft.reps} × ${latestLELeft.weight} kg` : "—"} / ${latestLERight ? `${latestLERight.reps} × ${latestLERight.weight} kg` : "—"}`}
                 subtitle="L / R"
               />
               <SummaryCard title="Leg Extension symmetry" value={latestLESym != null ? `${latestLESym}%` : "—"} />
 
               <SummaryCard
                 title="Hamstring Curl"
-                value={`${latestHCLeft ? `${latestHCLeft.reps} x ${latestHCLeft.weight}kg` : "—"} / ${latestHCRight ? `${latestHCRight.reps} x ${latestHCRight.weight}kg` : "—"}`}
+                value={`${latestHCLeft ? `${latestHCLeft.reps} × ${latestHCLeft.weight} kg` : "—"} / ${latestHCRight ? `${latestHCRight.reps} × ${latestHCRight.weight} kg` : "—"}`}
                 subtitle="L / R"
               />
               <SummaryCard title="Hamstring Curl symmetry" value={latestHCSym != null ? `${latestHCSym}%` : "—"} />

@@ -390,8 +390,6 @@ export default function ACLTrackerApp() {
 
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [dataLoading, setDataLoading] = useState(false);
-  const [hasLoadedUserData, setHasLoadedUserData] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [authMode, setAuthMode] = useState("login");
@@ -407,55 +405,22 @@ export default function ACLTrackerApp() {
   }, []);
 
   useEffect(() => {
-  if (authLoading) return;
+    if (authLoading) return;
 
-  if (!user) {
-    setWeeks([]);
-    setCustomExercises([]);
-    setSurgeryDate("");
-    setDataLoading(false);
-    setHasLoadedUserData(false);
-    return;
-  }
-
-  setDataLoading(true);
-  setHasLoadedUserData(false);
-
-  const ref = doc(db, "rehabData", user.uid);
-
-  const unsub = onSnapshot(
-    ref,
-    (snap) => {
-      if (snap.exists()) {
-        const saved = snap.data();
-        setWeeks(Array.isArray(saved.weeks) ? saved.weeks : []);
-        setCustomExercises(Array.isArray(saved.customExercises) ? saved.customExercises : []);
-        setSurgeryDate(typeof saved.surgeryDate === "string" ? saved.surgeryDate : "");
-      } else {
-        setWeeks([]);
-        setCustomExercises([]);
-        setSurgeryDate("");
-      }
-
-      setHasLoadedUserData(true);
-      setDataLoading(false);
-    },
-    (error) => {
-      console.error("Failed to load rehab data from Firestore", error);
-      setDataLoading(false);
+    if (!user) {
+      // The legacy app clears user-scoped data immediately on sign-out.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setWeeks([]);
+      setCustomExercises([]);
+      setSurgeryDate("");
+      return;
     }
-  );
 
-  return () => unsub();
-}, [user, authLoading]);
+    const ref = doc(db, "rehabData", user.uid);
 
-      setDataLoading(true);
-      setHasLoadedUserData(false);
-
-      try {
-        const ref = doc(db, "rehabData", user.uid);
-        const snap = await getDoc(ref);
-
+    const unsub = onSnapshot(
+      ref,
+      (snap) => {
         if (snap.exists()) {
           const saved = snap.data();
           setWeeks(Array.isArray(saved.weeks) ? saved.weeks : []);
@@ -466,19 +431,15 @@ export default function ACLTrackerApp() {
           setCustomExercises([]);
           setSurgeryDate("");
         }
-
-        setHasLoadedUserData(true);
-      } catch (error) {
+      },
+      (error) => {
         console.error("Failed to load rehab data from Firestore", error);
-      } finally {
-        setDataLoading(false);
       }
-    }
+    );
 
-    if (!authLoading) {
-      loadUserData();
-    }
+    return () => unsub();
   }, [user, authLoading]);
+
 
   async function handleAuthSubmit(e) {
     e.preventDefault();
@@ -536,6 +497,8 @@ export default function ACLTrackerApp() {
   useEffect(() => {
     if (surgeryDate && !weekManuallyEdited) {
       const autoWeek = calculateWeekFromSurgeryDate(surgeryDate, form.date);
+      // Keep Phase 0 behavior identical: date/surgery-date changes update the legacy week field.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setForm((prev) => ({ ...prev, week: autoWeek }));
     }
   }, [surgeryDate, form.date, weekManuallyEdited]);
@@ -567,7 +530,7 @@ export default function ACLTrackerApp() {
   const name = newExerciseName.trim();
   if (!name) return;
 
-  const id = `custom-${Date.now()}`;
+  const id = `custom-${makeId()}`;
   const item = { id, label: name, singleLeg: newExerciseSingleLeg, builtIn: false };
   const nextCustomExercises = [...customExercises, item];
 

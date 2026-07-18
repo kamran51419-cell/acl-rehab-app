@@ -77,11 +77,11 @@ function loggingMethodLabel(method) {
   return LOGGING_METHOD_LABELS[method] || "Task";
 }
 
-function friendlyErrorMessage(error, fallback) {
+function friendlyErrorMessage(error, fallback, resource = "rehab data") {
   const code = error?.code || "";
   const message = error?.message || "";
   if (code.includes("permission-denied") || /permission/i.test(message)) {
-    return "We could not access your plans right now. Please check that you are signed in and try again.";
+    return `We could not access your ${resource} right now. Please check that you are signed in and try again.`;
   }
   if (/network|offline|unavailable/i.test(message)) {
     return "We could not reach the server. Please check your connection and try again.";
@@ -279,24 +279,21 @@ function PrescriptionEditor({ exercise, onChange }) {
 
 function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, saving, saveMessage }) {
   const [exerciseQuery, setExerciseQuery] = useState("");
-  const [includeArchived, setIncludeArchived] = useState(false);
-  const [selectedExerciseId, setSelectedExerciseId] = useState("");
-  const [selectedType, setSelectedType] = useState(EXERCISE_TYPE.STRENGTH);
   const [pickerSession, setPickerSession] = useState(null);
   const [creatingExercise, setCreatingExercise] = useState(false);
+  const [pickerMessage, setPickerMessage] = useState("");
+  const [activePrescriptionId, setActivePrescriptionId] = useState("");
   const [newExercise, setNewExercise] = useState({ name: "", exerciseType: EXERCISE_TYPE.STRENGTH, loggingMethod: defaultLoggingMethodForExerciseType(EXERCISE_TYPE.STRENGTH), notes: "" });
   const validation = validatePlan(draft);
-  const filteredExercises = filterExerciseLibrary(exercises, { query: exerciseQuery, includeArchived });
+  const filteredExercises = filterExerciseLibrary(exercises, { query: exerciseQuery });
 
   const setSessions = (sessions) => setDraft({ ...draft, sessions });
   const updateSession = (sessionIndex, patch) => setSessions(draft.sessions.map((session, index) => (index === sessionIndex ? { ...session, ...patch } : session)));
   const addSession = () => setSessions([...draft.sessions, createPlanSession({ name: "New session", sortOrder: draft.sessions.length })]);
 
-  function addExerciseToSession(sessionIndex) {
-    const libraryExercise = exercises.find((exercise) => exercise.id === selectedExerciseId);
-    if (!libraryExercise) return;
+  function addExerciseToSession(sessionIndex, libraryExercise) {
     const session = draft.sessions[sessionIndex];
-    const exerciseType = selectedType || libraryExercise.exerciseType || EXERCISE_TYPE.STRENGTH;
+    const exerciseType = libraryExercise.exerciseType || libraryExercise.trackingType || EXERCISE_TYPE.STRENGTH;
     const planExercise = createPlanExercise({
       exerciseId: libraryExercise.id,
       exerciseNameSnapshot: libraryExercise.name,
@@ -306,22 +303,23 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
       loggingMethod: libraryExercise.loggingMethod || defaultLoggingMethodForExerciseType(exerciseType),
     });
     updateSession(sessionIndex, { exercises: [...session.exercises, planExercise] });
+    setActivePrescriptionId(planExercise.id);
+    setExerciseQuery("");
     setPickerSession(null);
   }
 
   async function createAndAddExercise(sessionIndex) {
     if (!newExercise.name.trim()) return;
-    const libraryExercise = createLibraryExercise(newExercise);
-    await saveExerciseDefinition(db, draft.userId, libraryExercise, { updatedAtToken: token() });
-    const session = draft.sessions[sessionIndex];
-    updateSession(sessionIndex, { exercises: [...session.exercises, createPlanExercise({
-      exerciseId: libraryExercise.id, exerciseNameSnapshot: libraryExercise.name,
-      exerciseType: libraryExercise.exerciseType, loggingMethod: libraryExercise.loggingMethod,
-      sortOrder: session.exercises.length, prescription: createDefaultPrescription(libraryExercise.exerciseType),
-    })] });
-    setNewExercise({ name: "", exerciseType: EXERCISE_TYPE.STRENGTH, loggingMethod: defaultLoggingMethodForExerciseType(EXERCISE_TYPE.STRENGTH), notes: "" });
-    setCreatingExercise(false);
-    setPickerSession(null);
+    setPickerMessage("");
+    try {
+      const libraryExercise = createLibraryExercise(newExercise);
+      await saveExerciseDefinition(db, draft.userId, libraryExercise, { updatedAtToken: token() });
+      addExerciseToSession(sessionIndex, libraryExercise);
+      setNewExercise({ name: "", exerciseType: EXERCISE_TYPE.STRENGTH, loggingMethod: defaultLoggingMethodForExerciseType(EXERCISE_TYPE.STRENGTH), notes: "" });
+      setCreatingExercise(false);
+    } catch (error) {
+      setPickerMessage(friendlyErrorMessage(error, "We could not save and add that exercise. Please try again.", "exercise library"));
+    }
   }
 
   return (
@@ -340,7 +338,7 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
       <div className="grid gap-3 md:grid-cols-2">
         <Field label="Programme name"><Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="ACL rehab programme" /></Field>
         <Field label="Description"><Input value={draft.description || ""} onChange={(e) => setDraft({ ...draft, description: e.target.value })} placeholder="Optional" /></Field>
-        <label className="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm"><input type="checkbox" checked={draft.isActive} onChange={(e) => setDraft({ ...draft, isActive: e.target.checked })} /> Active plan</label>
+        <label className="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm"><input type="checkbox" checked={draft.isActive} onChange={(e) => setDraft({ ...draft, isActive: e.target.checked })} /> Active programme</label>
       </div>
 
       <div className="space-y-4">
@@ -361,7 +359,7 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
 
             <div className="space-y-3">
               {session.exercises.map((exercise, exerciseIndex) => (
-                <div key={exercise.id} className="space-y-3 rounded-xl border border-slate-200 bg-white p-3">
+                <div key={exercise.id} className={cls("space-y-3 rounded-xl border bg-white p-3", activePrescriptionId === exercise.id ? "border-emerald-400 ring-2 ring-emerald-100" : "border-slate-200")}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div><div className="font-semibold">{exercise.exerciseNameSnapshot}</div><div className="text-sm text-slate-500">{planPrescriptionSummary(exercise)}</div></div>
                     <div className="flex flex-wrap gap-2">
@@ -372,7 +370,7 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
                     </div>
                   </div>
                   <Field label="Session-specific notes"><Textarea value={exercise.notes || ""} onChange={(e) => updateSession(sessionIndex, { exercises: session.exercises.map((item, index) => (index === exerciseIndex ? { ...item, notes: e.target.value } : item)) })} /></Field>
-                  <PrescriptionEditor exercise={exercise} onChange={(next) => updateSession(sessionIndex, { exercises: session.exercises.map((item, index) => (index === exerciseIndex ? next : item)) })} />
+                  <div className="border-t border-slate-100 pt-3"><div className="mb-3"><div className="font-semibold text-slate-900">Prescription</div><p className="text-xs text-slate-500">Configure the blocks for this session.</p></div><PrescriptionEditor exercise={exercise} onChange={(next) => updateSession(sessionIndex, { exercises: session.exercises.map((item, index) => (index === exerciseIndex ? next : item)) })} /></div>
                 </div>
               ))}
 
@@ -380,6 +378,7 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
                 <Button variant="outline" onClick={() => { setPickerSession(sessionIndex); setCreatingExercise(false); }}><Plus className="mr-1 h-4 w-4" /> Add Exercise</Button>
               ) : <div className="rounded-xl border border-dashed border-slate-300 bg-white p-3">
                 <div className="mb-3 flex items-center justify-between"><strong>Exercise Picker</strong><Button size="sm" variant="outline" onClick={() => setPickerSession(null)}>Close</Button></div>
+                {pickerMessage ? <div className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{pickerMessage}</div> : null}
                 {creatingExercise ? <div className="space-y-3">
                   <div className="grid gap-3 md:grid-cols-3">
                     <Field label="Exercise name"><Input autoFocus value={newExercise.name} onChange={(e) => setNewExercise({ ...newExercise, name: e.target.value })} /></Field>
@@ -389,17 +388,9 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
                   <Field label="Notes"><Textarea value={newExercise.notes} onChange={(e) => setNewExercise({ ...newExercise, notes: e.target.value })} /></Field>
                   <div className="flex gap-2"><Button onClick={() => createAndAddExercise(sessionIndex)}>Save and add to session</Button><Button variant="outline" onClick={() => setCreatingExercise(false)}>Back to library</Button></div>
                 </div> : <>
-                <div className="grid gap-3 md:grid-cols-[1fr_160px_auto]">
-                  <Field label="Find exercise"><Input value={exerciseQuery} onChange={(e) => setExerciseQuery(e.target.value)} placeholder="Search library" /></Field>
-                  <Field label="Type"><Select value={selectedType} onChange={(e) => setSelectedType(e.target.value)}>{EXERCISE_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}</Select></Field>
-                  <label className="flex items-end gap-2 pb-2 text-sm"><input type="checkbox" checked={includeArchived} onChange={(e) => setIncludeArchived(e.target.checked)} /> Include archived</label>
-                </div>
-                <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto]">
-                  <Select value={selectedExerciseId} onChange={(e) => setSelectedExerciseId(e.target.value)}>
-                    <option value="">Select exercise…</option>
-                    {filteredExercises.map((exercise) => <option key={exercise.id} value={exercise.id}>{exercise.name}{exercise.isArchived ? " (archived)" : ""}</option>)}
-                  </Select>
-                  <Button onClick={() => addExerciseToSession(sessionIndex)} disabled={!selectedExerciseId}>Add exercise</Button>
+                <Field label="Search exercises"><Input autoFocus value={exerciseQuery} onChange={(e) => setExerciseQuery(e.target.value)} placeholder="Search by exercise name" /></Field>
+                <div className="mt-3 max-h-72 space-y-2 overflow-y-auto">
+                  {filteredExercises.length ? filteredExercises.map((exercise) => <div key={exercise.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3"><div className="min-w-0"><div className="truncate font-medium">{exercise.name}</div><div className="text-xs text-slate-500">{exerciseTypeLabel(exercise.exerciseType || exercise.trackingType)}</div></div><Button size="sm" onClick={() => addExerciseToSession(sessionIndex, exercise)}>Add</Button></div>) : <div className="rounded-xl bg-slate-50 p-4 text-center text-sm text-slate-500">No matching exercises.</div>}
                 </div>
                 <Button className="mt-3" variant="outline" onClick={() => setCreatingExercise(true)}><Plus className="mr-1 h-4 w-4" /> Create New Exercise</Button>
                 </>}
@@ -550,8 +541,10 @@ function ExerciseLibrary({ user, exercises, onChanged }) {
 export default function PlansScreen({ user, view = "programme" }) {
   const [plans, setPlans] = useState([]);
   const [exercises, setExercises] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [plansLoading, setPlansLoading] = useState(view === "programme");
+  const [exercisesLoading, setExercisesLoading] = useState(true);
+  const [plansError, setPlansError] = useState("");
+  const [exercisesError, setExercisesError] = useState("");
   const [draft, setDraft] = useState(null);
   const [original, setOriginal] = useState(null);
   const [loadedToken, setLoadedToken] = useState("");
@@ -560,11 +553,16 @@ export default function PlansScreen({ user, view = "programme" }) {
 
   useEffect(() => {
     if (!user?.uid) return undefined;
-    setLoading(true);
-    const unsubPlans = subscribePlans(db, user.uid, (next) => { setPlans(next); setLoading(false); }, (err) => { setError(friendlyErrorMessage(err, "We could not load your plans. Please try again.")); setLoading(false); });
-    const unsubExercises = subscribeExerciseDefinitions(db, user.uid, setExercises, (err) => setError(friendlyErrorMessage(err, "We could not load your exercise library. Please try again.")));
+    setExercisesLoading(true);
+    setExercisesError("");
+    const unsubExercises = subscribeExerciseDefinitions(db, user.uid, (next) => { setExercises(next); setExercisesLoading(false); }, (err) => { setExercisesError(friendlyErrorMessage(err, "We could not load your exercise library. Please try again.", "exercise library")); setExercisesLoading(false); });
+    if (view === "exercises") return unsubExercises;
+
+    setPlansLoading(true);
+    setPlansError("");
+    const unsubPlans = subscribePlans(db, user.uid, (next) => { setPlans(next); setPlansLoading(false); }, (err) => { setPlansError(friendlyErrorMessage(err, "We could not load your programmes. Please try again.", "programmes")); setPlansLoading(false); });
     return () => { unsubPlans(); unsubExercises(); };
-  }, [user?.uid]);
+  }, [user?.uid, view]);
 
   const activePlans = useMemo(() => sectionPlans(plans, (plan) => !plan.isArchived && plan.isActive), [plans]);
   const inactivePlans = useMemo(() => sectionPlans(plans, (plan) => !plan.isArchived && !plan.isActive), [plans]);
@@ -607,7 +605,7 @@ export default function PlansScreen({ user, view = "programme" }) {
       setOriginal(structuredClone(saved));
       setDraft(structuredClone(saved));
       setLoadedToken(saveToken);
-      setSaveMessage("Plan saved.");
+      setSaveMessage("Programme saved.");
     } catch (err) {
       setSaveMessage(friendlyErrorMessage(err, "We could not save this plan. Please try again."));
     } finally {
@@ -621,23 +619,23 @@ export default function PlansScreen({ user, view = "programme" }) {
     try {
       await duplicatePlanDocument(db, user.uid, plan, { newPlanId: `plan-${makeId()}`, updatedAtToken: token() });
     } catch (err) {
-      setError(friendlyErrorMessage(err, "We could not duplicate that plan. Please try again."));
+      setPlansError(friendlyErrorMessage(err, "We could not duplicate that programme. Please try again.", "programmes"));
     } finally {
       setSaving(false);
     }
   }
 
   async function handleToggleActive(plan) {
-    try { await setPlanActive(db, user.uid, plan, !plan.isActive, { updatedAtToken: token() }); } catch (err) { setError(friendlyErrorMessage(err, "We could not update that plan. Please try again.")); }
+    try { await setPlanActive(db, user.uid, plan, !plan.isActive, { updatedAtToken: token() }); } catch (err) { setPlansError(friendlyErrorMessage(err, "We could not update that programme. Please try again.", "programmes")); }
   }
 
   async function handleArchive(plan) {
     if (!window.confirm(`Archive ${plan.name}? Archived plans stay readable and can be restored.`)) return;
-    try { await archivePlan(db, user.uid, plan, { updatedAtToken: token() }); } catch (err) { setError(friendlyErrorMessage(err, "We could not archive that plan. Please try again.")); }
+    try { await archivePlan(db, user.uid, plan, { updatedAtToken: token() }); } catch (err) { setPlansError(friendlyErrorMessage(err, "We could not archive that programme. Please try again.", "programmes")); }
   }
 
   async function handleRestore(plan) {
-    try { await restorePlan(db, user.uid, plan, { updatedAtToken: token() }); } catch (err) { setError(friendlyErrorMessage(err, "We could not restore that plan. Please try again.")); }
+    try { await restorePlan(db, user.uid, plan, { updatedAtToken: token() }); } catch (err) { setPlansError(friendlyErrorMessage(err, "We could not restore that programme. Please try again.", "programmes")); }
   }
 
   const renderSection = (title, items, empty) => (
@@ -649,14 +647,15 @@ export default function PlansScreen({ user, view = "programme" }) {
 
   return (
     <div className="space-y-6">
-      {view === "exercises" ? <><div><h1 className="text-2xl font-semibold tracking-tight">Manage Exercises</h1><p className="text-sm text-slate-500">Create, search, archive and restore your reusable exercise library.</p></div><ExerciseLibrary user={user} exercises={exercises} /></> : <>
+      {view === "exercises" ? <><div><h1 className="text-2xl font-semibold tracking-tight">Manage Exercises</h1><p className="text-sm text-slate-500">Create, search, archive and restore your reusable exercise library.</p></div>{exercisesError ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{exercisesError}</div> : null}{exercisesLoading ? <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-500">Loading exercise library…</div> : <ExerciseLibrary user={user} exercises={exercises} />}</> : <>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div><h1 className="text-2xl font-semibold tracking-tight">Programme</h1><p className="text-sm text-slate-500">Build reusable, named sessions and train them in any order.</p></div>
         <Button onClick={openNewPlan}><Plus className="mr-1 h-4 w-4" /> Create programme</Button>
       </div>
-      {error ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
-      {loading ? <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-500">Loading plans…</div> : null}
-      {!loading && plans.length === 0 ? <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center"><div className="font-semibold text-slate-900">No programmes yet</div><p className="mt-1 text-sm text-slate-500">Create your first programme and give each workout session a useful name.</p><Button className="mt-4" onClick={openNewPlan}>Create first programme</Button></div> : null}
+      {plansError ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{plansError}</div> : null}
+      {exercisesError ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">The exercise library could not be loaded. Programme exercises already saved remain editable.</div> : null}
+      {plansLoading ? <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-500">Loading programmes…</div> : null}
+      {!plansLoading && plans.length === 0 ? <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center"><div className="font-semibold text-slate-900">No programmes yet</div><p className="mt-1 text-sm text-slate-500">Create your first programme and give each workout session a useful name.</p><Button className="mt-4" onClick={openNewPlan}>Create first programme</Button></div> : null}
       {draft ? <PlanEditor draft={draft} setDraft={setDraft} original={original} exercises={exercises} onSave={saveDraft} onClose={closeEditor} saving={saving} saveMessage={saveMessage} /> : null}
       {renderSection("Active", activePlans, "Activate any plan when you are ready to use it regularly.")}
       {renderSection("Inactive and draft", inactivePlans, "Plans you deactivate will appear here.")}

@@ -9,6 +9,27 @@ import { createWorkout, SIDE } from "../src/lib/domain/v2Models.js";
 import { WORKOUT_BEHAVIOR, groupSessionExercises, previousWeightForExercise, previousWeightsForExercise, resolveWorkoutExerciseSide, workoutExerciseProgressKey, workoutExerciseSideLabel, workoutItem } from "../src/lib/domain/workoutDisplay.js";
 import { EXERCISE_LOGGING_METHOD, EXERCISE_TYPE } from "../src/lib/domain/plans.js";
 import { createDebouncedSaver, createInProgressWorkout, findInProgressWorkout, isWeightedExerciseComplete, reorderExerciseSnapshots, resumeWorkout, updateRecordedSetWeight } from "../src/lib/domain/workoutSession.js";
+import { latestCompletedWorkout, nextRehabAgeMode, persistRehabAgeMode, readRehabAgeMode, rehabAgeLabel } from "../src/lib/domain/homeDashboard.js";
+
+test("rehabilitation age cycles and persists its display preference", () => {
+  assert.equal(rehabAgeLabel("2026-02-17", "months", "2026-07-18"), "5 months post-op");
+  assert.equal(rehabAgeLabel("2026-02-17", "weeks", "2026-07-18"), "21 weeks post-op");
+  assert.equal(rehabAgeLabel("2026-02-17", "days", "2026-07-18"), "151 days post-op");
+  assert.equal(rehabAgeLabel("2026-02-17", "date", "2026-07-18"), "17 Feb 2026");
+  assert.deepEqual(["months", "weeks", "days", "date"].map(nextRehabAgeMode), ["weeks", "days", "date", "months"]);
+  const values = new Map();
+  const storage = { getItem: (key) => values.get(key), setItem: (key, value) => values.set(key, value) };
+  assert.equal(readRehabAgeMode(storage, "preference"), "months");
+  persistRehabAgeMode(storage, "preference", "days");
+  assert.equal(readRehabAgeMode(storage, "preference"), "days");
+  assert.equal(rehabAgeLabel("", "months", "2026-07-18"), "");
+});
+
+test("latest completed workout ignores unfinished workouts", () => {
+  const latest = latestCompletedWorkout([{ id: "draft", status: "in_progress", date: "2026-07-20" }, { id: "older", status: "completed", date: "2026-07-17" }, { id: "latest", status: "completed", date: "2026-07-18" }]);
+  assert.equal(latest.id, "latest");
+  assert.equal(latestCompletedWorkout([{ status: "in_progress" }]), null);
+});
 
 test("calculateWeekFromSurgeryDate returns 1-indexed rehab weeks", () => {
   assert.equal(calculateWeekFromSurgeryDate("2026-01-01", "2026-01-01"), "1");

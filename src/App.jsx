@@ -22,9 +22,10 @@ import {
 import { auth, db } from "./firebase";
 import PlansScreen from "./features/plans/PlansScreen";
 import WorkoutScreen from "./features/workout/WorkoutScreen";
+import HomeScreen from "./features/home/HomeScreen";
 import Button from "./components/ui/Button";
 import { saveLegacyRehabData, subscribeLegacyRehabData } from "./lib/firebase/legacyRehabRepository";
-import { calculateDaysSinceSurgery, calculateWeekFromSurgeryDate, todayString } from "./lib/domain/date";
+import { calculateWeekFromSurgeryDate, todayString } from "./lib/domain/date";
 import { blankSet, defaultSets } from "./lib/domain/sets";
 import {
   DEFAULT_EXERCISES,
@@ -34,8 +35,6 @@ import {
   compactDate,
   compactExerciseSummary,
   emptyWeek,
-  latestBestSetForExercise,
-  latestSymmetryForExercise,
   makeBilateralSession,
   makeId,
   makeSingleLegSession,
@@ -54,16 +53,6 @@ function CardShell({ title, right, children }) {
         {right}
       </div>
       <div className="p-5">{children}</div>
-    </div>
-  );
-}
-
-function SummaryCard({ title, value, subtitle }) {
-  return (
-    <div className="space-y-1 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="text-sm text-slate-500">{title}</div>
-      <div className="text-xl font-semibold leading-tight text-slate-900">{value}</div>
-      <div className="text-xs text-slate-500">{subtitle}</div>
     </div>
   );
 }
@@ -178,6 +167,7 @@ export default function ACLTrackerApp() {
   const [editing, setEditing] = useState(null);
   const [showAllRows, setShowAllRows] = useState(false);
   const [activeTab, setActiveTab] = useState("home");
+  const [workoutIntent, setWorkoutIntent] = useState(null);
   const [progressTab, setProgressTab] = useState("all");
   const [graphsTab, setGraphsTab] = useState("combined");
   const [surgeryDate, setSurgeryDate] = useState("");
@@ -215,9 +205,10 @@ export default function ACLTrackerApp() {
       return;
     }
 
-    // More and Programme use only their v2 user-scoped repositories. Do not
-    // attach the unrelated legacy rehab listener while either screen is open.
-    if (["more", "programme", "workout"].includes(activeTab)) return;
+    // Programme and Workout use only their v2 user-scoped repositories. Home
+    // and Settings retain the legacy surgery-date field until it is migrated by
+    // a future, explicit data-model change.
+    if (["programme", "workout"].includes(activeTab)) return;
 
     return subscribeLegacyRehabData(
       db,
@@ -280,7 +271,6 @@ export default function ACLTrackerApp() {
   const customExercisesPresent = customExercises.filter((e) =>
     weeks.some((w) => (w.sessions || []).some((s) => s.exerciseId === e.id))
   );
-  const daysSinceSurgery = calculateDaysSinceSurgery(surgeryDate);
 
   const currentSymmetry = useMemo(() => {
     if (!selectedExercise?.singleLeg) return null;
@@ -298,15 +288,6 @@ export default function ACLTrackerApp() {
 
   const displayedWeeks = showAllRows ? weeks : weeks.slice(-8);
 
-  const latestLPSym = latestSymmetryForExercise(weeks, "lp");
-  const latestLESym = latestSymmetryForExercise(weeks, "le");
-  const latestHCSym = latestSymmetryForExercise(weeks, "hc");
-  const latestLPLeft = latestBestSetForExercise(weeks, "lp", "leftSets");
-  const latestLPRight = latestBestSetForExercise(weeks, "lp", "rightSets");
-  const latestLELeft = latestBestSetForExercise(weeks, "le", "leftSets");
-  const latestLERight = latestBestSetForExercise(weeks, "le", "rightSets");
-  const latestHCLeft = latestBestSetForExercise(weeks, "hc", "leftSets");
-  const latestHCRight = latestBestSetForExercise(weeks, "hc", "rightSets");
   const builtInTabs = DEFAULT_EXERCISES.filter((e) => exerciseKeys.some((x) => x.id === e.id));
 
   const graphData = weeks.map((week) => {
@@ -554,72 +535,7 @@ async function saveSession() {
           <TabButton active={activeTab === "more"} onClick={() => setActiveTab("more")}>More</TabButton>
         </div>
 
-        {activeTab === "home" && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 md:gap-4">
-              <SummaryCard
-                title="Leg Press"
-                value={`${latestLPLeft ? `${latestLPLeft.reps} × ${latestLPLeft.weight} kg` : "—"} / ${latestLPRight ? `${latestLPRight.reps} × ${latestLPRight.weight} kg` : "—"}`}
-                subtitle="L / R"
-              />
-              <SummaryCard title="Leg Press symmetry" value={latestLPSym != null ? `${latestLPSym}%` : "—"} />
-
-              <SummaryCard
-                title="Leg Extension"
-                value={`${latestLELeft ? `${latestLELeft.reps} × ${latestLELeft.weight} kg` : "—"} / ${latestLERight ? `${latestLERight.reps} × ${latestLERight.weight} kg` : "—"}`}
-                subtitle="L / R"
-              />
-              <SummaryCard title="Leg Extension symmetry" value={latestLESym != null ? `${latestLESym}%` : "—"} />
-
-              <SummaryCard
-                title="Hamstring Curl"
-                value={`${latestHCLeft ? `${latestHCLeft.reps} × ${latestHCLeft.weight} kg` : "—"} / ${latestHCRight ? `${latestHCRight.reps} × ${latestHCRight.weight} kg` : "—"}`}
-                subtitle="L / R"
-              />
-              <SummaryCard title="Hamstring Curl symmetry" value={latestHCSym != null ? `${latestHCSym}%` : "—"} />
-            </div>
-
-            <CardShell title="Setup">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <Label className="text-sm font-medium text-slate-700">Surgery date (optional)</Label>
-                  <Input
-                    type="date"
-                    value={surgeryDate}
-                    onChange={async (e) => {
-  const newDate = e.target.value;
-  setSurgeryDate(newDate);
-  setWeekManuallyEdited(false);
-  await saveAllData(weeks, customExercises, newDate);
-}}
-                  />
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                  {surgeryDate
-                    ? "Week auto-calculates from Date by default, but you can still type over it manually if needed."
-                    : "No surgery date set. Week starts manual, then defaults to the next week after a save."}
-                </div>
-              </div>
-            </CardShell>
-
-            <CardShell title="Recovery home">
-              <div className="grid gap-4 md:grid-cols-2">
-                <SummaryCard
-                  title="Days since surgery"
-                  value={daysSinceSurgery != null ? String(daysSinceSurgery) : "—"}
-                  subtitle={surgeryDate ? "Based on today" : "Add surgery date"}
-                />
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                  This updates from the surgery date using today’s date. Add or change the surgery date above.
-                </div>
-              </div>
-            </CardShell>
-            <CardShell title="Workout">
-              <p className="mb-4 text-sm text-slate-600">Choose any session from your active programme whenever you are ready to train.</p>
-              <div className="flex flex-wrap gap-2"><Button onClick={() => setActiveTab("workout")}>Start Workout</Button><Button variant="outline" onClick={() => setActiveTab("programme")}>View Programme</Button></div>
-            </CardShell>
-          </div>
-        )}
+        {activeTab === "home" && <HomeScreen user={user} surgeryDate={surgeryDate} onOpenProgramme={() => setActiveTab("programme")} onOpenWorkout={(intent) => { setWorkoutIntent({ ...intent, token: Date.now() }); setActiveTab("workout"); }} />}
 
         {activeTab === "log" && (
           <div className="space-y-6">
@@ -759,9 +675,9 @@ async function saveSession() {
         )}
 
         {activeTab === "programme" && <PlansScreen user={user} />}
-        {activeTab === "workout" && <WorkoutScreen user={user} />}
+        {activeTab === "workout" && <WorkoutScreen user={user} intent={workoutIntent} onIntentHandled={() => setWorkoutIntent(null)} />}
         {activeTab === "progress" && <div className="space-y-4"><div><h1 className="text-2xl font-semibold">Progress</h1><p className="text-sm text-slate-500">Review your workout history and rehabilitation trends.</p></div><div className="flex gap-2"><Button onClick={() => setActiveTab("table")}>Workout history</Button><Button variant="outline" onClick={() => setActiveTab("graphs")}>Progress graphs</Button></div></div>}
-        {activeTab === "more" && <div className="space-y-4"><div><h1 className="text-2xl font-semibold">More</h1><p className="text-sm text-slate-500">Manage your library and app preferences.</p></div><PlansScreen user={user} view="exercises" /><CardShell title="Settings"><p className="text-sm text-slate-500">Profile, surgery details and export settings will live here.</p></CardShell></div>}
+        {activeTab === "more" && <div className="space-y-4"><div><h1 className="text-2xl font-semibold">More</h1><p className="text-sm text-slate-500">Manage your library and app preferences.</p></div><PlansScreen user={user} view="exercises" /><CardShell title="Settings"><div className="max-w-md"><Label className="text-sm font-medium text-slate-700">Surgery date (optional)</Label><Input type="date" value={surgeryDate} onChange={async (event) => { const nextDate = event.target.value; setSurgeryDate(nextDate); setWeekManuallyEdited(false); await saveAllData(weeks, customExercises, nextDate); }} /><p className="mt-2 text-sm text-slate-500">Used to calculate your rehabilitation age on Home.</p></div></CardShell></div>}
 
         {activeTab === "table" && (
           <div className="space-y-4">

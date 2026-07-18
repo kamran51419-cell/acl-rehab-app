@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, onSnapshot, runTransaction, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, runTransaction, serverTimestamp, setDoc, updateDoc, writeBatch } from "firebase/firestore";
 import { duplicatePlan, nextPlanForSave } from "../domain/plans.js";
 
 function stripUndefined(value) {
@@ -96,6 +96,18 @@ export async function duplicatePlanDocument(db, uid, sourcePlan, { newPlanId, up
 }
 
 export async function setPlanActive(db, uid, plan, isActive, { updatedAtToken }) {
+  if (isActive) {
+    const snapshot = await getDocs(plansCollection(db, uid));
+    const batch = writeBatch(db);
+    const states = exclusiveActiveProgrammeStates(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })), plan.id);
+    snapshot.docs.forEach((item) => {
+      const current = item.data();
+      const selected = states.find((state) => state.id === item.id)?.isActive;
+      if (current.isActive !== selected) batch.update(item.ref, stripUndefined({ isActive: selected, status: current.isArchived ? "archived" : selected ? "active" : "draft", activatedAt: selected ? serverTimestamp() : null, updatedAt: serverTimestamp(), updatedAtToken: selected ? updatedAtToken : `deactivated-${updatedAtToken}` }));
+    });
+    await batch.commit();
+    return;
+  }
   await updateDoc(planRef(db, uid, plan.id), stripUndefined({
     isActive,
     status: plan.isArchived ? "archived" : isActive ? "active" : "draft",
@@ -103,6 +115,10 @@ export async function setPlanActive(db, uid, plan, isActive, { updatedAtToken })
     updatedAt: serverTimestamp(),
     updatedAtToken,
   }));
+}
+
+export function exclusiveActiveProgrammeStates(plans, selectedId) {
+  return plans.map((plan) => ({ id: plan.id, isActive: plan.id === selectedId, status: plan.isArchived ? "archived" : plan.id === selectedId ? "active" : "draft" }));
 }
 
 export async function archivePlan(db, uid, plan, { updatedAtToken }) {
@@ -153,6 +169,22 @@ export async function archiveExerciseDefinition(db, uid, exerciseId, isArchived,
     console.error("Exercise library Firestore archive/restore failed", { uid, path, code: error?.code, message: error?.message, error });
     throw error;
   }
+}
+
+export async function deleteExerciseDefinition(db, uid, exerciseId, { deleteDocument = deleteDoc, referenceFactory = exerciseRef } = {}) {
+  const path = `${exerciseCollectionPath(uid)}/${exerciseId}`;
+  logExerciseRepository("delete start", { uid, path });
+  try {
+    await deleteDocument(referenceFactory(db, uid, exerciseId));
+    logExerciseRepository("delete complete", { uid, path });
+  } catch (error) {
+    console.error("Exercise library Firestore delete failed", { uid, path, code: error?.code, message: error?.message, error });
+    throw error;
+  }
+}
+
+export function subscribeWorkouts(db, uid, onNext, onError) {
+  return onSnapshot(collection(db, "users", uid, "workouts"), (snapshot) => onNext(snapshot.docs.map((item) => item.data())), onError);
 }
 
 export function subscribeExerciseDefinitions(db, uid, onNext, onError) {

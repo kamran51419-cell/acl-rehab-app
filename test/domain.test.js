@@ -6,7 +6,7 @@ import { bestSet, bestSetSym, setsSummaryLines, setVolume } from "../src/lib/dom
 import { compactExerciseSummary, sessionSummary } from "../src/lib/domain/legacyWorkouts.js";
 import { normalizeLegacyRehabData } from "../src/lib/firebase/legacyRehabRepository.js";
 import { createWorkout } from "../src/lib/domain/v2Models.js";
-import { checklistItems, groupSessionExercises } from "../src/lib/domain/workoutDisplay.js";
+import { WORKOUT_BEHAVIOR, groupSessionExercises, previousWeightForExercise, workoutItem } from "../src/lib/domain/workoutDisplay.js";
 import { EXERCISE_LOGGING_METHOD, EXERCISE_TYPE } from "../src/lib/domain/plans.js";
 
 test("calculateWeekFromSurgeryDate returns 1-indexed rehab weeks", () => {
@@ -34,10 +34,18 @@ test("workout display automatically groups mobility and tasks into checklists", 
   const strength = { id: "squat", exerciseNameSnapshot: "Squat", exerciseType: EXERCISE_TYPE.STRENGTH, loggingMethod: EXERCISE_LOGGING_METHOD.REPS, prescription: {} };
   const grouped = groupSessionExercises([strength, mobility, task]);
   assert.deepEqual(grouped.mobility.map((item) => item.id), ["stretch"]);
-  assert.deepEqual(grouped.tasks.map((item) => item.id), ["pogos"]);
-  assert.deepEqual(grouped.regular.map((item) => item.id), ["squat"]);
-  assert.deepEqual(checklistItems(mobility), [{ id: "stretch", name: "Hamstring stretch", duration: "30 sec" }]);
-  assert.deepEqual(checklistItems(task), [{ id: "pogos", name: "Pogos", duration: "" }]);
+  assert.deepEqual(grouped.other.map((item) => item.id), ["pogos"]);
+  assert.deepEqual(grouped.standard.map((item) => item.id), ["squat"]);
+  assert.deepEqual(workoutItem(mobility), { id: "stretch", name: "Hamstring stretch", summary: "30 sec", behavior: WORKOUT_BEHAVIOR.COMPLETION });
+  assert.deepEqual(workoutItem(task), { id: "pogos", name: "Pogos", summary: "", behavior: WORKOUT_BEHAVIOR.COMPLETION });
+});
+
+test("prescription methods determine completion, weight and interval workout behavior", () => {
+  const base = { id: "item", exerciseId: "exercise", exerciseNameSnapshot: "Exercise", exerciseType: EXERCISE_TYPE.OTHER };
+  for (const method of [EXERCISE_LOGGING_METHOD.REPS, EXERCISE_LOGGING_METHOD.TIME, EXERCISE_LOGGING_METHOD.DISTANCE, EXERCISE_LOGGING_METHOD.COMPLETED]) assert.equal(workoutItem({ ...base, loggingMethod: method, prescription: method === EXERCISE_LOGGING_METHOD.REPS ? { targetSets: 3, targetReps: { type: "fixed", value: 20 } } : method === EXERCISE_LOGGING_METHOD.TIME ? { targetDurationSeconds: 60 } : { targetDistance: 2 } }).behavior, WORKOUT_BEHAVIOR.COMPLETION);
+  assert.equal(workoutItem({ ...base, loggingMethod: EXERCISE_LOGGING_METHOD.REPS_WEIGHT, prescription: { targetSets: 3, targetReps: { type: "fixed", value: 10 } } }).behavior, WORKOUT_BEHAVIOR.WEIGHT);
+  assert.equal(workoutItem({ ...base, loggingMethod: EXERCISE_LOGGING_METHOD.INTERVALS, prescription: { stages: [] } }).behavior, WORKOUT_BEHAVIOR.INTERVALS);
+  assert.equal(previousWeightForExercise([{ date: "2026-01-01", exercises: [{ exerciseId: "exercise", prescriptionBlocks: [{ actualSets: [{ weight: 42.5 }] }] }] }], "exercise"), 42.5);
 });
 
 test("set helpers calculate best sets and symmetry from legacy set values", () => {

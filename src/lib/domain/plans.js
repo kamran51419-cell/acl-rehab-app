@@ -48,7 +48,7 @@ export const DEFAULT_LOGGING_METHOD_BY_EXERCISE_TYPE = Object.freeze({
   [EXERCISE_TYPE.BALANCE]: EXERCISE_LOGGING_METHOD.TIME,
   [EXERCISE_TYPE.MOBILITY]: EXERCISE_LOGGING_METHOD.TIME,
   [EXERCISE_TYPE.STRETCH]: EXERCISE_LOGGING_METHOD.TIME,
-  [EXERCISE_TYPE.OTHER]: EXERCISE_LOGGING_METHOD.COMPLETED,
+  [EXERCISE_TYPE.OTHER]: EXERCISE_LOGGING_METHOD.REPS,
   [EXERCISE_TYPE.TIMED_HOLD]: EXERCISE_LOGGING_METHOD.TIME,
   [EXERCISE_TYPE.FOAM_ROLLING]: EXERCISE_LOGGING_METHOD.TIME,
 });
@@ -59,13 +59,14 @@ export function defaultLoggingMethodForExerciseType(exerciseType = EXERCISE_TYPE
 
 export function loggingMethodsForExerciseType(exerciseType) {
   if (exerciseType === EXERCISE_TYPE.STRENGTH) return [EXERCISE_LOGGING_METHOD.REPS, EXERCISE_LOGGING_METHOD.REPS_WEIGHT];
-  if (exerciseType === EXERCISE_TYPE.PLYOMETRIC) return [EXERCISE_LOGGING_METHOD.COMPLETED];
+  if (exerciseType === EXERCISE_TYPE.PLYOMETRIC) return [];
   if (exerciseType === EXERCISE_TYPE.CARDIO) return [EXERCISE_LOGGING_METHOD.TIME, EXERCISE_LOGGING_METHOD.DISTANCE, EXERCISE_LOGGING_METHOD.INTERVALS];
-  if (exerciseType === EXERCISE_TYPE.BALANCE) return [EXERCISE_LOGGING_METHOD.TIME, EXERCISE_LOGGING_METHOD.REPS, EXERCISE_LOGGING_METHOD.COMPLETED];
+  if (exerciseType === EXERCISE_TYPE.BALANCE) return [EXERCISE_LOGGING_METHOD.REPS, EXERCISE_LOGGING_METHOD.TIME];
   if ([EXERCISE_TYPE.MOBILITY, EXERCISE_TYPE.STRETCH, EXERCISE_TYPE.TIMED_HOLD, EXERCISE_TYPE.FOAM_ROLLING].includes(exerciseType)) {
-    return [EXERCISE_LOGGING_METHOD.TIME, EXERCISE_LOGGING_METHOD.COMPLETED];
+    return [EXERCISE_LOGGING_METHOD.TIME];
   }
-  return [EXERCISE_LOGGING_METHOD.COMPLETED];
+  if (exerciseType === EXERCISE_TYPE.OTHER) return [EXERCISE_LOGGING_METHOD.REPS, EXERCISE_LOGGING_METHOD.REPS_WEIGHT, EXERCISE_LOGGING_METHOD.TIME, EXERCISE_LOGGING_METHOD.DISTANCE, EXERCISE_LOGGING_METHOD.INTERVALS];
+  return [];
 }
 
 export const TARGET_WEIGHT_MODE = Object.freeze({
@@ -146,25 +147,35 @@ export function createStrengthPrescription({ side = SIDE.BOTH, targetSets = 3, t
   return { side, targetSets: Number(targetSets), targetReps, notes };
 }
 
-export function createTimedHoldPrescription({ side = SIDE.BOTH, targetSets = 3, targetDurationSeconds = 30, notes = "" } = {}) {
-  return { side, targetSets: Number(targetSets), targetDurationSeconds: Number(targetDurationSeconds), notes };
+export function inferDurationUnit(seconds) {
+  return Number(seconds || 0) >= 60 && Number(seconds || 0) % 60 === 0 ? "minutes" : "seconds";
 }
 
-export function createCardioPrescription({ targetDurationSeconds = 900, targetDistance = undefined, distance = undefined, notes = "" } = {}) {
-  return { targetDurationSeconds: Number(targetDurationSeconds), targetDistance: targetDistance ?? distance, notes };
+export function durationSummary(seconds, durationUnit) {
+  const value = Number(seconds || 0);
+  const unit = durationUnit || inferDurationUnit(value);
+  return unit === "minutes" ? `${value / 60} min` : `${value} sec`;
+}
+
+export function createTimedHoldPrescription({ side = SIDE.BOTH, targetSets = 3, targetDurationSeconds = 30, durationUnit = "seconds", notes = "" } = {}) {
+  return { side, targetSets: Number(targetSets), targetDurationSeconds: Number(targetDurationSeconds), durationUnit, notes };
+}
+
+export function createCardioPrescription({ targetDurationSeconds = 900, durationUnit = "minutes", targetDistance = undefined, distance = undefined, notes = "" } = {}) {
+  return { targetDurationSeconds: Number(targetDurationSeconds), durationUnit, targetDistance: targetDistance ?? distance, notes };
 }
 
 export const INTERVAL_PHASE = Object.freeze({ WORK: "work", REST: "rest" });
 
-export function createIntervalStage({ id = makeGeneratedId("interval"), phase = INTERVAL_PHASE.WORK, durationSeconds = 60, label = "", sortOrder = 0 } = {}) {
-  return { id, phase, durationSeconds: Number(durationSeconds), label, sortOrder };
+export function createIntervalStage({ id = makeGeneratedId("interval"), phase = INTERVAL_PHASE.WORK, durationSeconds = 60, durationUnit = inferDurationUnit(durationSeconds), label = "", sortOrder = 0 } = {}) {
+  return { id, phase, durationSeconds: Number(durationSeconds), durationUnit, label, sortOrder };
 }
 
 export function createIntervalPrescription({ stages } = {}) {
   return {
     stages: stages || [
-      createIntervalStage({ phase: INTERVAL_PHASE.WORK, durationSeconds: 240, sortOrder: 0 }),
-      createIntervalStage({ phase: INTERVAL_PHASE.REST, durationSeconds: 60, sortOrder: 1 }),
+      createIntervalStage({ phase: INTERVAL_PHASE.WORK, durationSeconds: 240, durationUnit: "minutes", sortOrder: 0 }),
+      createIntervalStage({ phase: INTERVAL_PHASE.REST, durationSeconds: 60, durationUnit: "minutes", sortOrder: 1 }),
     ],
   };
 }
@@ -177,16 +188,21 @@ export function createListPrescription({ items = [""], notes = "" } = {}) {
 }
 
 export function createDefaultPrescription(exerciseType = EXERCISE_TYPE.STRENGTH, loggingMethod = defaultLoggingMethodForExerciseType(exerciseType)) {
-  if (exerciseType === EXERCISE_TYPE.STRENGTH) return createStrengthPrescription();
-  if (exerciseType === EXERCISE_TYPE.PLYOMETRIC || exerciseType === EXERCISE_TYPE.OTHER) return {};
+  if ([EXERCISE_LOGGING_METHOD.REPS, EXERCISE_LOGGING_METHOD.REPS_WEIGHT].includes(loggingMethod)) return createStrengthPrescription();
+  if (loggingMethod === EXERCISE_LOGGING_METHOD.INTERVALS) return createIntervalPrescription();
+  if (loggingMethod === EXERCISE_LOGGING_METHOD.DISTANCE) return createCardioPrescription({ targetDistance: 1 });
+  if (loggingMethod === EXERCISE_LOGGING_METHOD.TIME && exerciseType === EXERCISE_TYPE.CARDIO) return createCardioPrescription();
+  if (loggingMethod === EXERCISE_LOGGING_METHOD.TIME && [EXERCISE_TYPE.MOBILITY, EXERCISE_TYPE.STRETCH].includes(exerciseType)) return { targetDurationSeconds: 30, durationUnit: "seconds" };
+  if (loggingMethod === EXERCISE_LOGGING_METHOD.TIME && ![EXERCISE_TYPE.BALANCE, EXERCISE_TYPE.TIMED_HOLD].includes(exerciseType)) return { targetDurationSeconds: 60, durationUnit: "seconds" };
+  if (exerciseType === EXERCISE_TYPE.PLYOMETRIC || loggingMethod === EXERCISE_LOGGING_METHOD.COMPLETED) return {};
   if (exerciseType === EXERCISE_TYPE.TIMED_HOLD) return createTimedHoldPrescription();
   if (exerciseType === EXERCISE_TYPE.BALANCE) {
     if (loggingMethod === EXERCISE_LOGGING_METHOD.TIME) return createTimedHoldPrescription();
     if (loggingMethod === EXERCISE_LOGGING_METHOD.REPS) return createStrengthPrescription();
     return {};
   }
-  if (exerciseType === EXERCISE_TYPE.CARDIO) return loggingMethod === EXERCISE_LOGGING_METHOD.INTERVALS ? createIntervalPrescription() : createCardioPrescription();
-  if ([EXERCISE_TYPE.MOBILITY, EXERCISE_TYPE.STRETCH, EXERCISE_TYPE.FOAM_ROLLING].includes(exerciseType)) return loggingMethod === EXERCISE_LOGGING_METHOD.TIME ? { targetDurationSeconds: 30 } : {};
+  if (exerciseType === EXERCISE_TYPE.CARDIO) return createCardioPrescription();
+  if ([EXERCISE_TYPE.MOBILITY, EXERCISE_TYPE.STRETCH, EXERCISE_TYPE.FOAM_ROLLING].includes(exerciseType)) return { targetDurationSeconds: 30, durationUnit: "seconds" };
   return {};
 }
 
@@ -278,6 +294,12 @@ export function reorderItems(items, fromIndex, toIndex) {
   return ordered.map((item, index) => ({ ...item, sortOrder: index }));
 }
 
+export function insertItemAfter(items, afterIndex, item) {
+  const ordered = sortByOrder(items);
+  ordered.splice(afterIndex + 1, 0, item);
+  return ordered.map((entry, index) => ({ ...entry, sortOrder: index }));
+}
+
 function pushDuplicateErrors(items, path, errors) {
   const seen = new Set();
   asArray(items).forEach((item, index) => {
@@ -358,12 +380,19 @@ export function validatePlan(plan) {
       const path = `${sessionPath}.exercises[${exerciseIndex}]`;
       if (!exercise.exerciseId) errors.push(`${path} needs an exercise.`);
       if (!normalizeName(exercise.exerciseNameSnapshot)) errors.push(`${path} needs an exercise name snapshot.`);
+      const method = exercise.loggingMethod || defaultLoggingMethodForExerciseType(exercise.exerciseType);
+      const allowedMethods = loggingMethodsForExerciseType(exercise.exerciseType);
+      const isLegacyMethod = method === EXERCISE_LOGGING_METHOD.COMPLETED || method === EXERCISE_LOGGING_METHOD.TIME_DISTANCE || exercise.exerciseType === EXERCISE_TYPE.PLYOMETRIC;
+      if (!allowedMethods.includes(method) && !isLegacyMethod) errors.push(`${path} has an unsupported prescription method.`);
+      if (method === EXERCISE_LOGGING_METHOD.COMPLETED && exercise.exerciseType !== EXERCISE_TYPE.PLYOMETRIC) return;
       if (exercise.exerciseType === EXERCISE_TYPE.STRENGTH) validateStrength(exercise, path, errors);
       else if (exercise.exerciseType === EXERCISE_TYPE.PLYOMETRIC) { if (exercise.prescription?.blocks) validateStrength(exercise, path, errors); }
       else if (exercise.exerciseType === EXERCISE_TYPE.TIMED_HOLD) validateTimedHold(exercise, path, errors);
       else if (exercise.exerciseType === EXERCISE_TYPE.BALANCE && exercise.loggingMethod === EXERCISE_LOGGING_METHOD.TIME) validateTimedHold(exercise, path, errors);
       else if (exercise.exerciseType === EXERCISE_TYPE.BALANCE && exercise.loggingMethod === EXERCISE_LOGGING_METHOD.REPS) validateStrengthPrescription(exercise.prescription || {}, path, errors);
       else if (exercise.exerciseType === EXERCISE_TYPE.CARDIO) validateCardio(exercise, path, errors);
+      else if (exercise.exerciseType === EXERCISE_TYPE.OTHER && [EXERCISE_LOGGING_METHOD.REPS, EXERCISE_LOGGING_METHOD.REPS_WEIGHT].includes(method)) validateStrength(exercise, path, errors);
+      else if (exercise.exerciseType === EXERCISE_TYPE.OTHER && [EXERCISE_LOGGING_METHOD.TIME, EXERCISE_LOGGING_METHOD.DISTANCE, EXERCISE_LOGGING_METHOD.INTERVALS].includes(method)) validateCardio(exercise, path, errors);
       else if ([EXERCISE_TYPE.MOBILITY, EXERCISE_TYPE.STRETCH].includes(exercise.exerciseType)) {
         if (exercise.prescription?.items) validateListPrescription(exercise, path, errors);
         else if (exercise.loggingMethod === EXERCISE_LOGGING_METHOD.TIME && !positiveInt(exercise.prescription?.targetDurationSeconds)) errors.push(`${path} duration must be positive.`);
@@ -422,23 +451,32 @@ export function planPrescriptionSummary(exercise) {
     }).join(" · ");
   }
   if (type === EXERCISE_TYPE.TIMED_HOLD || type === EXERCISE_TYPE.BALANCE) {
-    if (exercise.loggingMethod === EXERCISE_LOGGING_METHOD.COMPLETED) return "Task";
+    if (exercise.loggingMethod === EXERCISE_LOGGING_METHOD.COMPLETED) return "Complete";
     if (exercise.loggingMethod === EXERCISE_LOGGING_METHOD.REPS) {
       const reps = exercise.prescription?.targetReps?.type === REP_TARGET_TYPE.RANGE ? `${exercise.prescription.targetReps.min}–${exercise.prescription.targetReps.max}` : exercise.prescription?.targetReps?.value || "?";
       return `${exercise.prescription?.targetSets || 0} × ${reps}`;
     }
     const side = exercise.prescription?.side === SIDE.LEFT ? "left" : exercise.prescription?.side === SIDE.RIGHT ? "right" : "both";
-    return `${exercise.prescription?.targetSets || 0} × ${exercise.prescription?.targetDurationSeconds || 0} sec ${side}`;
+    return `${exercise.prescription?.targetSets || 0} × ${durationSummary(exercise.prescription?.targetDurationSeconds, exercise.prescription?.durationUnit)} ${side}`;
   }
   if (type === EXERCISE_TYPE.CARDIO) {
     if (exercise.loggingMethod === EXERCISE_LOGGING_METHOD.INTERVALS) return `${asArray(exercise.prescription?.stages).length} intervals`;
     if (exercise.loggingMethod === EXERCISE_LOGGING_METHOD.DISTANCE) return `${exercise.prescription?.targetDistance || exercise.prescription?.distance || 0} km`;
-    const minutes = Math.round(Number(exercise.prescription?.targetDurationSeconds || 0) / 60);
-    return `${minutes} min`;
+    return durationSummary(exercise.prescription?.targetDurationSeconds, exercise.prescription?.durationUnit);
+  }
+  if (type === EXERCISE_TYPE.OTHER) {
+    if (exercise.loggingMethod === EXERCISE_LOGGING_METHOD.COMPLETED) return "Complete";
+    if ([EXERCISE_LOGGING_METHOD.REPS, EXERCISE_LOGGING_METHOD.REPS_WEIGHT].includes(exercise.loggingMethod)) {
+      const reps = exercise.prescription?.targetReps?.type === REP_TARGET_TYPE.RANGE ? `${exercise.prescription.targetReps.min}–${exercise.prescription.targetReps.max}` : exercise.prescription?.targetReps?.value || "?";
+      return `${exercise.prescription?.targetSets || 0} × ${reps}`;
+    }
+    if (exercise.loggingMethod === EXERCISE_LOGGING_METHOD.TIME) return durationSummary(exercise.prescription?.targetDurationSeconds, exercise.prescription?.durationUnit);
+    if (exercise.loggingMethod === EXERCISE_LOGGING_METHOD.DISTANCE) return `${exercise.prescription?.targetDistance || 0} km`;
+    if (exercise.loggingMethod === EXERCISE_LOGGING_METHOD.INTERVALS) return `${asArray(exercise.prescription?.stages).length} intervals`;
   }
   if (type === EXERCISE_TYPE.MOBILITY || type === EXERCISE_TYPE.STRETCH) {
     if (exercise.prescription?.items) return `${asArray(exercise.prescription.items).length} stretches`;
-    return exercise.loggingMethod === EXERCISE_LOGGING_METHOD.TIME ? `${exercise.prescription?.targetDurationSeconds || 0} sec` : "Task";
+    return exercise.loggingMethod === EXERCISE_LOGGING_METHOD.TIME ? durationSummary(exercise.prescription?.targetDurationSeconds, exercise.prescription?.durationUnit) : "Complete";
   }
   if (type === EXERCISE_TYPE.FOAM_ROLLING) return `${asArray(exercise.prescription?.items).length} areas`;
   if (type === EXERCISE_TYPE.OTHER) return "Complete as prescribed";

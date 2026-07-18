@@ -5,8 +5,8 @@ import { calculateWeekFromSurgeryDate, formatDate } from "../src/lib/domain/date
 import { bestSet, bestSetSym, setsSummaryLines, setVolume } from "../src/lib/domain/sets.js";
 import { compactExerciseSummary, sessionSummary } from "../src/lib/domain/legacyWorkouts.js";
 import { normalizeLegacyRehabData } from "../src/lib/firebase/legacyRehabRepository.js";
-import { createWorkout } from "../src/lib/domain/v2Models.js";
-import { WORKOUT_BEHAVIOR, groupSessionExercises, previousWeightForExercise, workoutItem } from "../src/lib/domain/workoutDisplay.js";
+import { createWorkout, SIDE } from "../src/lib/domain/v2Models.js";
+import { WORKOUT_BEHAVIOR, groupSessionExercises, previousWeightForExercise, previousWeightsForExercise, resolveWorkoutExerciseSide, workoutExerciseProgressKey, workoutExerciseSideLabel, workoutItem } from "../src/lib/domain/workoutDisplay.js";
 import { EXERCISE_LOGGING_METHOD, EXERCISE_TYPE } from "../src/lib/domain/plans.js";
 import { createDebouncedSaver, createInProgressWorkout, findInProgressWorkout, isWeightedExerciseComplete, reorderExerciseSnapshots, resumeWorkout, updateRecordedSetWeight } from "../src/lib/domain/workoutSession.js";
 
@@ -59,9 +59,67 @@ test("weighted workout drafts preserve multiple independent sets and resume", ()
   const resumed = resumeWorkout({ ...changed, notes: "Saved", status: "in_progress" }, draft);
   assert.equal(resumed.notes, "Saved");
   assert.equal(resumed.exercises[0].recordedSets[1].weight, 85);
+  assert.equal(resumed.exercises[0].recordedSets[1].rawWeight, "85");
   assert.equal(findInProgressWorkout([resumed], "plan", "session", "2026-07-18").id, "workout");
   const legacyResume = resumeWorkout({ ...draft, exercises: [{ ...draft.exercises[0], recordedSets: undefined, weight: 77.5 }] }, draft);
   assert.equal(legacyResume.exercises[0].recordedSets[0].weight, 77.5);
+  assert.equal(legacyResume.exercises[0].recordedSets[0].rawWeight, "77.5");
+});
+
+test("resume restores every saved weight and derives only missing raw values", () => {
+  const programme = { id: "plan", name: "Programme" };
+  const session = { id: "session", name: "Lower", exercises: [{ id: "press", exerciseId: "leg-press", exerciseNameSnapshot: "Leg Press", exerciseType: EXERCISE_TYPE.STRENGTH, loggingMethod: EXERCISE_LOGGING_METHOD.REPS_WEIGHT, prescription: { side: SIDE.LEFT, targetSets: 2, targetReps: { type: "fixed", value: 10 } } }] };
+  const fresh = createInProgressWorkout({ id: "fresh", userId: "uid", programme, session, date: "2026-07-18" });
+  const saved = { ...fresh, id: "saved", exercises: [{ ...fresh.exercises[0], recordedSets: [{ ...fresh.exercises[0].recordedSets[0], weight: 12.5, rawWeight: "12.50" }, { ...fresh.exercises[0].recordedSets[1], weight: 13, rawWeight: "" }] }] };
+  const resumed = resumeWorkout(saved, fresh);
+  assert.deepEqual(resumed.exercises[0].recordedSets.map(({ weight, rawWeight }) => ({ weight, rawWeight })), [{ weight: 12.5, rawWeight: "12.50" }, { weight: 13, rawWeight: "13" }]);
+});
+
+test("workout snapshots preserve side and programme guidance independently", () => {
+  const programme = { id: "plan", name: "Programme" };
+  const exercises = [SIDE.BOTH, SIDE.LEFT, SIDE.RIGHT].map((side, index) => ({ id: `press-${side}`, exerciseId: "leg-press", exerciseNameSnapshot: "Leg Press", exerciseType: EXERCISE_TYPE.STRENGTH, loggingMethod: EXERCISE_LOGGING_METHOD.REPS, notes: `Guidance ${side}`, sortOrder: index, prescription: { side, targetSets: 2, targetReps: { type: "fixed", value: 10 } } }));
+  const session = { id: "session", name: "Lower", exercises };
+  const workout = createInProgressWorkout({ id: "workout", userId: "uid", programme, session, date: "2026-07-18" });
+  assert.deepEqual(workout.exercises.map((exercise) => exercise.sideSnapshot), [SIDE.BOTH, SIDE.LEFT, SIDE.RIGHT]);
+  assert.deepEqual(workout.exercises.map((exercise) => exercise.programmeNoteSnapshot), ["Guidance both", "Guidance left", "Guidance right"]);
+  session.exercises[1].notes = "Changed later";
+  session.exercises[1].prescription.side = SIDE.RIGHT;
+  assert.equal(workout.exercises[1].programmeNoteSnapshot, "Guidance left");
+  assert.equal(workout.exercises[1].sideSnapshot, SIDE.LEFT);
+  assert.equal(workoutExerciseSideLabel({ ...workout.exercises[0], exerciseType: EXERCISE_TYPE.BALANCE }), "Both sides");
+  assert.deepEqual(workout.exercises.map(workoutExerciseProgressKey), ["leg-press:both", "leg-press:left", "leg-press:right"]);
+});
+
+test("side resolution reads snapshots, prescriptions and legacy blocks safely", () => {
+  assert.equal(resolveWorkoutExerciseSide({ sideSnapshot: SIDE.RIGHT, prescription: { side: SIDE.LEFT } }), SIDE.RIGHT);
+  assert.equal(resolveWorkoutExerciseSide({ prescription: { side: SIDE.LEFT } }), SIDE.LEFT);
+  assert.equal(resolveWorkoutExerciseSide({ prescriptionBlocks: [{ side: SIDE.BOTH }] }), SIDE.BOTH);
+  assert.equal(resolveWorkoutExerciseSide({ exerciseId: "legacy" }), undefined);
+  assert.equal(workoutExerciseProgressKey({ exerciseId: "legacy" }), "legacy:none");
+});
+
+test("previous weights match exercise identity, side and set number", () => {
+  const set = (weight, setNumber = 1) => ({ id: `set-${setNumber}`, setNumber, weight });
+  const workouts = [{ date: "2026-07-17", exercises: [
+    { id: "both-copy", exerciseId: "extension", sideSnapshot: SIDE.BOTH, recordedSets: [set(30), set(32, 2)] },
+    { id: "left-copy", exerciseId: "extension", sideSnapshot: SIDE.LEFT, recordedSets: [set(12), set(13, 2)] },
+    { id: "right-copy", exerciseId: "extension", sideSnapshot: SIDE.RIGHT, recordedSets: [set(14), set(15, 2)] },
+  ] }];
+  assert.deepEqual(previousWeightsForExercise(workouts, { id: "left-copy", exerciseId: "extension", prescription: { side: SIDE.LEFT } }), { 1: 12, 2: 13 });
+  assert.deepEqual(previousWeightsForExercise(workouts, { id: "right-copy", exerciseId: "extension", prescription: { side: SIDE.RIGHT } }), { 1: 14, 2: 15 });
+  assert.deepEqual(previousWeightsForExercise(workouts, { id: "both-copy", exerciseId: "extension", prescription: { side: SIDE.BOTH } }), { 1: 30, 2: 32 });
+  assert.deepEqual(previousWeightsForExercise([{ date: "2025-01-01", exercises: [{ exerciseId: "legacy", recordedSets: [set(9)] }] }], { id: "new", exerciseId: "legacy", prescription: { side: SIDE.LEFT } }), { 1: 9 });
+});
+
+test("repeated exercise copies keep weight updates independent", () => {
+  const programme = { id: "plan", name: "Programme" };
+  const base = { exerciseId: "extension", exerciseNameSnapshot: "Leg Extension", exerciseType: EXERCISE_TYPE.STRENGTH, loggingMethod: EXERCISE_LOGGING_METHOD.REPS_WEIGHT, prescription: { targetSets: 1, targetReps: { type: "fixed", value: 10 } } };
+  const session = { id: "session", name: "Lower", exercises: [{ ...base, id: "both", notes: "Bilateral", prescription: { ...base.prescription, side: SIDE.BOTH } }, { ...base, id: "left", notes: "Unilateral", prescription: { ...base.prescription, side: SIDE.LEFT } }] };
+  const draft = createInProgressWorkout({ id: "workout", userId: "uid", programme, session, date: "2026-07-18" });
+  const changed = updateRecordedSetWeight(draft, "left", "left-set-1", "12");
+  assert.equal(changed.exercises.find((exercise) => exercise.id === "both").recordedSets[0].weight, "");
+  assert.equal(changed.exercises.find((exercise) => exercise.id === "left").recordedSets[0].weight, 12);
+  assert.deepEqual(changed.exercises.map((exercise) => exercise.programmeNoteSnapshot), ["Bilateral", "Unilateral"]);
 });
 
 test("debounced autosave reuses the latest workout and flushes pending changes", async () => {
@@ -73,6 +131,22 @@ test("debounced autosave reuses the latest workout and flushes pending changes",
   await saver.flush();
   assert.deepEqual(saved, [{ id: "same", notes: "latest" }]);
   assert.deepEqual(statuses, ["saving", "saved"]);
+});
+
+test("autosave flush waits for persistence and reports failures", async () => {
+  const events = [];
+  let release;
+  const saver = createDebouncedSaver(() => new Promise((resolve) => { events.push("write-started"); release = resolve; }), 1000);
+  saver.schedule({ id: "workout" });
+  const flushing = saver.flush().then(() => events.push("navigation"));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(events, ["write-started"]);
+  release();
+  await flushing;
+  assert.deepEqual(events, ["write-started", "navigation"]);
+  const failing = createDebouncedSaver(async () => { throw new Error("offline"); }, 1000);
+  failing.schedule({ id: "workout" });
+  await assert.rejects(failing.flush(), /offline/);
 });
 
 test("exercise snapshot ordering preserves ids and prescriptions", () => {

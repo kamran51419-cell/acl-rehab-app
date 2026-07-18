@@ -1,5 +1,6 @@
 import { EXERCISE_LOGGING_METHOD } from "./plans.js";
 import { WORKOUT_STATUS } from "./v2Models.js";
+import { resolveWorkoutExerciseSide } from "./workoutDisplay.js";
 
 function ordered(items) {
   return (items || []).slice().sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
@@ -18,6 +19,8 @@ export function createWorkoutExerciseSnapshot(exercise, previousWeights = {}) {
     exerciseNameSnapshot: exercise.exerciseNameSnapshot,
     exerciseType: exercise.exerciseType,
     loggingMethod: exercise.loggingMethod,
+    sideSnapshot: resolveWorkoutExerciseSide(exercise),
+    programmeNoteSnapshot: exercise.notes || "",
     prescription: structuredClone(exercise.prescription || {}),
     sortOrder: exercise.sortOrder,
     completed: false,
@@ -48,7 +51,7 @@ export function createInProgressWorkout({ id, userId, programme, session, date, 
     programmeNameSnapshot: programme.name,
     sessionId: session.id,
     sessionNameSnapshot: session.name,
-    exercises: ordered(session.exercises).map((exercise) => createWorkoutExerciseSnapshot(exercise, previousWeightsByExercise[exercise.exerciseId] || {})),
+    exercises: ordered(session.exercises).map((exercise) => createWorkoutExerciseSnapshot(exercise, previousWeightsByExercise[exercise.id] || previousWeightsByExercise[exercise.exerciseId] || {})),
     notes: "",
   };
 }
@@ -63,11 +66,13 @@ export function resumeWorkout(existing, template) {
     ...template,
     ...existing,
     exercises: template.exercises.map((fresh) => {
-      const saved = (existing.exercises || []).find((exercise) => exercise.id === fresh.id || exercise.exerciseId === fresh.exerciseId);
+      const savedById = (existing.exercises || []).find((exercise) => exercise.id === fresh.id);
+      const sameDefinition = (existing.exercises || []).filter((exercise) => exercise.exerciseId === fresh.exerciseId);
+      const saved = savedById || (sameDefinition.length === 1 ? sameDefinition[0] : undefined);
       if (!saved) return fresh;
       const legacySets = (saved.prescriptionBlocks || []).flatMap((block) => block.actualSets || []);
       const savedSets = saved.recordedSets?.length ? saved.recordedSets : legacySets.length ? legacySets : saved.weight !== undefined ? [{ setNumber: 1, weight: saved.weight }] : [];
-      return { ...fresh, ...saved, recordedSets: fresh.recordedSets.map((set) => { const previous = savedSets.find((savedSet) => savedSet.id === set.id || Number(savedSet.setNumber) === set.setNumber); return previous ? { ...set, weight: previous.weight ?? set.weight } : set; }) };
+      return { ...fresh, ...saved, recordedSets: fresh.recordedSets.map((set) => { const previous = savedSets.find((savedSet) => savedSet.id === set.id || Number(savedSet.setNumber) === set.setNumber); if (!previous) return set; const weight = previous.weight ?? set.weight; return { ...set, ...previous, weight, rawWeight: previous.rawWeight !== undefined && previous.rawWeight !== "" ? previous.rawWeight : (weight !== undefined && weight !== "" ? String(weight) : set.rawWeight) }; }) };
     }),
   };
 }
@@ -102,6 +107,7 @@ export function createDebouncedSaver(save, delay = 500, onStatus = () => {}) {
       if (currentRevision === revision) onStatus("saved");
     } catch (error) {
       if (currentRevision === revision) onStatus("error", error);
+      throw error;
     }
   }
   return {
@@ -110,10 +116,10 @@ export function createDebouncedSaver(save, delay = 500, onStatus = () => {}) {
       revision += 1;
       clearTimeout(timer);
       const current = revision;
-      timer = setTimeout(() => { timer = null; persist(latest, current); }, delay);
+      timer = setTimeout(() => { timer = null; persist(latest, current).catch(() => {}); }, delay);
     },
     async flush() {
-      if (!timer) { await queue.catch(() => {}); return; }
+      if (!timer) { await queue; return; }
       clearTimeout(timer);
       timer = null;
       const current = revision;

@@ -3,11 +3,52 @@ import { PLAN_STATUS, SIDE, V2_SCHEMA_VERSION, createExerciseDefinition } from "
 
 export const EXERCISE_TYPE = Object.freeze({
   STRENGTH: "strength",
-  TIMED_HOLD: "timed_hold",
   CARDIO: "cardio",
+  PLYOMETRIC: "plyometric",
+  BALANCE: "balance",
   MOBILITY: "mobility",
+  STRETCH: "stretch",
+  OTHER: "other",
+  TIMED_HOLD: "timed_hold",
   FOAM_ROLLING: "foam_rolling",
 });
+
+export const EXERCISE_TYPE_OPTIONS = Object.freeze([
+  EXERCISE_TYPE.STRENGTH,
+  EXERCISE_TYPE.CARDIO,
+  EXERCISE_TYPE.PLYOMETRIC,
+  EXERCISE_TYPE.BALANCE,
+  EXERCISE_TYPE.MOBILITY,
+  EXERCISE_TYPE.STRETCH,
+  EXERCISE_TYPE.OTHER,
+]);
+
+export const EXERCISE_LOGGING_METHOD = Object.freeze({
+  REPS: "reps",
+  REPS_WEIGHT: "reps_weight",
+  TIME: "time",
+  DISTANCE: "distance",
+  TIME_DISTANCE: "time_distance",
+  COMPLETED: "completed",
+});
+
+export const EXERCISE_LOGGING_METHOD_OPTIONS = Object.freeze(Object.values(EXERCISE_LOGGING_METHOD));
+
+export const DEFAULT_LOGGING_METHOD_BY_EXERCISE_TYPE = Object.freeze({
+  [EXERCISE_TYPE.STRENGTH]: EXERCISE_LOGGING_METHOD.REPS_WEIGHT,
+  [EXERCISE_TYPE.CARDIO]: EXERCISE_LOGGING_METHOD.TIME_DISTANCE,
+  [EXERCISE_TYPE.PLYOMETRIC]: EXERCISE_LOGGING_METHOD.REPS,
+  [EXERCISE_TYPE.BALANCE]: EXERCISE_LOGGING_METHOD.TIME,
+  [EXERCISE_TYPE.MOBILITY]: EXERCISE_LOGGING_METHOD.TIME,
+  [EXERCISE_TYPE.STRETCH]: EXERCISE_LOGGING_METHOD.TIME,
+  [EXERCISE_TYPE.OTHER]: EXERCISE_LOGGING_METHOD.COMPLETED,
+  [EXERCISE_TYPE.TIMED_HOLD]: EXERCISE_LOGGING_METHOD.TIME,
+  [EXERCISE_TYPE.FOAM_ROLLING]: EXERCISE_LOGGING_METHOD.TIME,
+});
+
+export function defaultLoggingMethodForExerciseType(exerciseType = EXERCISE_TYPE.STRENGTH) {
+  return DEFAULT_LOGGING_METHOD_BY_EXERCISE_TYPE[exerciseType] || EXERCISE_LOGGING_METHOD.COMPLETED;
+}
 
 export const TARGET_WEIGHT_MODE = Object.freeze({
   PREVIOUS: "previous",
@@ -102,9 +143,10 @@ export function createListPrescription({ items = [""], notes = "" } = {}) {
 }
 
 export function createDefaultPrescription(exerciseType = EXERCISE_TYPE.STRENGTH) {
-  if (exerciseType === EXERCISE_TYPE.TIMED_HOLD) return createTimedHoldPrescription();
+  if (exerciseType === EXERCISE_TYPE.TIMED_HOLD || exerciseType === EXERCISE_TYPE.BALANCE) return createTimedHoldPrescription();
   if (exerciseType === EXERCISE_TYPE.CARDIO) return createCardioPrescription();
-  if (exerciseType === EXERCISE_TYPE.MOBILITY || exerciseType === EXERCISE_TYPE.FOAM_ROLLING) return createListPrescription();
+  if ([EXERCISE_TYPE.MOBILITY, EXERCISE_TYPE.STRETCH, EXERCISE_TYPE.FOAM_ROLLING].includes(exerciseType)) return createListPrescription();
+  if (exerciseType === EXERCISE_TYPE.OTHER) return {};
   return { blocks: [createStrengthBlock()] };
 }
 
@@ -115,15 +157,17 @@ export function createPlanExercise({
   exerciseType = EXERCISE_TYPE.STRENGTH,
   sortOrder = 0,
   prescription = createDefaultPrescription(exerciseType),
+  loggingMethod = defaultLoggingMethodForExerciseType(exerciseType),
   notes = "",
 } = {}) {
-  return { id, exerciseId, exerciseNameSnapshot, exerciseType, sortOrder, prescription, notes };
+  return { id, exerciseId, exerciseNameSnapshot, exerciseType, loggingMethod, sortOrder, prescription, notes };
 }
 
-export function createLibraryExercise({ id = makeGeneratedId("exercise"), userId = null, name, exerciseType = EXERCISE_TYPE.STRENGTH, defaultSideConfig = SIDE.BOTH, notes = "", isArchived = false, legacy = undefined } = {}) {
+export function createLibraryExercise({ id = makeGeneratedId("exercise"), userId = null, name, exerciseType = EXERCISE_TYPE.STRENGTH, loggingMethod = defaultLoggingMethodForExerciseType(exerciseType), defaultSideConfig = SIDE.BOTH, notes = "", isArchived = false, legacy = undefined } = {}) {
   return {
     ...createExerciseDefinition({ id, userId, name: normalizeName(name), defaultSideConfig, notes, isArchived, legacy }),
     exerciseType,
+    loggingMethod,
     trackingType: exerciseType,
   };
 }
@@ -135,7 +179,7 @@ export function duplicatePlanExercise(exercise, { sortOrder = exercise?.sortOrde
     sortOrder,
   };
 
-  if (exercise?.exerciseType === EXERCISE_TYPE.STRENGTH) {
+  if (exercise?.exerciseType === EXERCISE_TYPE.STRENGTH || exercise?.exerciseType === EXERCISE_TYPE.PLYOMETRIC) {
     duplicated.prescription = {
       ...structuredClone(exercise.prescription),
       blocks: asArray(exercise.prescription?.blocks).map((block, index) => ({
@@ -144,7 +188,7 @@ export function duplicatePlanExercise(exercise, { sortOrder = exercise?.sortOrde
         sortOrder: index,
       })),
     };
-  } else if (exercise?.exerciseType === EXERCISE_TYPE.MOBILITY || exercise?.exerciseType === EXERCISE_TYPE.FOAM_ROLLING) {
+  } else if ([EXERCISE_TYPE.MOBILITY, EXERCISE_TYPE.STRETCH, EXERCISE_TYPE.FOAM_ROLLING].includes(exercise?.exerciseType)) {
     duplicated.prescription = {
       ...structuredClone(exercise.prescription),
       items: asArray(exercise.prescription?.items).map((item, index) => ({
@@ -255,11 +299,11 @@ export function validatePlan(plan) {
       const path = `${sessionPath}.exercises[${exerciseIndex}]`;
       if (!exercise.exerciseId) errors.push(`${path} needs an exercise.`);
       if (!normalizeName(exercise.exerciseNameSnapshot)) errors.push(`${path} needs an exercise name snapshot.`);
-      if (exercise.exerciseType === EXERCISE_TYPE.STRENGTH) validateStrength(exercise, path, errors);
-      else if (exercise.exerciseType === EXERCISE_TYPE.TIMED_HOLD) validateTimedHold(exercise, path, errors);
+      if (exercise.exerciseType === EXERCISE_TYPE.STRENGTH || exercise.exerciseType === EXERCISE_TYPE.PLYOMETRIC) validateStrength(exercise, path, errors);
+      else if (exercise.exerciseType === EXERCISE_TYPE.TIMED_HOLD || exercise.exerciseType === EXERCISE_TYPE.BALANCE) validateTimedHold(exercise, path, errors);
       else if (exercise.exerciseType === EXERCISE_TYPE.CARDIO) validateCardio(exercise, path, errors);
-      else if (exercise.exerciseType === EXERCISE_TYPE.MOBILITY || exercise.exerciseType === EXERCISE_TYPE.FOAM_ROLLING) validateListPrescription(exercise, path, errors);
-      else errors.push(`${path} has an unsupported exercise type.`);
+      else if ([EXERCISE_TYPE.MOBILITY, EXERCISE_TYPE.STRETCH, EXERCISE_TYPE.FOAM_ROLLING].includes(exercise.exerciseType)) validateListPrescription(exercise, path, errors);
+      else if (exercise.exerciseType !== EXERCISE_TYPE.OTHER) errors.push(`${path} has an unsupported exercise type.`);
     });
   });
   return { valid: errors.length === 0, errors };
@@ -279,6 +323,7 @@ export function canonicalPlanContent(plan) {
         exerciseId: exercise.exerciseId,
         exerciseNameSnapshot: exercise.exerciseNameSnapshot,
         exerciseType: exercise.exerciseType,
+        loggingMethod: exercise.loggingMethod || defaultLoggingMethodForExerciseType(exercise.exerciseType),
         sortOrder: exercise.sortOrder,
         prescription: exercise.prescription,
         notes: String(exercise.notes || ""),
@@ -302,14 +347,14 @@ export function nextPlanForSave(original, draft) {
 
 export function planPrescriptionSummary(exercise) {
   const type = exercise.exerciseType;
-  if (type === EXERCISE_TYPE.STRENGTH) {
+  if (type === EXERCISE_TYPE.STRENGTH || type === EXERCISE_TYPE.PLYOMETRIC) {
     return sortByOrder(exercise.prescription?.blocks).map((block) => {
       const side = block.side === SIDE.LEFT ? "left" : block.side === SIDE.RIGHT ? "right" : "both";
       const reps = block.targetReps?.type === REP_TARGET_TYPE.RANGE ? `${block.targetReps.min}–${block.targetReps.max}` : block.targetReps?.value || "?";
       return `${block.targetSets} × ${reps} ${side}`;
     }).join(" · ");
   }
-  if (type === EXERCISE_TYPE.TIMED_HOLD) {
+  if (type === EXERCISE_TYPE.TIMED_HOLD || type === EXERCISE_TYPE.BALANCE) {
     const side = exercise.prescription?.side === SIDE.LEFT ? "left" : exercise.prescription?.side === SIDE.RIGHT ? "right" : "both";
     return `${exercise.prescription?.targetSets || 0} × ${exercise.prescription?.targetDurationSeconds || 0} sec ${side}`;
   }
@@ -318,8 +363,9 @@ export function planPrescriptionSummary(exercise) {
     const resistance = exercise.prescription?.resistance ? ` · Resistance ${exercise.prescription.resistance}` : "";
     return `${minutes} min${resistance}`;
   }
-  if (type === EXERCISE_TYPE.MOBILITY) return `${asArray(exercise.prescription?.items).length} stretches`;
+  if (type === EXERCISE_TYPE.MOBILITY || type === EXERCISE_TYPE.STRETCH) return `${asArray(exercise.prescription?.items).length} stretches`;
   if (type === EXERCISE_TYPE.FOAM_ROLLING) return `${asArray(exercise.prescription?.items).length} areas`;
+  if (type === EXERCISE_TYPE.OTHER) return "Complete as prescribed";
   return "No prescription";
 }
 

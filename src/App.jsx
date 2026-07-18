@@ -22,6 +22,7 @@ import {
 import { auth, db } from "./firebase";
 import PlansScreen from "./features/plans/PlansScreen";
 import WorkoutScreen from "./features/workout/WorkoutScreen";
+import Button from "./components/ui/Button";
 import { saveLegacyRehabData, subscribeLegacyRehabData } from "./lib/firebase/legacyRehabRepository";
 import { calculateDaysSinceSurgery, calculateWeekFromSurgeryDate, todayString } from "./lib/domain/date";
 import { blankSet, defaultSets } from "./lib/domain/sets";
@@ -79,23 +80,6 @@ function TabButton({ active, onClick, children }) {
     >
       {children}
     </button>
-  );
-}
-
-function Button({ variant = "primary", size = "md", className = "", ...props }) {
-  return (
-    <button
-      type="button"
-      className={cls(
-        "inline-flex items-center justify-center rounded-xl font-medium transition disabled:cursor-not-allowed disabled:opacity-60",
-        size === "sm" ? "px-3 py-2 text-xs" : "px-4 py-2 text-sm",
-        variant === "primary" && "bg-slate-900 text-white hover:bg-slate-800",
-        variant === "outline" && "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
-        variant === "destructive" && "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100",
-        className
-      )}
-      {...props}
-    />
   );
 }
 

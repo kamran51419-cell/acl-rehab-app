@@ -6,6 +6,15 @@ import { durationLabel, groupSessionExercises, previousWeightsForExercise, worko
 import { createDebouncedSaver, createInProgressWorkout, findInProgressWorkout, isWeightedExerciseComplete, resumeWorkout, updateRecordedSetWeight } from "../../lib/domain/workoutSession";
 import { createInProgressWorkoutDocument, finishWorkoutDocument, subscribePlans, subscribeWorkouts, updateInProgressWorkoutDocument } from "../../lib/firebase/planRepository";
 import { makeId } from "../../lib/domain/legacyWorkouts";
+import Button from "../../components/ui/Button";
+
+const defaultRepository = {
+  subscribePlans,
+  subscribeWorkouts,
+  createInProgressWorkoutDocument,
+  updateInProgressWorkoutDocument,
+  finishWorkoutDocument,
+};
 
 function CompletionList({ title, exercises, onToggle }) {
   if (!exercises.length) return null;
@@ -26,15 +35,20 @@ function IntervalCard({ exercise, onToggle }) {
   return <label className={`block cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 ${exercise.completed ? "opacity-60" : ""}`}><span className="flex items-start gap-3"><input className="mt-1" type="checkbox" checked={Boolean(exercise.completed)} onChange={() => onToggle(exercise.id)} /><span><span className={`block font-semibold ${exercise.completed ? "line-through" : ""}`}>{exercise.exerciseNameSnapshot}</span><span className="text-sm text-slate-500">Intervals</span></span></span><div className="mt-3 space-y-1 pl-7 text-sm text-slate-600">{stages.map((stage) => <div key={stage.id}>{stage.phase === "rest" ? "Rest" : "Work"} · {durationLabel(stage.durationSeconds, stage.durationUnit)}{stage.label ? ` · ${stage.label}` : ""}</div>)}</div></label>;
 }
 
-export default function WorkoutScreen({ user }) {
+export function WorkoutForm({ workout, saveStatus = "", onBack, onToggle, onWeight, onDate, onNotes, onFinish }) {
+  const { mobility, other, standard, weighted, intervals } = groupSessionExercises(workout.exercises);
+  return <div className="space-y-5"><button className="text-sm font-medium text-slate-600" onClick={onBack}>← All sessions</button><div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><div className="flex items-center justify-between gap-3"><div><div className="text-sm font-medium text-emerald-700">Workout in progress</div><h1 className="mt-1 text-2xl font-semibold">{workout.sessionNameSnapshot}</h1></div><span className={`text-xs ${saveStatus === "error" ? "text-red-600" : "text-slate-500"}`}>{saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved" : saveStatus === "error" ? "Could not save" : ""}</span></div><div className="mt-4 grid gap-3 md:grid-cols-2"><label className="text-sm font-medium text-slate-700">Workout date<input type="date" className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3" value={workout.date} onChange={(event) => onDate(event.target.value)} /></label><label className="text-sm font-medium text-slate-700">Workout notes<input className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3" value={workout.notes || ""} onChange={(event) => onNotes(event.target.value)} /></label></div><div className="mt-5 space-y-3"><CompletionList title="Exercises" exercises={standard} onToggle={onToggle} /><CompletionList title="Mobility / Stretch" exercises={mobility} onToggle={onToggle} /><CompletionList title="Other" exercises={other} onToggle={onToggle} />{weighted.map((exercise) => <WeightCard key={exercise.id} exercise={exercise} onWeight={onWeight} />)}{intervals.map((exercise) => <IntervalCard key={exercise.id} exercise={exercise} onToggle={onToggle} />)}</div><Button className="mt-6 w-full md:w-auto" onClick={onFinish}>Finish workout</Button></div></div>;
+}
+
+export default function WorkoutScreen({ user, repository = defaultRepository }) {
   const [plans, setPlans] = useState([]);
   const [workouts, setWorkouts] = useState([]);
   const [selectedSession, setSelectedSession] = useState(null);
   const [workout, setWorkout] = useState(null);
   const [saveStatus, setSaveStatus] = useState("");
-  useEffect(() => user?.uid ? subscribePlans(db, user.uid, setPlans, () => {}) : undefined, [user?.uid]);
-  useEffect(() => user?.uid ? subscribeWorkouts(db, user.uid, setWorkouts, () => {}) : undefined, [user?.uid]);
-  const saver = useMemo(() => createDebouncedSaver((value) => updateInProgressWorkoutDocument(db, user.uid, value), 500, (status) => setSaveStatus(status)), [user.uid]);
+  useEffect(() => user?.uid ? repository.subscribePlans(db, user.uid, setPlans, () => {}) : undefined, [repository, user?.uid]);
+  useEffect(() => user?.uid ? repository.subscribeWorkouts(db, user.uid, setWorkouts, () => {}) : undefined, [repository, user?.uid]);
+  const saver = useMemo(() => createDebouncedSaver((value) => repository.updateInProgressWorkoutDocument(db, user.uid, value), 500, (status) => setSaveStatus(status)), [repository, user.uid]);
   useEffect(() => () => saver.cancel(), [saver]);
   useEffect(() => { if (workout) saver.schedule(workout); }, [workout, saver]);
   const activeProgrammes = useMemo(() => plans.filter((plan) => plan.isActive && !plan.isArchived).sort((a, b) => String(b.activatedAt?.seconds || b.updatedAtToken || b.id).localeCompare(String(a.activatedAt?.seconds || a.updatedAtToken || a.id))), [plans]);
@@ -47,7 +61,7 @@ export default function WorkoutScreen({ user }) {
     const template = createInProgressWorkout({ id: `workout-${makeId()}`, userId: user.uid, programme, session, date, previousWeightsByExercise });
     const existing = findInProgressWorkout(workouts, programme.id, session.id, date) || workouts.find((item) => item.status === "in_progress" && item.planId === programme.id && item.sessionId === session.id);
     const next = resumeWorkout(existing, template);
-    if (!existing) await createInProgressWorkoutDocument(db, user.uid, next);
+    if (!existing) await repository.createInProgressWorkoutDocument(db, user.uid, next);
     setSelectedSession(session);
     setWorkout(next);
     setSaveStatus(existing ? "saved" : "saved");
@@ -57,15 +71,14 @@ export default function WorkoutScreen({ user }) {
   function updateWeight(exerciseId, setId, weight) { setWorkout((current) => updateRecordedSetWeight(current, exerciseId, setId, weight)); }
   async function finishWorkout() {
     await saver.flush();
-    await finishWorkoutDocument(db, user.uid, workout);
+    await repository.finishWorkoutDocument(db, user.uid, workout);
     setWorkout(null);
     setSelectedSession(null);
     setSaveStatus("");
   }
 
   if (selectedSession && workout) {
-    const { mobility, other, standard, weighted, intervals } = groupSessionExercises(workout.exercises);
-    return <div className="space-y-5"><button className="text-sm font-medium text-slate-600" onClick={() => { saver.flush(); setSelectedSession(null); setWorkout(null); }}>← All sessions</button><div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><div className="flex items-center justify-between gap-3"><div><div className="text-sm font-medium text-emerald-700">Workout in progress</div><h1 className="mt-1 text-2xl font-semibold">{workout.sessionNameSnapshot}</h1></div><span className={`text-xs ${saveStatus === "error" ? "text-red-600" : "text-slate-500"}`}>{saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved" : saveStatus === "error" ? "Could not save" : ""}</span></div><div className="mt-4 grid gap-3 md:grid-cols-2"><label className="text-sm font-medium text-slate-700">Workout date<input type="date" className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3" value={workout.date} onChange={(event) => setWorkout({ ...workout, date: event.target.value })} /></label><label className="text-sm font-medium text-slate-700">Workout notes<input className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3" value={workout.notes || ""} onChange={(event) => setWorkout({ ...workout, notes: event.target.value })} /></label></div><div className="mt-5 space-y-3"><CompletionList title="Exercises" exercises={standard} onToggle={toggleExercise} /><CompletionList title="Mobility / Stretch" exercises={mobility} onToggle={toggleExercise} /><CompletionList title="Other" exercises={other} onToggle={toggleExercise} />{weighted.map((exercise) => <WeightCard key={exercise.id} exercise={exercise} onWeight={updateWeight} />)}{intervals.map((exercise) => <IntervalCard key={exercise.id} exercise={exercise} onToggle={toggleExercise} />)}</div><Button className="mt-6 w-full md:w-auto" onClick={finishWorkout}>Finish workout</Button></div></div>;
+    return <WorkoutForm workout={workout} saveStatus={saveStatus} onBack={() => { saver.flush(); setSelectedSession(null); setWorkout(null); }} onToggle={toggleExercise} onWeight={updateWeight} onDate={(date) => setWorkout({ ...workout, date })} onNotes={(notes) => setWorkout({ ...workout, notes })} onFinish={finishWorkout} />;
   }
 
   return <div className="space-y-5"><div><p className="text-sm font-medium text-emerald-700">Current Programme</p><h1 className="text-2xl font-semibold">Workout</h1><p className="text-sm text-slate-500">Choose the session you are performing. There is no fixed day or required order.</p></div>{activeProgrammes.length > 1 ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Multiple legacy programmes are active. Activate your preferred programme again to normalize this to one.</div> : null}{!programme ? <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center"><Dumbbell className="mx-auto mb-3 text-slate-400"/><h2 className="font-semibold">No active programme</h2><p className="text-sm text-slate-500">Activate a programme before starting a workout.</p></div> : <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="text-lg font-semibold">{programme.name}</h2><div className="mt-4 space-y-2">{sessions.map((session) => <button key={session.id} onClick={() => chooseSession(session)} className="flex w-full items-center justify-between rounded-2xl border border-slate-200 p-4 text-left hover:bg-slate-50"><span><span className="block font-semibold">{session.name}</span><span className="text-sm text-slate-500">{session.exercises?.length || 0} exercises</span></span><ChevronRight className="h-5 w-5 text-slate-400"/></button>)}</div></div>}</div>;

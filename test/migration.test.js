@@ -51,9 +51,12 @@ test("bilateral legacy sessions become one both-side working prescription block"
   const exercise = workout.exercises[0];
   assert.equal(workout.date, "2026-07-18");
   assert.equal(workout.notes, "felt good");
-  assert.equal(workout.legacy.legacyWeek, "4");
-  assert.equal(workout.legacy.legacySessionId, "bilateral-1");
-  assert.deepEqual(workout.legacy.raw, bilateralSession);
+  assert.equal(workout.legacy.legacySessions[0].legacyWeek, "4");
+  assert.equal(workout.legacy.legacySessions[0].legacySessionId, "bilateral-1");
+  assert.deepEqual(workout.legacy.rawSessions[0], bilateralSession);
+  assert.equal(exercise.legacy.legacyWeek, "4");
+  assert.equal(exercise.legacy.legacySessionId, "bilateral-1");
+  assert.deepEqual(exercise.legacy.raw, bilateralSession);
   assert.equal(exercise.exerciseId, "squat");
   assert.equal(exercise.progression.strategy, "manual");
   assert.equal(exercise.progression.enabled, false);
@@ -77,7 +80,7 @@ test("left/right legacy sessions become separate left and right prescription blo
   const workout = result.workouts[0];
   const blocks = workout.exercises[0].prescriptionBlocks;
 
-  assert.equal(workout.legacy.singleLeg, true);
+  assert.equal(workout.exercises[0].legacy.singleLeg, true);
   assert.equal(workout.exercises[0].exerciseId, "le");
   assert.equal(workout.exercises[0].exerciseNameSnapshot, "Leg Extension");
   assert.equal(blocks.length, 2);
@@ -105,7 +108,8 @@ test("malformed legacy data and missing fields produce safe empty/default v2 out
 
   assert.equal(result.migrationSummary.legacyWeekCount, 1);
   assert.equal(result.migrationSummary.legacySessionCount, 2);
-  assert.equal(result.workouts.length, 2);
+  assert.equal(result.workouts.length, 1);
+  assert.equal(result.workouts[0].exercises.length, 2);
   assert.equal(result.workouts[0].date, "");
   assert.equal(result.workouts[0].notes, "");
   assert.equal(result.workouts[0].exercises[0].prescriptionBlocks[0].side, SIDE.BOTH);
@@ -121,4 +125,53 @@ test("transforms are idempotent for the same legacy payload", () => {
   };
 
   assert.deepEqual(transformLegacyDataToV2(legacyData), transformLegacyDataToV2(legacyData));
+});
+
+
+test("multiple same-date legacy exercise logs become one workout with multiple exercises", () => {
+  const legacyData = {
+    weeks: [{ week: "6", sessions: [bilateralSession, leftRightSession] }],
+    customExercises: [{ id: "squat", label: "Squat", singleLeg: false, builtIn: false }],
+  };
+
+  const result = transformLegacyDataToV2(legacyData);
+  assert.equal(result.workouts.length, 2);
+
+  const july18 = result.workouts.find((workout) => workout.date === "2026-07-18");
+  const july19 = result.workouts.find((workout) => workout.date === "2026-07-19");
+
+  assert.equal(july18.exercises.length, 1);
+  assert.equal(july19.exercises.length, 1);
+
+  const sameDateResult = transformLegacyDataToV2({
+    weeks: [
+      {
+        week: "6",
+        sessions: [
+          bilateralSession,
+          { ...leftRightSession, id: "single-same-date", date: "2026-07-18" },
+        ],
+      },
+    ],
+    customExercises: [{ id: "squat", label: "Squat", singleLeg: false, builtIn: false }],
+  });
+
+  assert.equal(sameDateResult.workouts.length, 1);
+  assert.equal(sameDateResult.workouts[0].date, "2026-07-18");
+  assert.equal(sameDateResult.workouts[0].exercises.length, 2);
+  assert.equal(sameDateResult.workouts[0].legacy.legacySessions.length, 2);
+  assert.equal(sameDateResult.workouts[0].exercises[0].legacy.legacySessionId, "bilateral-1");
+  assert.equal(sameDateResult.workouts[0].exercises[1].legacy.legacySessionId, "single-same-date");
+  assert.deepEqual(sameDateResult, transformLegacyDataToV2({
+    weeks: [
+      {
+        week: "6",
+        sessions: [
+          bilateralSession,
+          { ...leftRightSession, id: "single-same-date", date: "2026-07-18" },
+        ],
+      },
+    ],
+    customExercises: [{ id: "squat", label: "Squat", singleLeg: false, builtIn: false }],
+  }));
 });

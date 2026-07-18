@@ -68,30 +68,47 @@ function createLegacyExerciseDefinition(rawExerciseId, exerciseMap, fallbackSess
   });
 }
 
-function makeWorkoutId(week, session, sessionIndex) {
+function legacySessionRef(entry) {
+  return {
+    legacyWeek: asString(entry.week?.week),
+    legacySessionId: asString(entry.session?.id),
+    legacySessionIndex: entry.sessionIndex,
+    originalExerciseId: asString(entry.session?.exerciseId) || null,
+    date: asString(entry.session?.date),
+  };
+}
+
+function makeWorkoutId(date, entries) {
   return deterministicId("legacy-workout", {
-    week: asString(week?.week),
-    sessionId: asString(session?.id),
-    sessionIndex,
-    session,
+    date,
+    sessions: entries.map(legacySessionRef),
+    rawSessions: entries.map((entry) => entry.session ?? null),
   });
 }
 
-function makeBlockId(workoutId, side) {
-  return deterministicId("legacy-block", { workoutId, side });
+function makeWorkoutExerciseId(workoutId, entry, exerciseId) {
+  return deterministicId("legacy-workout-exercise", {
+    workoutId,
+    exerciseId,
+    legacy: legacySessionRef(entry),
+  });
 }
 
-function makeSetId(workoutId, side, setIndex, set) {
-  return deterministicId("legacy-set", { workoutId, side, setIndex, set });
+function makeBlockId(workoutExerciseId, side) {
+  return deterministicId("legacy-block", { workoutExerciseId, side });
 }
 
-function transformSets(workoutId, side, sets) {
+function makeSetId(workoutExerciseId, side, setIndex, set) {
+  return deterministicId("legacy-set", { workoutExerciseId, side, setIndex, set });
+}
+
+function transformSets(workoutExerciseId, side, sets) {
   return asArray(sets).map((set, index) => {
     const rawReps = asString(set?.reps);
     const rawWeight = asString(set?.weight);
 
     return createWorkoutSet({
-      id: makeSetId(workoutId, side, index, set),
+      id: makeSetId(workoutExerciseId, side, index, set),
       setNumber: index + 1,
       side,
       setType: SET_TYPE.WORKING,
@@ -106,12 +123,12 @@ function transformSets(workoutId, side, sets) {
   });
 }
 
-function createLegacyBlock(workoutId, side, sets, sortOrder) {
-  const actualSets = transformSets(workoutId, side, sets);
+function createLegacyBlock(workoutExerciseId, side, sets, sortOrder) {
+  const actualSets = transformSets(workoutExerciseId, side, sets);
 
   return {
     ...createPrescriptionBlock({
-      id: makeBlockId(workoutId, side),
+      id: makeBlockId(workoutExerciseId, side),
       side,
       targetSets: actualSets.length,
       targetReps: unknownTargetReps(),
@@ -123,41 +140,27 @@ function createLegacyBlock(workoutId, side, sets, sortOrder) {
   };
 }
 
-function transformLegacySessionToWorkout({ week, session, sessionIndex, exerciseMap, userId = null }) {
-  const workoutId = makeWorkoutId(week, session, sessionIndex);
+function transformLegacySessionToWorkoutExercise({ workoutId, entry, exerciseMap, sortOrder }) {
+  const { week, session, sessionIndex } = entry;
   const rawExerciseId = asString(session?.exerciseId);
   const exerciseId = legacyExerciseId(rawExerciseId, { week: week?.week, sessionIndex, session });
   const exerciseNameSnapshot = legacyExerciseName(rawExerciseId, exerciseMap);
+  const workoutExerciseId = makeWorkoutExerciseId(workoutId, entry, exerciseId);
   const blocks = session?.singleLeg
     ? [
-        createLegacyBlock(workoutId, SIDE.LEFT, session?.leftSets, 0),
-        createLegacyBlock(workoutId, SIDE.RIGHT, session?.rightSets, 1),
+        createLegacyBlock(workoutExerciseId, SIDE.LEFT, session?.leftSets, 0),
+        createLegacyBlock(workoutExerciseId, SIDE.RIGHT, session?.rightSets, 1),
       ]
-    : [createLegacyBlock(workoutId, SIDE.BOTH, session?.sets, 0)];
+    : [createLegacyBlock(workoutExerciseId, SIDE.BOTH, session?.sets, 0)];
 
-  return createWorkout({
-    id: workoutId,
-    userId,
-    date: asString(session?.date),
-    startedAt: null,
-    completedAt: asString(session?.date) || null,
-    status: WORKOUT_STATUS.COMPLETED,
-    planId: null,
-    planVersion: null,
-    sessionId: null,
-    sessionNameSnapshot: "Legacy log",
+  return {
+    id: workoutExerciseId,
+    exerciseId,
+    exerciseNameSnapshot,
+    sortOrder,
+    progression: manualProgression(false),
+    prescriptionBlocks: blocks,
     notes: asString(session?.notes),
-    exercises: [
-      {
-        id: deterministicId("legacy-workout-exercise", { workoutId, exerciseId }),
-        exerciseId,
-        exerciseNameSnapshot,
-        sortOrder: 0,
-        progression: manualProgression(false),
-        prescriptionBlocks: blocks,
-        notes: "",
-      },
-    ],
     legacy: {
       migratedFrom: "rehabData.weeks.sessions",
       legacyWeek: asString(week?.week),
@@ -166,6 +169,39 @@ function transformLegacySessionToWorkout({ week, session, sessionIndex, exercise
       originalExerciseId: rawExerciseId || null,
       singleLeg: Boolean(session?.singleLeg),
       raw: session ?? null,
+    },
+  };
+}
+
+function transformLegacyDateGroupToWorkout({ date, entries, exerciseMap, userId = null }) {
+  const workoutId = makeWorkoutId(date, entries);
+  const exercises = entries.map((entry, index) =>
+    transformLegacySessionToWorkoutExercise({ workoutId, entry, exerciseMap, sortOrder: index })
+  );
+
+  const notes = entries
+    .map((entry) => asString(entry.session?.notes))
+    .filter(Boolean)
+    .join("\n");
+
+  return createWorkout({
+    id: workoutId,
+    userId,
+    date,
+    startedAt: null,
+    completedAt: date || null,
+    status: WORKOUT_STATUS.COMPLETED,
+    planId: null,
+    planVersion: null,
+    sessionId: null,
+    sessionNameSnapshot: "Legacy log",
+    notes,
+    exercises,
+    legacy: {
+      migratedFrom: "rehabData.weeks.sessions.byDate",
+      date,
+      legacySessions: entries.map(legacySessionRef),
+      rawSessions: entries.map((entry) => entry.session ?? null),
     },
   });
 }
@@ -182,16 +218,27 @@ export function transformLegacyDataToV2(legacyData = {}, { userId = null } = {})
     if (id) exerciseMap.set(id, exercise);
   }
 
-  const workouts = [];
+  const groupedEntries = new Map();
   const referencedExerciseIds = new Set();
+  let legacySessionCount = 0;
 
   for (const week of asArray(legacyData.weeks)) {
     asArray(week?.sessions).forEach((session, sessionIndex) => {
-      const workout = transformLegacySessionToWorkout({ week, session, sessionIndex, exerciseMap, userId });
-      workouts.push(workout);
-      referencedExerciseIds.add(workout.exercises[0].exerciseId);
+      const date = asString(session?.date);
+      const entry = { week, session, sessionIndex };
+      const rawExerciseId = asString(session?.exerciseId);
+      const exerciseId = legacyExerciseId(rawExerciseId, { week: week?.week, sessionIndex, session });
+
+      if (!groupedEntries.has(date)) groupedEntries.set(date, []);
+      groupedEntries.get(date).push(entry);
+      referencedExerciseIds.add(exerciseId);
+      legacySessionCount += 1;
     });
   }
+
+  const workouts = [...groupedEntries.entries()].map(([date, entries]) =>
+    transformLegacyDateGroupToWorkout({ date, entries, exerciseMap, userId })
+  );
 
   const exercises = [...referencedExerciseIds]
     .sort()
@@ -210,7 +257,7 @@ export function transformLegacyDataToV2(legacyData = {}, { userId = null } = {})
     workouts,
     migrationSummary: {
       legacyWeekCount: asArray(legacyData.weeks).length,
-      legacySessionCount: workouts.length,
+      legacySessionCount,
       exerciseCount: exercises.length,
       workoutCount: workouts.length,
     },
@@ -227,5 +274,6 @@ function findFallbackSession(legacyData, exerciseId) {
 
 export const __testables = {
   parseOptionalNumber,
-  transformLegacySessionToWorkout,
+  transformLegacyDateGroupToWorkout,
+  transformLegacySessionToWorkoutExercise,
 };

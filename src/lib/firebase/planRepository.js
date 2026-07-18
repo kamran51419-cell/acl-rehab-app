@@ -25,6 +25,14 @@ function exerciseRef(db, uid, exerciseId) {
   return doc(db, "users", uid, "exercises", exerciseId);
 }
 
+export function exerciseCollectionPath(uid) {
+  return `users/${uid}/exercises`;
+}
+
+function logExerciseRepository(event, details) {
+  if (import.meta.env?.DEV) console.info(`[exerciseRepository] ${event}`, details);
+}
+
 export function planPaths(uid, planId = "{planId}") {
   return {
     plans: `users/${uid}/plans/{planId}`,
@@ -120,23 +128,47 @@ export async function restorePlan(db, uid, plan, { updatedAtToken }) {
 }
 
 export async function saveExerciseDefinition(db, uid, exercise, { updatedAtToken }) {
-  await setDoc(
-    exerciseRef(db, uid, exercise.id),
-    stripUndefined({ ...exercise, userId: uid, updatedAt: serverTimestamp(), updatedAtToken }),
-    { merge: true }
-  );
+  const path = `${exerciseCollectionPath(uid)}/${exercise.id}`;
+  logExerciseRepository("save start", { uid, path });
+  try {
+    await setDoc(
+      exerciseRef(db, uid, exercise.id),
+      stripUndefined({ ...exercise, userId: uid, updatedAt: serverTimestamp(), updatedAtToken }),
+      { merge: true }
+    );
+    logExerciseRepository("save complete", { uid, path });
+  } catch (error) {
+    console.error("Exercise library Firestore save failed", { uid, path, code: error?.code, message: error?.message, error });
+    throw error;
+  }
 }
 
 export async function archiveExerciseDefinition(db, uid, exerciseId, isArchived, { updatedAtToken }) {
-  await updateDoc(exerciseRef(db, uid, exerciseId), stripUndefined({ isArchived, archivedAt: isArchived ? serverTimestamp() : null, updatedAt: serverTimestamp(), updatedAtToken }));
+  const path = `${exerciseCollectionPath(uid)}/${exerciseId}`;
+  logExerciseRepository(isArchived ? "archive start" : "restore start", { uid, path });
+  try {
+    await updateDoc(exerciseRef(db, uid, exerciseId), stripUndefined({ isArchived, archivedAt: isArchived ? serverTimestamp() : null, updatedAt: serverTimestamp(), updatedAtToken }));
+    logExerciseRepository(isArchived ? "archive complete" : "restore complete", { uid, path });
+  } catch (error) {
+    console.error("Exercise library Firestore archive/restore failed", { uid, path, code: error?.code, message: error?.message, error });
+    throw error;
+  }
 }
 
 export function subscribeExerciseDefinitions(db, uid, onNext, onError) {
+  const path = exerciseCollectionPath(uid);
+  logExerciseRepository("subscription start", { uid, path });
   return onSnapshot(
     collection(db, "users", uid, "exercises"),
-    (snapshot) => onNext(snapshot.docs.map((item) => item.data()).sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")))),
-    onError
+    (snapshot) => {
+      logExerciseRepository("subscription snapshot", { uid, path, size: snapshot.size });
+      onNext(snapshot.docs.map((item) => item.data()).sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))));
+    },
+    (error) => {
+      console.error("Exercise library Firestore subscription failed", { uid, path, code: error?.code, message: error?.message, error });
+      onError(error);
+    }
   );
 }
 
-export const __testables = { stripUndefined, preparePlanWrite, planPaths };
+export const __testables = { stripUndefined, preparePlanWrite, planPaths, exerciseCollectionPath };

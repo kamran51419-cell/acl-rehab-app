@@ -228,6 +228,7 @@ test("plan repository helpers strip undefined fields and use v2 paths only", () 
   assert.deepEqual(cleaned, { a: 1, nested: { d: 2 } });
   const paths = planRepoTestables.planPaths("uid", "plan-1");
   assert.equal(paths.plan, "users/uid/plans/plan-1");
+  assert.equal(planRepoTestables.exerciseCollectionPath("uid"), "users/uid/exercises");
   assert.equal(Object.values(paths).some((path) => path.includes("rehabData")), false);
   const write = planRepoTestables.preparePlanWrite({ id: "p", createdAt: undefined }, { created: true, timestamp: "server", updatedAtToken: "token" });
   assert.deepEqual(write, { id: "p", updatedAt: "server", updatedAtToken: "token", createdAt: "server" });

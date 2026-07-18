@@ -211,6 +211,7 @@ export default function ACLTrackerApp() {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (firebaseUser) => {
+      if (import.meta.env.DEV) console.info("[auth] state changed", { uid: firebaseUser?.uid || null });
       setUser(firebaseUser || null);
       setAuthLoading(false);
     });
@@ -230,6 +231,10 @@ export default function ACLTrackerApp() {
       return;
     }
 
+    // More and Programme use only their v2 user-scoped repositories. Do not
+    // attach the unrelated legacy rehab listener while either screen is open.
+    if (["more", "programme", "workout"].includes(activeTab)) return;
+
     return subscribeLegacyRehabData(
       db,
       user.uid,
@@ -242,7 +247,7 @@ export default function ACLTrackerApp() {
         console.error("Failed to load rehab data from Firestore", error);
       }
     );
-  }, [user, authLoading]);
+  }, [user, authLoading, activeTab]);
 
 
   async function handleAuthSubmit(e) {

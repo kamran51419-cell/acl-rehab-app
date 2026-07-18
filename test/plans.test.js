@@ -29,7 +29,7 @@ import {
   validatePlan,
 } from "../src/lib/domain/plans.js";
 import { SIDE } from "../src/lib/domain/v2Models.js";
-import { __testables as planRepoTestables, deleteExerciseDefinition, exclusiveActiveProgrammeStates } from "../src/lib/firebase/planRepository.js";
+import { __testables as planRepoTestables, deleteExerciseDefinition, deletePlan, exclusiveActiveProgrammeStates } from "../src/lib/firebase/planRepository.js";
 
 function mixedStrengthPlan() {
   const plan = createBlankPlan({ name: "ACL Rehab Plan", isActive: true });
@@ -283,6 +283,12 @@ test("exercise deletion removes only the library document", async () => {
   await deleteExerciseDefinition({}, "uid", "le", { referenceFactory: (_db, uid, id) => `users/${uid}/exercises/${id}`, deleteDocument: async (ref) => { deletedRef = ref; } });
   assert.equal(deletedRef, "users/uid/exercises/le");
   assert.deepEqual(programme, before);
+});
+
+test("programme deletion removes only its document", async () => {
+  let deletedRef;
+  await deletePlan({}, "uid", "plan", { referenceFactory: (_db, uid, id) => `users/${uid}/plans/${id}`, deleteDocument: async (ref) => { deletedRef = ref; } });
+  assert.equal(deletedRef, "users/uid/plans/plan");
 });
 
 test("prescription summaries are human readable", () => {

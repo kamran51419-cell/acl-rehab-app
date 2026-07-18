@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Plus, Search, Trash2 } from "lucide-react";
+import { GripVertical, Plus, Search, Trash2 } from "lucide-react";
 import { db } from "../../firebase";
 import {
   EXERCISE_LOGGING_METHOD,
@@ -28,12 +28,12 @@ import {
 } from "../../lib/domain/plans";
 import { SIDE } from "../../lib/domain/v2Models";
 import { makeId } from "../../lib/domain/legacyWorkouts";
-import { formatDate } from "../../lib/domain/date";
 import {
   archiveExerciseDefinition,
   archivePlan,
   createPlan,
   duplicatePlanDocument,
+  deletePlan,
   deleteExerciseDefinition,
   restorePlan,
   saveExerciseDefinition,
@@ -135,28 +135,16 @@ function sectionPlans(plans, predicate) {
   return plans.filter(predicate);
 }
 
-function dateLabel(value) {
-  if (!value) return "—";
-  if (typeof value === "string") return formatDate(value.slice(0, 10));
-  if (value?.toDate) return formatDate(value.toDate().toISOString().slice(0, 10));
-  return "—";
-}
-
-function PlanCard({ plan, onEdit, onDuplicate, onToggleActive, onArchive, onRestore }) {
+function PlanCard({ plan, onEdit, onDuplicate, onToggleActive, onArchive, onRestore, onDelete }) {
   return (
     <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-lg font-semibold text-slate-900">{plan.name || "Untitled programme"}</div>
-          {plan.description ? <div className="mt-1 text-sm text-slate-500">{plan.description}</div> : null}
         </div>
         <span className={cls("rounded-full px-2 py-1 text-xs font-medium", plan.isArchived ? "bg-slate-100 text-slate-600" : plan.isActive ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>{plan.isArchived ? "Archived" : plan.isActive ? "Active" : "Inactive"}</span>
       </div>
-      <div className="grid grid-cols-3 gap-2 text-xs text-slate-500">
-        <div>{plan.sessions?.length || 0} sessions</div>
-        <div>Version {plan.version || 1}</div>
-        <div>Updated {dateLabel(plan.updatedAt)}</div>
-      </div>
+      <div className="text-xs text-slate-500">{plan.sessions?.length || 0} sessions</div>
       <div className="flex flex-wrap gap-2">
         <Button size="sm" onClick={() => onEdit(plan)}>Open / edit</Button>
         <Button size="sm" variant="outline" onClick={() => onDuplicate(plan)}>Duplicate</Button>
@@ -168,6 +156,7 @@ function PlanCard({ plan, onEdit, onDuplicate, onToggleActive, onArchive, onRest
             <Button size="sm" variant="danger" onClick={() => onArchive(plan)}>Archive</Button>
           </>
         )}
+        <Button size="sm" variant="danger" onClick={() => onDelete(plan)}>Delete programme</Button>
       </div>
     </div>
   );
@@ -243,11 +232,17 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
   const [pickerMessage, setPickerMessage] = useState("");
   const [activePrescriptionId, setActivePrescriptionId] = useState("");
   const [newExercise, setNewExercise] = useState({ name: "", exerciseType: EXERCISE_TYPE.STRENGTH });
+  const [draggingExercise, setDraggingExercise] = useState(null);
   const validation = validatePlan(draft);
   const filteredExercises = filterExerciseLibrary(exercises, { query: exerciseQuery });
 
   const setSessions = (sessions) => setDraft({ ...draft, sessions });
   const updateSession = (sessionIndex, patch) => setSessions(draft.sessions.map((session, index) => (index === sessionIndex ? { ...session, ...patch } : session)));
+  const moveExercise = (sessionIndex, fromIndex, toIndex) => {
+    if (fromIndex === toIndex) return;
+    updateSession(sessionIndex, { exercises: reorderItems(draft.sessions[sessionIndex].exercises, fromIndex, toIndex) });
+    setDraggingExercise({ sessionIndex, exerciseIndex: toIndex });
+  };
   const addSession = () => setSessions([...draft.sessions, createPlanSession({ name: "New session", sortOrder: draft.sessions.length })]);
   const insertSessionAfter = (sessionIndex) => {
     const session = createPlanSession({ name: "New session", sortOrder: sessionIndex + 1 });
@@ -323,9 +318,9 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
 
             <div className="space-y-3">
               {session.exercises.map((exercise, exerciseIndex) => (
-                <div key={exercise.id} className={cls("space-y-3 rounded-xl border bg-white p-3", activePrescriptionId === exercise.id ? "border-emerald-400 ring-2 ring-emerald-100" : "border-slate-200")}>
+                <div key={exercise.id} onDragOver={(event) => event.preventDefault()} onDrop={() => draggingExercise?.sessionIndex === sessionIndex && moveExercise(sessionIndex, draggingExercise.exerciseIndex, exerciseIndex)} onPointerEnter={(event) => event.pointerType === "touch" && draggingExercise?.sessionIndex === sessionIndex && moveExercise(sessionIndex, draggingExercise.exerciseIndex, exerciseIndex)} className={cls("space-y-3 rounded-xl border bg-white p-3", activePrescriptionId === exercise.id ? "border-emerald-400 ring-2 ring-emerald-100" : "border-slate-200")}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div><div className="font-semibold">{exercise.exerciseNameSnapshot}</div><div className="text-sm text-slate-500">{planPrescriptionSummary(exercise)}</div></div>
+                    <div className="flex items-start gap-2"><button type="button" draggable onDragStart={() => setDraggingExercise({ sessionIndex, exerciseIndex })} onDragEnd={() => setDraggingExercise(null)} onPointerDown={() => setDraggingExercise({ sessionIndex, exerciseIndex })} onPointerUp={() => setDraggingExercise(null)} className="cursor-grab touch-none rounded p-1 text-slate-400" aria-label={`Drag ${exercise.exerciseNameSnapshot}`}><GripVertical className="h-5 w-5" /></button><div><div className="font-semibold">{exercise.exerciseNameSnapshot}</div><div className="text-sm text-slate-500">{planPrescriptionSummary(exercise)}</div></div></div>
                     <div className="flex flex-wrap gap-2">
                       <Button size="sm" variant="outline" onClick={() => updateSession(sessionIndex, { exercises: reorderItems(session.exercises, exerciseIndex, exerciseIndex - 1) })} disabled={exerciseIndex === 0}>Up</Button>
                       <Button size="sm" variant="outline" onClick={() => updateSession(sessionIndex, { exercises: reorderItems(session.exercises, exerciseIndex, exerciseIndex + 1) })} disabled={exerciseIndex === session.exercises.length - 1}>Down</Button>
@@ -338,9 +333,7 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
                 </div>
               ))}
 
-              {pickerSession !== sessionIndex ? (
-                <Button variant="outline" onClick={() => { setPickerSession(sessionIndex); setCreatingExercise(false); }}><Plus className="mr-1 h-4 w-4" /> Add Exercise</Button>
-              ) : <div className="rounded-xl border border-dashed border-slate-300 bg-white p-3">
+              {pickerSession === sessionIndex ? <div className="rounded-xl border border-dashed border-slate-300 bg-white p-3">
                 <div className="mb-3 flex items-center justify-between"><strong>Exercise Picker</strong><Button size="sm" variant="outline" onClick={() => setPickerSession(null)}>Close</Button></div>
                 {pickerMessage ? <div className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{pickerMessage}</div> : null}
                 {creatingExercise ? <div className="space-y-3">
@@ -356,9 +349,9 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
                 </div>
                 <Button className="mt-3" variant="outline" onClick={() => setCreatingExercise(true)}><Plus className="mr-1 h-4 w-4" /> Create New Exercise</Button>
                 </>}
-              </div>}
+              </div> : null}
             </div>
-            <Button variant="outline" onClick={() => insertSessionAfter(sessionIndex)}><Plus className="mr-1 h-4 w-4" /> Add session</Button>
+            <div className="flex items-center justify-between gap-3"><Button variant="outline" onClick={() => { setPickerSession(sessionIndex); setCreatingExercise(false); }}><Plus className="mr-1 h-4 w-4" /> Add exercise</Button><Button variant="outline" onClick={() => insertSessionAfter(sessionIndex)}><Plus className="mr-1 h-4 w-4" /> Add session</Button></div>
           </div>
         ))}
       </div>
@@ -506,6 +499,8 @@ export default function PlansScreen({ user, view = "programme" }) {
   const [loadedToken, setLoadedToken] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
+  const [programmeNotice, setProgrammeNotice] = useState("");
+  const [deleteProgrammeCandidate, setDeleteProgrammeCandidate] = useState(null);
 
   useEffect(() => {
     if (!user?.uid) return undefined;
@@ -559,10 +554,11 @@ export default function PlansScreen({ user, view = "programme" }) {
         ? await updatePlan(db, user.uid, original, planToSave, { expectedUpdatedAtToken: loadedToken, updatedAtToken: saveToken })
         : await createPlan(db, user.uid, planToSave, { updatedAtToken: saveToken });
       if (saved.isActive) await setPlanActive(db, user.uid, saved, true, { updatedAtToken: saveToken });
-      setOriginal(structuredClone(saved));
-      setDraft(structuredClone(saved));
-      setLoadedToken(saveToken);
-      setSaveMessage("Programme saved.");
+      setOriginal(null);
+      setDraft(null);
+      setLoadedToken("");
+      setSaveMessage("");
+      setProgrammeNotice("Programme saved.");
     } catch (err) {
       setSaveMessage(friendlyErrorMessage(err, "We could not save this plan. Please try again."));
     } finally {
@@ -595,10 +591,22 @@ export default function PlansScreen({ user, view = "programme" }) {
     try { await restorePlan(db, user.uid, plan, { updatedAtToken: token() }); } catch (err) { setPlansError(friendlyErrorMessage(err, "We could not restore that programme. Please try again.", "programmes")); }
   }
 
+  async function handleDeleteProgramme() {
+    if (!deleteProgrammeCandidate) return;
+    try {
+      await deletePlan(db, user.uid, deleteProgrammeCandidate.id);
+      setPlans((current) => current.filter((plan) => plan.id !== deleteProgrammeCandidate.id));
+      setDeleteProgrammeCandidate(null);
+      setProgrammeNotice("Programme permanently deleted. Completed workouts were not changed.");
+    } catch (err) {
+      setPlansError(friendlyErrorMessage(err, "We could not delete that programme. Please try again.", "programmes"));
+    }
+  }
+
   const renderSection = (title, items, empty) => (
     <section className="space-y-3">
       <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-      {items.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">{empty}</div> : <div className="grid gap-3 lg:grid-cols-2">{items.map((plan) => <PlanCard key={plan.id} plan={plan} onEdit={openPlan} onDuplicate={handleDuplicate} onToggleActive={handleToggleActive} onArchive={handleArchive} onRestore={handleRestore} />)}</div>}
+      {items.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">{empty}</div> : <div className="grid gap-3 lg:grid-cols-2">{items.map((plan) => <PlanCard key={plan.id} plan={plan} onEdit={openPlan} onDuplicate={handleDuplicate} onToggleActive={handleToggleActive} onArchive={handleArchive} onRestore={handleRestore} onDelete={setDeleteProgrammeCandidate} />)}</div>}
     </section>
   );
 
@@ -609,6 +617,7 @@ export default function PlansScreen({ user, view = "programme" }) {
         <div><h1 className="text-2xl font-semibold tracking-tight">Programme</h1><p className="text-sm text-slate-500">Build reusable, named sessions and train them in any order.</p></div>
         <Button onClick={openNewPlan}><Plus className="mr-1 h-4 w-4" /> Create programme</Button>
       </div>
+      {programmeNotice ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{programmeNotice}</div> : null}
       {plansError ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{plansError}</div> : null}
       {exercisesError ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">The exercise library could not be loaded. Programme exercises already saved remain editable.</div> : null}
       {plansLoading ? <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-500">Loading programmes…</div> : null}
@@ -617,6 +626,7 @@ export default function PlansScreen({ user, view = "programme" }) {
       {renderSection("Active", activePlans, "Activate any plan when you are ready to use it regularly.")}
       {renderSection("Inactive and draft", inactivePlans, "Plans you deactivate will appear here.")}
       {renderSection("Archived", archivedPlans, "Archived plans will appear here and can be restored later.")}
+      {deleteProgrammeCandidate ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"><div role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl"><h3 className="text-lg font-semibold">Delete "{deleteProgrammeCandidate.name}" permanently?</h3><p className="mt-2 text-sm text-slate-600">This programme will be removed permanently. Completed workouts will remain untouched.</p><div className="mt-5 flex justify-end gap-2"><Button variant="outline" onClick={() => setDeleteProgrammeCandidate(null)}>Cancel</Button><Button variant="danger" onClick={handleDeleteProgramme}>Delete permanently</Button></div></div></div> : null}
       </>}
     </div>
   );

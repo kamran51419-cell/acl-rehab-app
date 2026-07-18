@@ -1,48 +1,71 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ChevronRight, Dumbbell } from "lucide-react";
 import { db } from "../../firebase";
-import { planPrescriptionSummary } from "../../lib/domain/plans";
-import { durationLabel, groupSessionExercises, previousWeightForExercise, workoutItem } from "../../lib/domain/workoutDisplay";
-import { subscribePlans, subscribeWorkouts } from "../../lib/firebase/planRepository";
+import { todayString } from "../../lib/domain/date";
+import { durationLabel, groupSessionExercises, previousWeightsForExercise, workoutItem } from "../../lib/domain/workoutDisplay";
+import { createDebouncedSaver, createInProgressWorkout, findInProgressWorkout, isWeightedExerciseComplete, resumeWorkout, updateRecordedSetWeight } from "../../lib/domain/workoutSession";
+import { createInProgressWorkoutDocument, finishWorkoutDocument, subscribePlans, subscribeWorkouts, updateInProgressWorkoutDocument } from "../../lib/firebase/planRepository";
+import { makeId } from "../../lib/domain/legacyWorkouts";
 
-function CompletionList({ title, exercises, checked, onToggle }) {
+function CompletionList({ title, exercises, onToggle }) {
   if (!exercises.length) return null;
-  return <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><h2 className="font-semibold text-slate-900">{title}</h2><div className="mt-3 space-y-2">{exercises.map((exercise) => { const item = workoutItem(exercise); const done = checked.has(item.id); return <label key={item.id} className={`flex cursor-pointer items-start gap-3 rounded-xl bg-white p-3 ${done ? "opacity-60" : ""}`}><input className="mt-1" type="checkbox" checked={done} onChange={() => onToggle(item.id)} /><span className={done ? "line-through" : ""}><span className="block font-medium">{item.name}</span>{item.summary ? <span className="block text-sm text-slate-500">{item.summary}</span> : null}</span></label>; })}</div></section>;
+  return <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><h2 className="font-semibold text-slate-900">{title}</h2><div className="mt-3 space-y-2">{exercises.map((exercise) => { const item = workoutItem(exercise); return <label key={item.id} className={`flex cursor-pointer items-start gap-3 rounded-xl bg-white p-3 ${exercise.completed ? "opacity-60" : ""}`}><input className="mt-1" type="checkbox" checked={Boolean(exercise.completed)} onChange={() => onToggle(exercise.id)} /><span className={exercise.completed ? "line-through" : ""}><span className="block font-medium">{item.name}</span>{item.summary ? <span className="block text-sm text-slate-500">{item.summary}</span> : null}</span></label>; })}</div></section>;
 }
 
-function WeightCard({ exercise, value, onChange }) {
-  return <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="font-semibold">{exercise.exerciseNameSnapshot}</div><div className="text-sm text-slate-500">{planPrescriptionSummary(exercise)}</div><label className="mt-3 block text-sm font-medium text-slate-700">Weight (kg)<input className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3" inputMode="decimal" value={value} onChange={(event) => onChange(event.target.value)} /></label></div>;
+function repsLabel(target = {}) {
+  return target.type === "range" ? `${target.min}–${target.max} reps` : `${target.value || "?"} reps`;
 }
 
-function IntervalCard({ exercise, checked, onToggle }) {
+function WeightCard({ exercise, onWeight }) {
+  const complete = isWeightedExerciseComplete(exercise);
+  return <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="flex items-center justify-between"><div className="font-semibold">{exercise.exerciseNameSnapshot}</div>{complete ? <span className="text-xs font-medium text-emerald-700">Complete</span> : null}</div><div className="mt-2 space-y-1.5">{exercise.recordedSets.map((set) => <label key={set.id} className="grid grid-cols-[auto_1fr_minmax(80px,120px)_auto] items-center gap-2 text-sm"><span className="font-medium">Set {set.setNumber}:</span><span className="text-slate-600">{repsLabel(set.prescribedReps)}</span><input aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} weight`} className="h-9 rounded-lg border border-slate-200 px-2" inputMode="decimal" value={set.rawWeight ?? set.weight ?? ""} onChange={(event) => onWeight(exercise.id, set.id, event.target.value)} /><span className="text-slate-500">kg</span></label>)}</div></div>;
+}
+
+function IntervalCard({ exercise, onToggle }) {
   const stages = (exercise.prescription?.stages || []).slice().sort((a, b) => a.sortOrder - b.sortOrder);
-  return <label className={`block cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 ${checked ? "opacity-60" : ""}`}><span className="flex items-start gap-3"><input className="mt-1" type="checkbox" checked={checked} onChange={onToggle} /><span><span className={`block font-semibold ${checked ? "line-through" : ""}`}>{exercise.exerciseNameSnapshot}</span><span className="text-sm text-slate-500">Intervals</span></span></span><div className="mt-3 space-y-1 pl-7 text-sm text-slate-600">{stages.map((stage) => <div key={stage.id}>{stage.phase === "rest" ? "Rest" : "Work"} · {durationLabel(stage.durationSeconds, stage.durationUnit)}{stage.label ? ` · ${stage.label}` : ""}</div>)}</div></label>;
+  return <label className={`block cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 ${exercise.completed ? "opacity-60" : ""}`}><span className="flex items-start gap-3"><input className="mt-1" type="checkbox" checked={Boolean(exercise.completed)} onChange={() => onToggle(exercise.id)} /><span><span className={`block font-semibold ${exercise.completed ? "line-through" : ""}`}>{exercise.exerciseNameSnapshot}</span><span className="text-sm text-slate-500">Intervals</span></span></span><div className="mt-3 space-y-1 pl-7 text-sm text-slate-600">{stages.map((stage) => <div key={stage.id}>{stage.phase === "rest" ? "Rest" : "Work"} · {durationLabel(stage.durationSeconds, stage.durationUnit)}{stage.label ? ` · ${stage.label}` : ""}</div>)}</div></label>;
 }
 
 export default function WorkoutScreen({ user }) {
   const [plans, setPlans] = useState([]);
   const [workouts, setWorkouts] = useState([]);
   const [selectedSession, setSelectedSession] = useState(null);
-  const [checked, setChecked] = useState(new Set());
-  const [weights, setWeights] = useState({});
+  const [workout, setWorkout] = useState(null);
+  const [saveStatus, setSaveStatus] = useState("");
   useEffect(() => user?.uid ? subscribePlans(db, user.uid, setPlans, () => {}) : undefined, [user?.uid]);
   useEffect(() => user?.uid ? subscribeWorkouts(db, user.uid, setWorkouts, () => {}) : undefined, [user?.uid]);
+  const saver = useMemo(() => createDebouncedSaver((value) => updateInProgressWorkoutDocument(db, user.uid, value), 500, (status) => setSaveStatus(status)), [user.uid]);
+  useEffect(() => () => saver.cancel(), [saver]);
+  useEffect(() => { if (workout) saver.schedule(workout); }, [workout, saver]);
   const activeProgrammes = useMemo(() => plans.filter((plan) => plan.isActive && !plan.isArchived).sort((a, b) => String(b.activatedAt?.seconds || b.updatedAtToken || b.id).localeCompare(String(a.activatedAt?.seconds || a.updatedAtToken || a.id))), [plans]);
   const programme = activeProgrammes[0];
   const sessions = useMemo(() => (programme?.sessions || []).slice().sort((a, b) => a.sortOrder - b.sortOrder), [programme]);
 
-  function toggleChecked(id) { setChecked((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; }); }
-  function chooseSession(session) {
+  async function chooseSession(session) {
+    const date = todayString();
+    const previousWeightsByExercise = Object.fromEntries((session.exercises || []).map((exercise) => [exercise.exerciseId, previousWeightsForExercise(workouts.filter((item) => item.status === "completed"), exercise.exerciseId)]));
+    const template = createInProgressWorkout({ id: `workout-${makeId()}`, userId: user.uid, programme, session, date, previousWeightsByExercise });
+    const existing = findInProgressWorkout(workouts, programme.id, session.id, date) || workouts.find((item) => item.status === "in_progress" && item.planId === programme.id && item.sessionId === session.id);
+    const next = resumeWorkout(existing, template);
+    if (!existing) await createInProgressWorkoutDocument(db, user.uid, next);
     setSelectedSession(session);
-    const initialWeights = {};
-    (session.exercises || []).forEach((exercise) => { const previous = previousWeightForExercise(workouts, exercise.exerciseId); if (previous !== "") initialWeights[exercise.id] = String(previous); });
-    setWeights(initialWeights);
+    setWorkout(next);
+    setSaveStatus(existing ? "saved" : "saved");
   }
 
-  if (selectedSession) {
-    const exercises = selectedSession.exercises || [];
-    const { mobility, other, standard, weighted, intervals } = groupSessionExercises(exercises);
-    return <div className="space-y-5"><button className="text-sm font-medium text-slate-600" onClick={() => { setSelectedSession(null); setChecked(new Set()); setWeights({}); }}>← All sessions</button><div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><div className="text-sm font-medium text-emerald-700">Ready to start</div><h1 className="mt-1 text-2xl font-semibold">{selectedSession.name}</h1><p className="mt-2 text-slate-500">{programme.name} · {exercises.length} exercises</p><div className="mt-5 space-y-3"><CompletionList title="Exercises" exercises={standard} checked={checked} onToggle={toggleChecked} /><CompletionList title="Mobility / Stretch" exercises={mobility} checked={checked} onToggle={toggleChecked} /><CompletionList title="Other" exercises={other} checked={checked} onToggle={toggleChecked} />{weighted.map((exercise) => <WeightCard key={exercise.id} exercise={exercise} value={weights[exercise.id] || ""} onChange={(value) => setWeights((current) => ({ ...current, [exercise.id]: value }))} />)}{intervals.map((exercise) => <IntervalCard key={exercise.id} exercise={exercise} checked={checked.has(exercise.id)} onToggle={() => toggleChecked(exercise.id)} />)}</div><p className="mt-5 text-sm text-slate-500">Workout entries will keep the workout date independent from when the entry is created.</p></div></div>;
+  function toggleExercise(id) { setWorkout((current) => ({ ...current, exercises: current.exercises.map((exercise) => exercise.id === id ? { ...exercise, completed: !exercise.completed } : exercise) })); }
+  function updateWeight(exerciseId, setId, weight) { setWorkout((current) => updateRecordedSetWeight(current, exerciseId, setId, weight)); }
+  async function finishWorkout() {
+    await saver.flush();
+    await finishWorkoutDocument(db, user.uid, workout);
+    setWorkout(null);
+    setSelectedSession(null);
+    setSaveStatus("");
+  }
+
+  if (selectedSession && workout) {
+    const { mobility, other, standard, weighted, intervals } = groupSessionExercises(workout.exercises);
+    return <div className="space-y-5"><button className="text-sm font-medium text-slate-600" onClick={() => { saver.flush(); setSelectedSession(null); setWorkout(null); }}>← All sessions</button><div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><div className="flex items-center justify-between gap-3"><div><div className="text-sm font-medium text-emerald-700">Workout in progress</div><h1 className="mt-1 text-2xl font-semibold">{workout.sessionNameSnapshot}</h1></div><span className={`text-xs ${saveStatus === "error" ? "text-red-600" : "text-slate-500"}`}>{saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved" : saveStatus === "error" ? "Could not save" : ""}</span></div><div className="mt-4 grid gap-3 md:grid-cols-2"><label className="text-sm font-medium text-slate-700">Workout date<input type="date" className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3" value={workout.date} onChange={(event) => setWorkout({ ...workout, date: event.target.value })} /></label><label className="text-sm font-medium text-slate-700">Workout notes<input className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3" value={workout.notes || ""} onChange={(event) => setWorkout({ ...workout, notes: event.target.value })} /></label></div><div className="mt-5 space-y-3"><CompletionList title="Exercises" exercises={standard} onToggle={toggleExercise} /><CompletionList title="Mobility / Stretch" exercises={mobility} onToggle={toggleExercise} /><CompletionList title="Other" exercises={other} onToggle={toggleExercise} />{weighted.map((exercise) => <WeightCard key={exercise.id} exercise={exercise} onWeight={updateWeight} />)}{intervals.map((exercise) => <IntervalCard key={exercise.id} exercise={exercise} onToggle={toggleExercise} />)}</div><Button className="mt-6 w-full md:w-auto" onClick={finishWorkout}>Finish workout</Button></div></div>;
   }
 
   return <div className="space-y-5"><div><p className="text-sm font-medium text-emerald-700">Current Programme</p><h1 className="text-2xl font-semibold">Workout</h1><p className="text-sm text-slate-500">Choose the session you are performing. There is no fixed day or required order.</p></div>{activeProgrammes.length > 1 ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Multiple legacy programmes are active. Activate your preferred programme again to normalize this to one.</div> : null}{!programme ? <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center"><Dumbbell className="mx-auto mb-3 text-slate-400"/><h2 className="font-semibold">No active programme</h2><p className="text-sm text-slate-500">Activate a programme before starting a workout.</p></div> : <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="text-lg font-semibold">{programme.name}</h2><div className="mt-4 space-y-2">{sessions.map((session) => <button key={session.id} onClick={() => chooseSession(session)} className="flex w-full items-center justify-between rounded-2xl border border-slate-200 p-4 text-left hover:bg-slate-50"><span><span className="block font-semibold">{session.name}</span><span className="text-sm text-slate-500">{session.exercises?.length || 0} exercises</span></span><ChevronRight className="h-5 w-5 text-slate-400"/></button>)}</div></div>}</div>;

@@ -8,6 +8,7 @@ import { normalizeLegacyRehabData } from "../src/lib/firebase/legacyRehabReposit
 import { createWorkout } from "../src/lib/domain/v2Models.js";
 import { WORKOUT_BEHAVIOR, groupSessionExercises, previousWeightForExercise, workoutItem } from "../src/lib/domain/workoutDisplay.js";
 import { EXERCISE_LOGGING_METHOD, EXERCISE_TYPE } from "../src/lib/domain/plans.js";
+import { createDebouncedSaver, createInProgressWorkout, findInProgressWorkout, isWeightedExerciseComplete, reorderExerciseSnapshots, resumeWorkout, updateRecordedSetWeight } from "../src/lib/domain/workoutSession.js";
 
 test("calculateWeekFromSurgeryDate returns 1-indexed rehab weeks", () => {
   assert.equal(calculateWeekFromSurgeryDate("2026-01-01", "2026-01-01"), "1");
@@ -46,6 +47,38 @@ test("prescription methods determine completion, weight and interval workout beh
   assert.equal(workoutItem({ ...base, loggingMethod: EXERCISE_LOGGING_METHOD.REPS_WEIGHT, prescription: { targetSets: 3, targetReps: { type: "fixed", value: 10 } } }).behavior, WORKOUT_BEHAVIOR.WEIGHT);
   assert.equal(workoutItem({ ...base, loggingMethod: EXERCISE_LOGGING_METHOD.INTERVALS, prescription: { stages: [] } }).behavior, WORKOUT_BEHAVIOR.INTERVALS);
   assert.equal(previousWeightForExercise([{ date: "2026-01-01", exercises: [{ exerciseId: "exercise", prescriptionBlocks: [{ actualSets: [{ weight: 42.5 }] }] }] }], "exercise"), 42.5);
+});
+
+test("weighted workout drafts preserve multiple independent sets and resume", () => {
+  const programme = { id: "plan", version: 2, name: "Programme" };
+  const session = { id: "session", name: "Lower", exercises: [{ id: "press", exerciseId: "leg-press", exerciseNameSnapshot: "Leg Press", exerciseType: EXERCISE_TYPE.STRENGTH, loggingMethod: EXERCISE_LOGGING_METHOD.REPS_WEIGHT, sortOrder: 0, prescription: { targetSets: 2, targetReps: { type: "fixed", value: 10 } } }] };
+  const draft = createInProgressWorkout({ id: "workout", userId: "uid", programme, session, date: "2026-07-18", previousWeightsByExercise: { "leg-press": { 1: 80, 2: 82.5 } } });
+  assert.deepEqual(draft.exercises[0].recordedSets.map((set) => [set.id, set.setNumber, set.prescribedReps.value, set.weight, set.unit]), [["press-set-1", 1, 10, 80, "kg"], ["press-set-2", 2, 10, 82.5, "kg"]]);
+  const changed = updateRecordedSetWeight(draft, "press", "press-set-2", "85");
+  assert.equal(isWeightedExerciseComplete(changed.exercises[0]), true);
+  const resumed = resumeWorkout({ ...changed, notes: "Saved", status: "in_progress" }, draft);
+  assert.equal(resumed.notes, "Saved");
+  assert.equal(resumed.exercises[0].recordedSets[1].weight, 85);
+  assert.equal(findInProgressWorkout([resumed], "plan", "session", "2026-07-18").id, "workout");
+  const legacyResume = resumeWorkout({ ...draft, exercises: [{ ...draft.exercises[0], recordedSets: undefined, weight: 77.5 }] }, draft);
+  assert.equal(legacyResume.exercises[0].recordedSets[0].weight, 77.5);
+});
+
+test("debounced autosave reuses the latest workout and flushes pending changes", async () => {
+  const saved = [];
+  const statuses = [];
+  const saver = createDebouncedSaver(async (workout) => saved.push(workout), 20, (status) => statuses.push(status));
+  saver.schedule({ id: "same", notes: "first" });
+  saver.schedule({ id: "same", notes: "latest" });
+  await saver.flush();
+  assert.deepEqual(saved, [{ id: "same", notes: "latest" }]);
+  assert.deepEqual(statuses, ["saving", "saved"]);
+});
+
+test("exercise snapshot ordering preserves ids and prescriptions", () => {
+  const exercises = [{ id: "a", sortOrder: 0, prescription: { value: 1 } }, { id: "b", sortOrder: 1, prescription: { value: 2 } }];
+  const reordered = reorderExerciseSnapshots(exercises, 0, 1);
+  assert.deepEqual(reordered.map((item) => [item.id, item.sortOrder, item.prescription.value]), [["b", 0, 2], ["a", 1, 1]]);
 });
 
 test("set helpers calculate best sets and symmetry from legacy set values", () => {

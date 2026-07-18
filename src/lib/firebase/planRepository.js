@@ -25,6 +25,10 @@ function exerciseRef(db, uid, exerciseId) {
   return doc(db, "users", uid, "exercises", exerciseId);
 }
 
+function workoutRef(db, uid, workoutId) {
+  return doc(db, "users", uid, "workouts", workoutId);
+}
+
 export function exerciseCollectionPath(uid) {
   return `users/${uid}/exercises`;
 }
@@ -143,6 +147,10 @@ export async function restorePlan(db, uid, plan, { updatedAtToken }) {
   }));
 }
 
+export async function deletePlan(db, uid, planId, { deleteDocument = deleteDoc, referenceFactory = planRef } = {}) {
+  await deleteDocument(referenceFactory(db, uid, planId));
+}
+
 export async function saveExerciseDefinition(db, uid, exercise, { updatedAtToken }) {
   const path = `${exerciseCollectionPath(uid)}/${exercise.id}`;
   logExerciseRepository("save start", { uid, path });
@@ -185,6 +193,20 @@ export async function deleteExerciseDefinition(db, uid, exerciseId, { deleteDocu
 
 export function subscribeWorkouts(db, uid, onNext, onError) {
   return onSnapshot(collection(db, "users", uid, "workouts"), (snapshot) => onNext(snapshot.docs.map((item) => item.data())), onError);
+}
+
+export async function createInProgressWorkoutDocument(db, uid, workout) {
+  const data = stripUndefined({ ...workout, userId: uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  await setDoc(workoutRef(db, uid, workout.id), data, { merge: false });
+  return { ...workout, userId: uid };
+}
+
+export async function updateInProgressWorkoutDocument(db, uid, workout) {
+  await setDoc(workoutRef(db, uid, workout.id), stripUndefined({ ...workout, userId: uid, updatedAt: serverTimestamp() }), { merge: true });
+}
+
+export async function finishWorkoutDocument(db, uid, workout) {
+  await setDoc(workoutRef(db, uid, workout.id), stripUndefined({ ...workout, userId: uid, status: "completed", completedAt: serverTimestamp(), updatedAt: serverTimestamp() }), { merge: true });
 }
 
 export function subscribeExerciseDefinitions(db, uid, onNext, onError) {

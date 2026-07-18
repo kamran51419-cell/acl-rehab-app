@@ -25,14 +25,19 @@ export function workoutItem(exercise) {
 }
 
 export function previousWeightForExercise(workouts = [], exerciseId) {
+  const weights = previousWeightsForExercise(workouts, exerciseId);
+  return weights[1] ?? Object.values(weights)[0] ?? "";
+}
+
+export function previousWeightsForExercise(workouts = [], exerciseId) {
   const ordered = workouts.slice().sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
   for (const workout of ordered) {
     const exercise = (workout.exercises || []).find((item) => item.exerciseId === exerciseId);
-    const sets = (exercise?.prescriptionBlocks || []).flatMap((block) => block.actualSets || []);
+    const sets = exercise?.recordedSets?.length ? exercise.recordedSets : (exercise?.prescriptionBlocks || []).flatMap((block) => block.actualSets || []);
     const weighted = sets.filter((set) => Number.isFinite(Number(set.weight)));
-    if (weighted.length) return Number(weighted[weighted.length - 1].weight);
+    if (weighted.length) return Object.fromEntries(weighted.map((set, index) => [Number(set.setNumber || index + 1), Number(set.weight)]));
   }
-  return "";
+  return {};
 }
 
 export function groupSessionExercises(exercises = []) {

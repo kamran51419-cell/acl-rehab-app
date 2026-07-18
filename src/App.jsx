@@ -19,246 +19,28 @@ import {
   signOut,
   sendPasswordResetEmail,
 } from "firebase/auth";
-import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
-
-const DEFAULT_EXERCISES = [
-  { id: "lp", label: "Leg Press", singleLeg: true, builtIn: true },
-  { id: "le", label: "Leg Extension", singleLeg: true, builtIn: true },
-  { id: "hc", label: "Hamstring Curl", singleLeg: true, builtIn: true },
-];
-
-const blankSet = () => ({ reps: "", weight: "" });
-const defaultSets = () => [blankSet(), blankSet(), blankSet()];
-const blankSide = () => ({ sets: defaultSets() });
-const todayString = () => {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-};
-const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-const blankForm = {
-  week: "",
-  date: todayString(),
-  exerciseId: "lp",
-  left: blankSide(),
-  right: blankSide(),
-  bilateral: { sets: defaultSets() },
-  notes: "",
-};
+import { saveLegacyRehabData, subscribeLegacyRehabData } from "./lib/firebase/legacyRehabRepository";
+import { calculateDaysSinceSurgery, calculateWeekFromSurgeryDate, todayString } from "./lib/domain/date";
+import { blankSet, defaultSets } from "./lib/domain/sets";
+import {
+  DEFAULT_EXERCISES,
+  aggregateWeekExerciseSessions,
+  bestSetSym,
+  blankForm,
+  compactDate,
+  compactExerciseSummary,
+  emptyWeek,
+  latestBestSetForExercise,
+  latestSymmetryForExercise,
+  makeBilateralSession,
+  makeId,
+  makeSingleLegSession,
+  sessionSummary,
+} from "./lib/domain/legacyWorkouts";
 
 function cls(...parts) {
   return parts.filter(Boolean).join(" ");
-}
-
-function Button({ children, variant = "default", size = "default", className = "", ...props }) {
-  const base =
-    "inline-flex items-center justify-center rounded-xl border text-sm font-medium transition focus:outline-none disabled:opacity-50 disabled:pointer-events-none";
-  const variants = {
-    default: "bg-slate-900 text-white border-slate-900 hover:bg-slate-800",
-    outline: "bg-white text-slate-700 border-slate-200 hover:bg-slate-50",
-    destructive: "bg-red-600 text-white border-red-600 hover:bg-red-700",
-  };
-  const sizes = {
-    default: "h-10 px-4 py-2",
-    sm: "h-9 px-3 py-2 text-xs",
-  };
-  return (
-    <button className={cls(base, variants[variant], sizes[size], className)} {...props}>
-      {children}
-    </button>
-  );
-}
-
-function Input(props) {
-  return (
-    <input
-      className={cls("h-10 w-full min-w-0 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm", props.className)}
-      {...props}
-    />
-  );
-}
-
-function Label({ children, className = "", ...props }) {
-  return (
-    <label className={cls("mb-1 block text-sm font-medium text-slate-700", className)} {...props}>
-      {children}
-    </label>
-  );
-}
-
-function setVolume(set) {
-  return Number(set?.reps || 0) * Number(set?.weight || 0);
-}
-
-function bestSet(sets = []) {
-  if (!sets.length) return null;
-  let best = null;
-  for (const s of sets) {
-    const vol = setVolume(s);
-    if (!best || vol > best.volume) {
-      best = { reps: s.reps || "", weight: s.weight || "", volume: vol };
-    }
-  }
-  return best && best.volume > 0 ? best : null;
-}
-
-function bestSetSym(leftSets = [], rightSets = []) {
-  const bestL = Math.max(0, ...leftSets.map(setVolume));
-  const bestR = Math.max(0, ...rightSets.map(setVolume));
-  if (!bestL || !bestR) return null;
-  return Math.round((Math.min(bestL, bestR) / Math.max(bestL, bestR)) * 100);
-}
-
-function setsSummaryLines(sets = []) {
-  if (!sets.length || sets.every((s) => !s.reps && !s.weight)) return ["—"];
-  return sets.map((s, i) => `${i + 1}. ${s.reps || "?"} reps, ${s.weight || "?"} kg`);
-}
-
-function formatDate(dateString) {
-  if (!dateString) return "—";
-  const d = new Date(`${dateString}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return String(dateString);
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
-}
-
-function calculateWeekFromSurgeryDate(surgeryDate, logDate) {
-  if (!surgeryDate || !logDate) return "";
-  const surgery = new Date(`${surgeryDate}T00:00:00`);
-  const logged = new Date(`${logDate}T00:00:00`);
-  const diffMs = logged.getTime() - surgery.getTime();
-  if (Number.isNaN(diffMs)) return "";
-  const diffDays = Math.floor(diffMs / 86400000);
-  if (diffDays < 0) return "";
-  return String(Math.floor(diffDays / 7) + 1);
-}
-
-function calculateDaysSinceSurgery(surgeryDate) {
-  if (!surgeryDate) return null;
-  const surgery = new Date(`${surgeryDate}T00:00:00`);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const diffMs = today.getTime() - surgery.getTime();
-  if (Number.isNaN(diffMs)) return null;
-  const diffDays = Math.floor(diffMs / 86400000);
-  if (diffDays < 0) return null;
-  return diffDays + 1;
-}
-
-function compactDate(sessions) {
-  const dates = [...new Set((sessions || []).map((s) => s.date).filter(Boolean))].map(formatDate);
-  if (!dates.length) return "—";
-  return dates.join(", ");
-}
-
-function makeSingleLegSession(exerciseId, date, leftSets, rightSets, notes) {
-  return {
-    id: makeId(),
-    exerciseId,
-    date,
-    singleLeg: true,
-    leftSets,
-    rightSets,
-    notes,
-  };
-}
-
-function makeBilateralSession(exerciseId, date, sets, notes) {
-  return {
-    id: makeId(),
-    exerciseId,
-    date,
-    singleLeg: false,
-    sets,
-    notes,
-  };
-}
-
-function emptyWeek(week) {
-  return { week, sessions: [] };
-}
-
-function aggregateWeekExerciseSessions(week, exerciseId) {
-  return (week.sessions || []).filter((s) => s.exerciseId === exerciseId);
-}
-
-function latestNonEmptySession(data, exerciseId, sideKey) {
-  for (let i = data.length - 1; i >= 0; i -= 1) {
-    const matches = (data[i].sessions || []).filter(
-      (s) => s.exerciseId === exerciseId && s.singleLeg && (s[sideKey] || []).some((x) => x.reps || x.weight)
-    );
-    if (matches.length) return matches[matches.length - 1][sideKey];
-  }
-  return [];
-}
-
-function latestBestSetForExercise(data, exerciseId, sideKey) {
-  return bestSet(latestNonEmptySession(data, exerciseId, sideKey));
-}
-
-function latestSymmetryForExercise(data, exerciseId) {
-  for (let i = data.length - 1; i >= 0; i -= 1) {
-    const matches = (data[i].sessions || []).filter((s) => s.exerciseId === exerciseId && s.singleLeg);
-    for (let j = matches.length - 1; j >= 0; j -= 1) {
-      const sym = bestSetSym(matches[j].leftSets || [], matches[j].rightSets || []);
-      if (sym !== null) return sym;
-    }
-  }
-  return null;
-}
-
-function compactExerciseSummary(week, exercise) {
-  const sessions = aggregateWeekExerciseSessions(week, exercise.id);
-  if (!sessions.length) return null;
-  const last = sessions[sessions.length - 1];
-  if (exercise.singleLeg) {
-    const left = bestSet(last.leftSets || []);
-    const right = bestSet(last.rightSets || []);
-    const sym = bestSetSym(last.leftSets || [], last.rightSets || []);
-    return {
-      type: "single",
-      dates: compactDate(sessions),
-      left: left ? `${left.reps} x ${left.weight}kg` : "—",
-      right: right ? `${right.reps} x ${right.weight}kg` : "—",
-      symmetry: sym,
-    };
-  }
-  const best = bestSet(last.sets || []);
-  return {
-    type: "bilateral",
-    dates: compactDate(sessions),
-    value: best ? `${best.reps} x ${best.weight}kg` : "—",
-  };
-}
-
-function sessionSummary(session) {
-  if (!session) {
-    return { date: "—", notes: "—", left: ["—"], right: ["—"], sets: ["—"], symmetry: null };
-  }
-  if (session.singleLeg) {
-    return {
-      date: formatDate(session.date),
-      notes: session.notes || "—",
-      left: setsSummaryLines(session.leftSets || []),
-      right: setsSummaryLines(session.rightSets || []),
-      sets: [],
-      symmetry: bestSetSym(session.leftSets || [], session.rightSets || []),
-    };
-  }
-  return {
-    date: formatDate(session.date),
-    notes: session.notes || "—",
-    left: [],
-    right: [],
-    sets: setsSummaryLines(session.sets || []),
-    symmetry: null,
-  };
 }
 
 function CardShell({ title, right, children }) {
@@ -416,28 +198,18 @@ export default function ACLTrackerApp() {
       return;
     }
 
-    const ref = doc(db, "rehabData", user.uid);
-
-    const unsub = onSnapshot(
-      ref,
-      (snap) => {
-        if (snap.exists()) {
-          const saved = snap.data();
-          setWeeks(Array.isArray(saved.weeks) ? saved.weeks : []);
-          setCustomExercises(Array.isArray(saved.customExercises) ? saved.customExercises : []);
-          setSurgeryDate(typeof saved.surgeryDate === "string" ? saved.surgeryDate : "");
-        } else {
-          setWeeks([]);
-          setCustomExercises([]);
-          setSurgeryDate("");
-        }
+    return subscribeLegacyRehabData(
+      db,
+      user.uid,
+      (saved) => {
+        setWeeks(saved.weeks);
+        setCustomExercises(saved.customExercises);
+        setSurgeryDate(saved.surgeryDate);
       },
       (error) => {
         console.error("Failed to load rehab data from Firestore", error);
       }
     );
-
-    return () => unsub();
   }, [user, authLoading]);
 
 
@@ -557,15 +329,11 @@ async function saveAllData(nextWeeks = weeks, nextCustomExercises = customExerci
   if (!user?.uid) return;
 
   try {
-    await setDoc(
-      doc(db, "rehabData", user.uid),
-      {
-        weeks: nextWeeks,
-        customExercises: nextCustomExercises,
-        surgeryDate: nextSurgeryDate,
-      },
-      { merge: true }
-    );
+    await saveLegacyRehabData(db, user.uid, {
+      weeks: nextWeeks,
+      customExercises: nextCustomExercises,
+      surgeryDate: nextSurgeryDate,
+    });
   } catch (error) {
     console.error("Failed to save rehab data to Firestore", error);
   }

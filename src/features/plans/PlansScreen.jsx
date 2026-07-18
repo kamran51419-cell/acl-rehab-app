@@ -66,7 +66,7 @@ const LOGGING_METHOD_LABELS = {
   [EXERCISE_LOGGING_METHOD.TIME]: "Time",
   [EXERCISE_LOGGING_METHOD.DISTANCE]: "Distance",
   [EXERCISE_LOGGING_METHOD.TIME_DISTANCE]: "Time + Distance",
-  [EXERCISE_LOGGING_METHOD.COMPLETED]: "Completed",
+  [EXERCISE_LOGGING_METHOD.COMPLETED]: "Task",
 };
 
 function exerciseTypeLabel(type) {
@@ -74,7 +74,7 @@ function exerciseTypeLabel(type) {
 }
 
 function loggingMethodLabel(method) {
-  return LOGGING_METHOD_LABELS[method] || "Completed";
+  return LOGGING_METHOD_LABELS[method] || "Task";
 }
 
 function friendlyErrorMessage(error, fallback) {
@@ -143,7 +143,7 @@ function PlanCard({ plan, onEdit, onDuplicate, onToggleActive, onArchive, onRest
     <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-lg font-semibold text-slate-900">{plan.name || "Untitled plan"}</div>
+          <div className="text-lg font-semibold text-slate-900">{plan.name || "Untitled programme"}</div>
           {plan.description ? <div className="mt-1 text-sm text-slate-500">{plan.description}</div> : null}
         </div>
         <span className={cls("rounded-full px-2 py-1 text-xs font-medium", plan.isArchived ? "bg-slate-100 text-slate-600" : plan.isActive ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>{plan.isArchived ? "Archived" : plan.isActive ? "Active" : "Inactive"}</span>
@@ -282,12 +282,15 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
   const [includeArchived, setIncludeArchived] = useState(false);
   const [selectedExerciseId, setSelectedExerciseId] = useState("");
   const [selectedType, setSelectedType] = useState(EXERCISE_TYPE.STRENGTH);
+  const [pickerSession, setPickerSession] = useState(null);
+  const [creatingExercise, setCreatingExercise] = useState(false);
+  const [newExercise, setNewExercise] = useState({ name: "", exerciseType: EXERCISE_TYPE.STRENGTH, loggingMethod: defaultLoggingMethodForExerciseType(EXERCISE_TYPE.STRENGTH), notes: "" });
   const validation = validatePlan(draft);
   const filteredExercises = filterExerciseLibrary(exercises, { query: exerciseQuery, includeArchived });
 
   const setSessions = (sessions) => setDraft({ ...draft, sessions });
   const updateSession = (sessionIndex, patch) => setSessions(draft.sessions.map((session, index) => (index === sessionIndex ? { ...session, ...patch } : session)));
-  const addSession = () => setSessions([...draft.sessions, createPlanSession({ name: `Session ${draft.sessions.length + 1}`, sortOrder: draft.sessions.length })]);
+  const addSession = () => setSessions([...draft.sessions, createPlanSession({ name: "New session", sortOrder: draft.sessions.length })]);
 
   function addExerciseToSession(sessionIndex) {
     const libraryExercise = exercises.find((exercise) => exercise.id === selectedExerciseId);
@@ -303,23 +306,39 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
       loggingMethod: libraryExercise.loggingMethod || defaultLoggingMethodForExerciseType(exerciseType),
     });
     updateSession(sessionIndex, { exercises: [...session.exercises, planExercise] });
+    setPickerSession(null);
+  }
+
+  async function createAndAddExercise(sessionIndex) {
+    if (!newExercise.name.trim()) return;
+    const libraryExercise = createLibraryExercise(newExercise);
+    await saveExerciseDefinition(db, draft.userId, libraryExercise, { updatedAtToken: token() });
+    const session = draft.sessions[sessionIndex];
+    updateSession(sessionIndex, { exercises: [...session.exercises, createPlanExercise({
+      exerciseId: libraryExercise.id, exerciseNameSnapshot: libraryExercise.name,
+      exerciseType: libraryExercise.exerciseType, loggingMethod: libraryExercise.loggingMethod,
+      sortOrder: session.exercises.length, prescription: createDefaultPrescription(libraryExercise.exerciseType),
+    })] });
+    setNewExercise({ name: "", exerciseType: EXERCISE_TYPE.STRENGTH, loggingMethod: defaultLoggingMethodForExerciseType(EXERCISE_TYPE.STRENGTH), notes: "" });
+    setCreatingExercise(false);
+    setPickerSession(null);
   }
 
   return (
     <div className="space-y-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-md">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold text-slate-900">{original ? "Edit plan" : "Create plan"}</h2>
-          <p className="text-sm text-slate-500">Plan changes do not alter completed workouts.</p>
+          <h2 className="text-xl font-semibold text-slate-900">{original ? "Edit programme" : "Create programme"}</h2>
+          <p className="text-sm text-slate-500">Programme changes do not alter completed workouts.</p>
         </div>
-        <div className="flex gap-2"><Button variant="outline" onClick={onClose}>Close</Button><Button onClick={onSave} disabled={saving || !validation.valid}>{saving ? "Saving…" : "Save plan"}</Button></div>
+        <div className="flex gap-2"><Button variant="outline" onClick={onClose}>Close</Button><Button onClick={onSave} disabled={saving || !validation.valid}>{saving ? "Saving…" : "Save programme"}</Button></div>
       </div>
 
       {saveMessage ? <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{saveMessage}</div> : null}
       {!validation.valid ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">{validation.errors.slice(0, 4).join(" ")}</div> : null}
 
       <div className="grid gap-3 md:grid-cols-2">
-        <Field label="Plan name"><Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="ACL rehab plan" /></Field>
+        <Field label="Programme name"><Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="ACL rehab programme" /></Field>
         <Field label="Description"><Input value={draft.description || ""} onChange={(e) => setDraft({ ...draft, description: e.target.value })} placeholder="Optional" /></Field>
         <label className="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm"><input type="checkbox" checked={draft.isActive} onChange={(e) => setDraft({ ...draft, isActive: e.target.checked })} /> Active plan</label>
       </div>
@@ -357,7 +376,19 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
                 </div>
               ))}
 
-              <div className="rounded-xl border border-dashed border-slate-300 bg-white p-3">
+              {pickerSession !== sessionIndex ? (
+                <Button variant="outline" onClick={() => { setPickerSession(sessionIndex); setCreatingExercise(false); }}><Plus className="mr-1 h-4 w-4" /> Add Exercise</Button>
+              ) : <div className="rounded-xl border border-dashed border-slate-300 bg-white p-3">
+                <div className="mb-3 flex items-center justify-between"><strong>Exercise Picker</strong><Button size="sm" variant="outline" onClick={() => setPickerSession(null)}>Close</Button></div>
+                {creatingExercise ? <div className="space-y-3">
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <Field label="Exercise name"><Input autoFocus value={newExercise.name} onChange={(e) => setNewExercise({ ...newExercise, name: e.target.value })} /></Field>
+                    <Field label="Exercise type"><Select value={newExercise.exerciseType} onChange={(e) => { const exerciseType = e.target.value; setNewExercise({ ...newExercise, exerciseType, loggingMethod: defaultLoggingMethodForExerciseType(exerciseType) }); }}>{EXERCISE_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}</Select></Field>
+                    <Field label="Recording"><Select value={newExercise.loggingMethod} onChange={(e) => setNewExercise({ ...newExercise, loggingMethod: e.target.value })}>{EXERCISE_LOGGING_METHOD_OPTIONS.map((method) => <option key={method} value={method}>{loggingMethodLabel(method)}</option>)}</Select></Field>
+                  </div>
+                  <Field label="Notes"><Textarea value={newExercise.notes} onChange={(e) => setNewExercise({ ...newExercise, notes: e.target.value })} /></Field>
+                  <div className="flex gap-2"><Button onClick={() => createAndAddExercise(sessionIndex)}>Save and add to session</Button><Button variant="outline" onClick={() => setCreatingExercise(false)}>Back to library</Button></div>
+                </div> : <>
                 <div className="grid gap-3 md:grid-cols-[1fr_160px_auto]">
                   <Field label="Find exercise"><Input value={exerciseQuery} onChange={(e) => setExerciseQuery(e.target.value)} placeholder="Search library" /></Field>
                   <Field label="Type"><Select value={selectedType} onChange={(e) => setSelectedType(e.target.value)}>{EXERCISE_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}</Select></Field>
@@ -370,7 +401,9 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
                   </Select>
                   <Button onClick={() => addExerciseToSession(sessionIndex)} disabled={!selectedExerciseId}>Add exercise</Button>
                 </div>
-              </div>
+                <Button className="mt-3" variant="outline" onClick={() => setCreatingExercise(true)}><Plus className="mr-1 h-4 w-4" /> Create New Exercise</Button>
+                </>}
+              </div>}
             </div>
           </div>
         ))}
@@ -427,6 +460,18 @@ function ExerciseLibrary({ user, exercises, onChanged }) {
     try {
       await archiveExerciseDefinition(db, user.uid, exercise.id, !exercise.isArchived, { updatedAtToken: token() });
       setMessage(exercise.isArchived ? "Exercise restored." : "Exercise archived.");
+    } catch (error) {
+      setMessage(friendlyErrorMessage(error, "We could not update that exercise. Please try again."));
+    }
+  }
+
+  async function editExercise(exercise) {
+    const name = window.prompt("Exercise name", exercise.name);
+    if (!name?.trim()) return;
+    const notes = window.prompt("Exercise notes", exercise.notes || "");
+    try {
+      await saveExerciseDefinition(db, user.uid, { ...exercise, name: name.trim(), notes: notes ?? exercise.notes }, { updatedAtToken: token() });
+      setMessage("Exercise updated.");
     } catch (error) {
       setMessage(friendlyErrorMessage(error, "We could not update that exercise. Please try again."));
     }
@@ -490,6 +535,7 @@ function ExerciseLibrary({ user, exercises, onChanged }) {
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   {exercise.isArchived ? <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-500">Archived</span> : null}
+                  <Button size="sm" variant="outline" onClick={() => editExercise(exercise)}>Edit</Button>
                   <Button size="sm" variant="outline" onClick={() => toggleArchive(exercise)}>{exercise.isArchived ? "Restore" : "Archive"}</Button>
                 </div>
               </div>
@@ -501,7 +547,7 @@ function ExerciseLibrary({ user, exercises, onChanged }) {
   );
 }
 
-export default function PlansScreen({ user }) {
+export default function PlansScreen({ user, view = "programme" }) {
   const [plans, setPlans] = useState([]);
   const [exercises, setExercises] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -527,7 +573,7 @@ export default function PlansScreen({ user }) {
   function openNewPlan() {
     setOriginal(null);
     setLoadedToken("");
-    setDraft(createBlankPlan({ userId: user.uid, name: "New workout plan" }));
+    setDraft(createBlankPlan({ userId: user.uid, name: "New programme" }));
     setSaveMessage("");
   }
 
@@ -603,18 +649,19 @@ export default function PlansScreen({ user }) {
 
   return (
     <div className="space-y-6">
+      {view === "exercises" ? <><div><h1 className="text-2xl font-semibold tracking-tight">Manage Exercises</h1><p className="text-sm text-slate-500">Create, search, archive and restore your reusable exercise library.</p></div><ExerciseLibrary user={user} exercises={exercises} /></> : <>
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><h1 className="text-2xl font-semibold tracking-tight">Workout plans</h1><p className="text-sm text-slate-500">Create reusable plans for gym training, rehab sessions and mobility work.</p></div>
-        <Button onClick={openNewPlan}><Plus className="mr-1 h-4 w-4" /> Create plan</Button>
+        <div><h1 className="text-2xl font-semibold tracking-tight">Programme</h1><p className="text-sm text-slate-500">Build reusable, named sessions and train them in any order.</p></div>
+        <Button onClick={openNewPlan}><Plus className="mr-1 h-4 w-4" /> Create programme</Button>
       </div>
       {error ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
       {loading ? <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-500">Loading plans…</div> : null}
-      {!loading && plans.length === 0 ? <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center"><div className="font-semibold text-slate-900">No plans yet</div><p className="mt-1 text-sm text-slate-500">Create your first reusable workout plan so sessions do not need to be recreated every week.</p><Button className="mt-4" onClick={openNewPlan}>Create first plan</Button></div> : null}
+      {!loading && plans.length === 0 ? <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center"><div className="font-semibold text-slate-900">No programmes yet</div><p className="mt-1 text-sm text-slate-500">Create your first programme and give each workout session a useful name.</p><Button className="mt-4" onClick={openNewPlan}>Create first programme</Button></div> : null}
       {draft ? <PlanEditor draft={draft} setDraft={setDraft} original={original} exercises={exercises} onSave={saveDraft} onClose={closeEditor} saving={saving} saveMessage={saveMessage} /> : null}
-      <ExerciseLibrary user={user} exercises={exercises} />
       {renderSection("Active", activePlans, "Activate any plan when you are ready to use it regularly.")}
       {renderSection("Inactive and draft", inactivePlans, "Plans you deactivate will appear here.")}
       {renderSection("Archived", archivedPlans, "Archived plans will appear here and can be restored later.")}
+      </>}
     </div>
   );
 }

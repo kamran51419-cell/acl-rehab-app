@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ClipboardList, Home, Table2, LineChart as LineChartIcon, Plus, Trash2, X } from "lucide-react";
+import { ClipboardList, Home, Table2, Dumbbell, Menu, Plus, Trash2, X } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -21,6 +21,7 @@ import {
 } from "firebase/auth";
 import { auth, db } from "./firebase";
 import PlansScreen from "./features/plans/PlansScreen";
+import WorkoutScreen from "./features/workout/WorkoutScreen";
 import { saveLegacyRehabData, subscribeLegacyRehabData } from "./lib/firebase/legacyRehabRepository";
 import { calculateDaysSinceSurgery, calculateWeekFromSurgeryDate, todayString } from "./lib/domain/date";
 import { blankSet, defaultSets } from "./lib/domain/sets";
@@ -558,10 +559,10 @@ async function saveSession() {
 
         <div className="hidden md:flex flex-wrap gap-2">
           <TabButton active={activeTab === "home"} onClick={() => setActiveTab("home")}>Home</TabButton>
-          <TabButton active={activeTab === "log"} onClick={() => setActiveTab("log")}>Log Session</TabButton>
-          <TabButton active={activeTab === "plans"} onClick={() => setActiveTab("plans")}>Plans</TabButton>
-          <TabButton active={activeTab === "table"} onClick={() => setActiveTab("table")}>Progress</TabButton>
-          <TabButton active={activeTab === "graphs"} onClick={() => setActiveTab("graphs")}>Graphs</TabButton>
+          <TabButton active={activeTab === "programme"} onClick={() => setActiveTab("programme")}>Programme</TabButton>
+          <TabButton active={activeTab === "workout"} onClick={() => setActiveTab("workout")}>Workout</TabButton>
+          <TabButton active={["progress", "table", "graphs"].includes(activeTab)} onClick={() => setActiveTab("progress")}>Progress</TabButton>
+          <TabButton active={activeTab === "more"} onClick={() => setActiveTab("more")}>More</TabButton>
         </div>
 
         {activeTab === "home" && (
@@ -623,6 +624,10 @@ async function saveSession() {
                   This updates from the surgery date using today’s date. Add or change the surgery date above.
                 </div>
               </div>
+            </CardShell>
+            <CardShell title="Workout">
+              <p className="mb-4 text-sm text-slate-600">Choose any session from your active programme whenever you are ready to train.</p>
+              <div className="flex flex-wrap gap-2"><Button onClick={() => setActiveTab("workout")}>Start Workout</Button><Button variant="outline" onClick={() => setActiveTab("programme")}>View Programme</Button></div>
             </CardShell>
           </div>
         )}
@@ -764,7 +769,10 @@ async function saveSession() {
           </div>
         )}
 
-        {activeTab === "plans" && <PlansScreen user={user} />}
+        {activeTab === "programme" && <PlansScreen user={user} />}
+        {activeTab === "workout" && <WorkoutScreen user={user} />}
+        {activeTab === "progress" && <div className="space-y-4"><div><h1 className="text-2xl font-semibold">Progress</h1><p className="text-sm text-slate-500">Review your workout history and rehabilitation trends.</p></div><div className="flex gap-2"><Button onClick={() => setActiveTab("table")}>Workout history</Button><Button variant="outline" onClick={() => setActiveTab("graphs")}>Progress graphs</Button></div></div>}
+        {activeTab === "more" && <div className="space-y-4"><div><h1 className="text-2xl font-semibold">More</h1><p className="text-sm text-slate-500">Manage your library and app preferences.</p></div><PlansScreen user={user} view="exercises" /><CardShell title="Settings"><p className="text-sm text-slate-500">Profile, surgery details and export settings will live here.</p></CardShell></div>}
 
         {activeTab === "table" && (
           <div className="space-y-4">
@@ -1060,35 +1068,35 @@ async function saveSession() {
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("log")}
-            className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "log" ? "bg-slate-100 font-medium" : "text-slate-500")}
-          >
-            <Plus className="h-4 w-4" />
-            Log
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("plans")}
-            className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "plans" ? "bg-slate-100 font-medium" : "text-slate-500")}
+            onClick={() => setActiveTab("programme")}
+            className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "programme" ? "bg-slate-100 font-medium" : "text-slate-500")}
           >
             <ClipboardList className="h-4 w-4" />
-            Plans
+            Programme
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("table")}
-            className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "table" ? "bg-slate-100 font-medium" : "text-slate-500")}
+            onClick={() => setActiveTab("workout")}
+            className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "workout" ? "bg-slate-100 font-medium" : "text-slate-500")}
+          >
+            <Dumbbell className="h-4 w-4" />
+            Workout
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("progress")}
+            className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", ["progress", "table", "graphs"].includes(activeTab) ? "bg-slate-100 font-medium" : "text-slate-500")}
           >
             <Table2 className="h-4 w-4" />
             Progress
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("graphs")}
-            className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "graphs" ? "bg-slate-100 font-medium" : "text-slate-500")}
+            onClick={() => setActiveTab("more")}
+            className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "more" ? "bg-slate-100 font-medium" : "text-slate-500")}
           >
-            <LineChartIcon className="h-4 w-4" />
-            Graphs
+            <Menu className="h-4 w-4" />
+            More
           </button>
         </div>
       </div>

@@ -128,3 +128,8 @@ export function createDebouncedSaver(save, delay = 500, onStatus = () => {}) {
     cancel() { clearTimeout(timer); timer = null; },
   };
 }
+
+export async function completeWorkout(workout, saver, finish) {
+  await saver.flush();
+  return finish(workout);
+}

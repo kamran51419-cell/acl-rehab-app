@@ -8,7 +8,7 @@ import { normalizeLegacyRehabData } from "../src/lib/firebase/legacyRehabReposit
 import { createWorkout, SIDE } from "../src/lib/domain/v2Models.js";
 import { WORKOUT_BEHAVIOR, groupSessionExercises, previousWeightForExercise, previousWeightsForExercise, resolveWorkoutExerciseSide, workoutExerciseProgressKey, workoutExerciseSideLabel, workoutItem } from "../src/lib/domain/workoutDisplay.js";
 import { EXERCISE_LOGGING_METHOD, EXERCISE_TYPE } from "../src/lib/domain/plans.js";
-import { createDebouncedSaver, createInProgressWorkout, findInProgressWorkout, isWeightedExerciseComplete, reorderExerciseSnapshots, resumeWorkout, updateRecordedSetWeight } from "../src/lib/domain/workoutSession.js";
+import { completeWorkout, createDebouncedSaver, createInProgressWorkout, findInProgressWorkout, isWeightedExerciseComplete, reorderExerciseSnapshots, resumeWorkout, updateRecordedSetWeight } from "../src/lib/domain/workoutSession.js";
 import { latestCompletedWorkout, nextRehabAgeMode, persistRehabAgeMode, readRehabAgeMode, rehabAgeLabel } from "../src/lib/domain/homeDashboard.js";
 
 test("rehabilitation age cycles and persists its display preference", () => {
@@ -26,8 +26,11 @@ test("rehabilitation age cycles and persists its display preference", () => {
 });
 
 test("latest completed workout ignores unfinished workouts", () => {
-  const latest = latestCompletedWorkout([{ id: "draft", status: "in_progress", date: "2026-07-20" }, { id: "older", status: "completed", date: "2026-07-17" }, { id: "latest", status: "completed", date: "2026-07-18" }]);
+  const workouts = [{ id: "draft", status: "in_progress", date: "2026-07-20" }, { id: "older", status: "completed", date: "2026-07-17" }, { id: "latest", status: "completed", date: "2026-07-18" }];
+  const latest = latestCompletedWorkout(workouts);
   assert.equal(latest.id, "latest");
+  assert.equal(latestCompletedWorkout(workouts.filter((workout) => workout.id !== "latest")).id, "older");
+  assert.equal(latestCompletedWorkout(workouts.filter((workout) => workout.status !== "completed")), null);
   assert.equal(latestCompletedWorkout([{ status: "in_progress" }]), null);
 });
 
@@ -168,6 +171,16 @@ test("autosave flush waits for persistence and reports failures", async () => {
   const failing = createDebouncedSaver(async () => { throw new Error("offline"); }, 1000);
   failing.schedule({ id: "workout" });
   await assert.rejects(failing.flush(), /offline/);
+});
+
+test("workout completion flushes latest state before marking it completed", async () => {
+  const events = [];
+  const latest = { id: "workout", notes: "latest", exercises: [{ id: "press", completed: true, recordedSets: [{ weight: 85 }] }] };
+  const completed = await completeWorkout(latest, { async flush() { events.push("flush"); } }, async (workout) => { events.push("finish"); assert.equal(workout, latest); return { ...workout, status: "completed" }; });
+  assert.deepEqual(events, ["flush", "finish"]);
+  assert.equal(completed.status, "completed");
+  assert.equal(completed.exercises[0].recordedSets[0].weight, 85);
+  await assert.rejects(completeWorkout(latest, { async flush() { throw new Error("offline"); } }, async () => { throw new Error("must not finish"); }), /offline/);
 });
 
 test("exercise snapshot ordering preserves ids and prescriptions", () => {

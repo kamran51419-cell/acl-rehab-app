@@ -39,3 +39,16 @@ test("selected workout session renders its form and Finish workout action", asyn
   assert.match(markup, /Workout date/);
   assert.match(markup, /Finish workout/);
 });
+
+test("workout form shows finishing and failure states", async (context) => {
+  const vite = await createServer({ server: { middlewareMode: true }, appType: "custom", logLevel: "silent" });
+  context.after(() => vite.close());
+  const { WorkoutForm } = await vite.ssrLoadModule("/src/features/workout/WorkoutScreen.jsx");
+  const workout = { id: "workout", date: "2026-07-18", sessionNameSnapshot: "Session", exercises: [] };
+  const finishing = renderToStaticMarkup(React.createElement(WorkoutForm, { workout, finishing: true, onBack() {}, onToggle() {}, onWeight() {}, onDate() {}, onNotes() {}, onFinish() {} }));
+  assert.match(finishing, /Finishing…/);
+  assert.match(finishing, /disabled=""/);
+  const failed = renderToStaticMarkup(React.createElement(WorkoutForm, { workout, finishError: "Could not finish workout. Please try again.", onBack() {}, onToggle() {}, onWeight() {}, onDate() {}, onNotes() {}, onFinish() {} }));
+  assert.match(failed, /Could not finish workout/);
+  assert.match(failed, /Finish workout/);
+});

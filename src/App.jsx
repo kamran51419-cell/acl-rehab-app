@@ -22,6 +22,7 @@ import {
 import { auth, db } from "./firebase";
 import PlansScreen from "./features/plans/PlansScreen";
 import WorkoutScreen from "./features/workout/WorkoutScreen";
+import WorkoutHistoryScreen from "./features/workout/WorkoutHistoryScreen";
 import HomeScreen from "./features/home/HomeScreen";
 import Button from "./components/ui/Button";
 import { saveLegacyRehabData, subscribeLegacyRehabData } from "./lib/firebase/legacyRehabRepository";
@@ -168,6 +169,7 @@ export default function ACLTrackerApp() {
   const [showAllRows, setShowAllRows] = useState(false);
   const [activeTab, setActiveTab] = useState("home");
   const [workoutIntent, setWorkoutIntent] = useState(null);
+  const [highlightedWorkoutId, setHighlightedWorkoutId] = useState(null);
   const [progressTab, setProgressTab] = useState("all");
   const [graphsTab, setGraphsTab] = useState("combined");
   const [surgeryDate, setSurgeryDate] = useState("");
@@ -531,7 +533,7 @@ async function saveSession() {
           <TabButton active={activeTab === "home"} onClick={() => setActiveTab("home")}>Home</TabButton>
           <TabButton active={activeTab === "programme"} onClick={() => setActiveTab("programme")}>Programme</TabButton>
           <TabButton active={activeTab === "workout"} onClick={() => setActiveTab("workout")}>Workout</TabButton>
-          <TabButton active={["progress", "table", "graphs"].includes(activeTab)} onClick={() => setActiveTab("progress")}>Progress</TabButton>
+          <TabButton active={["progress", "workout-history", "table", "graphs"].includes(activeTab)} onClick={() => setActiveTab("progress")}>Progress</TabButton>
           <TabButton active={activeTab === "more"} onClick={() => setActiveTab("more")}>More</TabButton>
         </div>
 
@@ -675,8 +677,9 @@ async function saveSession() {
         )}
 
         {activeTab === "programme" && <PlansScreen user={user} />}
-        {activeTab === "workout" && <WorkoutScreen user={user} intent={workoutIntent} onIntentHandled={() => setWorkoutIntent(null)} />}
-        {activeTab === "progress" && <div className="space-y-4"><div><h1 className="text-2xl font-semibold">Progress</h1><p className="text-sm text-slate-500">Review your workout history and rehabilitation trends.</p></div><div className="flex gap-2"><Button onClick={() => setActiveTab("table")}>Workout history</Button><Button variant="outline" onClick={() => setActiveTab("graphs")}>Progress graphs</Button></div></div>}
+        {activeTab === "workout" && <WorkoutScreen user={user} intent={workoutIntent} onIntentHandled={() => setWorkoutIntent(null)} onFinished={(completed) => { setHighlightedWorkoutId(completed.id); setActiveTab("workout-history"); }} />}
+        {activeTab === "progress" && <div className="space-y-4"><div><h1 className="text-2xl font-semibold">Progress</h1><p className="text-sm text-slate-500">Review your workout history and rehabilitation trends.</p></div><div className="flex gap-2"><Button onClick={() => setActiveTab("workout-history")}>Workout history</Button><Button variant="outline" onClick={() => setActiveTab("graphs")}>Progress graphs</Button></div></div>}
+        {activeTab === "workout-history" && <WorkoutHistoryScreen user={user} highlightId={highlightedWorkoutId} />}
         {activeTab === "more" && <div className="space-y-4"><div><h1 className="text-2xl font-semibold">More</h1><p className="text-sm text-slate-500">Manage your library and app preferences.</p></div><PlansScreen user={user} view="exercises" /><CardShell title="Settings"><div className="max-w-md"><Label className="text-sm font-medium text-slate-700">Surgery date (optional)</Label><Input type="date" value={surgeryDate} onChange={async (event) => { const nextDate = event.target.value; setSurgeryDate(nextDate); setWeekManuallyEdited(false); await saveAllData(weeks, customExercises, nextDate); }} /><p className="mt-2 text-sm text-slate-500">Used to calculate your rehabilitation age on Home.</p></div></CardShell></div>}
 
         {activeTab === "table" && (
@@ -990,7 +993,7 @@ async function saveSession() {
           <button
             type="button"
             onClick={() => setActiveTab("progress")}
-            className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", ["progress", "table", "graphs"].includes(activeTab) ? "bg-slate-100 font-medium" : "text-slate-500")}
+            className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", ["progress", "workout-history", "table", "graphs"].includes(activeTab) ? "bg-slate-100 font-medium" : "text-slate-500")}
           >
             <Table2 className="h-4 w-4" />
             Progress

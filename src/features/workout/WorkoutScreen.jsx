@@ -3,7 +3,7 @@ import { ChevronRight, Dumbbell } from "lucide-react";
 import { db } from "../../firebase";
 import { todayString } from "../../lib/domain/date";
 import { durationLabel, groupSessionExercises, previousWeightsForExercise, workoutExerciseSideLabel, workoutItem } from "../../lib/domain/workoutDisplay";
-import { createDebouncedSaver, createInProgressWorkout, findInProgressWorkout, isWeightedExerciseComplete, resumeWorkout, updateRecordedSetWeight } from "../../lib/domain/workoutSession";
+import { completeWorkout, createDebouncedSaver, createInProgressWorkout, findInProgressWorkout, isWeightedExerciseComplete, resumeWorkout, updateRecordedSetWeight } from "../../lib/domain/workoutSession";
 import { createInProgressWorkoutDocument, finishWorkoutDocument, subscribePlans, subscribeWorkouts, updateInProgressWorkoutDocument } from "../../lib/firebase/planRepository";
 import { makeId } from "../../lib/domain/legacyWorkouts";
 import Button from "../../components/ui/Button";
@@ -49,18 +49,20 @@ function IntervalCard({ exercise, onToggle }) {
   return <label className={`block cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 ${exercise.completed ? "opacity-60" : ""}`}><span className="flex items-start gap-3"><input className="mt-1" type="checkbox" checked={Boolean(exercise.completed)} onChange={() => onToggle(exercise.id)} /><span><span className={`block font-semibold ${exercise.completed ? "line-through" : ""}`}>{exercise.exerciseNameSnapshot}</span><ExerciseGuidance exercise={exercise} /><span className="text-sm text-slate-500">Intervals</span></span></span><div className="mt-3 space-y-1 pl-7 text-sm text-slate-600">{stages.map((stage) => <div key={stage.id}>{stage.phase === "rest" ? "Rest" : "Work"} · {durationLabel(stage.durationSeconds, stage.durationUnit)}{stage.label ? ` · ${stage.label}` : ""}</div>)}</div></label>;
 }
 
-export function WorkoutForm({ workout, saveStatus = "", leaving = false, onBack, onToggle, onWeight, onDate, onNotes, onFinish }) {
+export function WorkoutForm({ workout, saveStatus = "", leaving = false, finishing = false, finishError = "", onBack, onToggle, onWeight, onDate, onNotes, onFinish }) {
   const { mobility, other, standard, weighted, intervals } = groupSessionExercises(workout.exercises);
-  return <div className="space-y-5"><button disabled={leaving} className="text-sm font-medium text-slate-600 disabled:opacity-50" onClick={onBack}>{leaving ? "Saving..." : "← All sessions"}</button><div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><div className="flex items-center justify-between gap-3"><div><div className="text-sm font-medium text-emerald-700">Workout in progress</div><h1 className="mt-1 text-2xl font-semibold">{workout.sessionNameSnapshot}</h1></div><span className={`text-xs ${saveStatus === "error" ? "text-red-600" : "text-slate-500"}`}>{saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved" : saveStatus === "error" ? "Could not save" : ""}</span></div><div className="mt-4 grid gap-3 md:grid-cols-2"><label className="text-sm font-medium text-slate-700">Workout date<input type="date" className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3" value={workout.date} onChange={(event) => onDate(event.target.value)} /></label><label className="text-sm font-medium text-slate-700">Workout notes<input className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3" value={workout.notes || ""} onChange={(event) => onNotes(event.target.value)} /></label></div><div className="mt-5 space-y-3"><CompletionList title="Exercises" exercises={standard} onToggle={onToggle} /><CompletionList title="Mobility / Stretch" exercises={mobility} onToggle={onToggle} /><CompletionList title="Other" exercises={other} onToggle={onToggle} />{weighted.map((exercise) => <WeightCard key={exercise.id} exercise={exercise} onWeight={onWeight} />)}{intervals.map((exercise) => <IntervalCard key={exercise.id} exercise={exercise} onToggle={onToggle} />)}</div><Button className="mt-6 w-full md:w-auto" onClick={onFinish}>Finish workout</Button></div></div>;
+  return <div className="space-y-5"><button disabled={leaving || finishing} className="text-sm font-medium text-slate-600 disabled:opacity-50" onClick={onBack}>{leaving ? "Saving..." : "← All sessions"}</button><div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><div className="flex items-center justify-between gap-3"><div><div className="text-sm font-medium text-emerald-700">Workout in progress</div><h1 className="mt-1 text-2xl font-semibold">{workout.sessionNameSnapshot}</h1></div><span className={`text-xs ${saveStatus === "error" ? "text-red-600" : "text-slate-500"}`}>{saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved" : saveStatus === "error" ? "Could not save" : ""}</span></div><div className="mt-4 grid gap-3 md:grid-cols-2"><label className="text-sm font-medium text-slate-700">Workout date<input type="date" className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3" value={workout.date} onChange={(event) => onDate(event.target.value)} /></label><label className="text-sm font-medium text-slate-700">Workout notes<input className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3" value={workout.notes || ""} onChange={(event) => onNotes(event.target.value)} /></label></div><div className="mt-5 space-y-3"><CompletionList title="Exercises" exercises={standard} onToggle={onToggle} /><CompletionList title="Mobility / Stretch" exercises={mobility} onToggle={onToggle} /><CompletionList title="Other" exercises={other} onToggle={onToggle} />{weighted.map((exercise) => <WeightCard key={exercise.id} exercise={exercise} onWeight={onWeight} />)}{intervals.map((exercise) => <IntervalCard key={exercise.id} exercise={exercise} onToggle={onToggle} />)}</div>{finishError ? <p className="mt-4 text-sm font-medium text-red-600">{finishError}</p> : null}<Button disabled={finishing} className="mt-6 w-full md:w-auto" onClick={onFinish}>{finishing ? "Finishing…" : "Finish workout"}</Button></div></div>;
 }
 
-export default function WorkoutScreen({ user, repository = defaultRepository, intent = null, onIntentHandled = noop }) {
+export default function WorkoutScreen({ user, repository = defaultRepository, intent = null, onIntentHandled = noop, onFinished = noop }) {
   const [plans, setPlans] = useState([]);
   const [workouts, setWorkouts] = useState([]);
   const [selectedSession, setSelectedSession] = useState(null);
   const [workout, setWorkout] = useState(null);
   const [saveStatus, setSaveStatus] = useState("");
   const [leaving, setLeaving] = useState(false);
+  const [finishing, setFinishing] = useState(false);
+  const [finishError, setFinishError] = useState("");
   const localWorkouts = useRef(recentWorkoutDrafts);
   const handledIntent = useRef(null);
   useEffect(() => user?.uid ? repository.subscribePlans(db, user.uid, setPlans, () => {}) : undefined, [repository, user?.uid]);
@@ -121,16 +123,27 @@ export default function WorkoutScreen({ user, repository = defaultRepository, in
   function toggleExercise(id) { setWorkout((current) => ({ ...current, exercises: current.exercises.map((exercise) => exercise.id === id ? { ...exercise, completed: !exercise.completed } : exercise) })); }
   function updateWeight(exerciseId, setId, weight) { setWorkout((current) => updateRecordedSetWeight(current, exerciseId, setId, weight)); }
   async function finishWorkout() {
-    await saver.flush();
-    await repository.finishWorkoutDocument(db, user.uid, workout);
-    localWorkouts.current.delete(workout.id);
-    setWorkout(null);
-    setSelectedSession(null);
-    setSaveStatus("");
+    if (finishing) return;
+    setFinishing(true);
+    setFinishError("");
+    try {
+      const completed = await completeWorkout(workout, saver, (latest) => repository.finishWorkoutDocument(db, user.uid, latest));
+      localWorkouts.current.set(workout.id, completed);
+      setWorkouts((current) => current.some((item) => item.id === completed.id) ? current.map((item) => item.id === completed.id ? completed : item) : [...current, completed]);
+      setWorkout(null);
+      setSelectedSession(null);
+      setSaveStatus("");
+      onFinished(completed);
+    } catch (error) {
+      console.error("Could not finish workout", error);
+      setFinishError("Could not finish workout. Please try again.");
+    } finally {
+      setFinishing(false);
+    }
   }
 
   if (selectedSession && workout) {
-    return <WorkoutForm workout={workout} saveStatus={saveStatus} leaving={leaving} onBack={returnToSessions} onToggle={toggleExercise} onWeight={updateWeight} onDate={(date) => setWorkout({ ...workout, date })} onNotes={(notes) => setWorkout({ ...workout, notes })} onFinish={finishWorkout} />;
+    return <WorkoutForm workout={workout} saveStatus={saveStatus} leaving={leaving} finishing={finishing} finishError={finishError} onBack={returnToSessions} onToggle={toggleExercise} onWeight={updateWeight} onDate={(date) => setWorkout({ ...workout, date })} onNotes={(notes) => setWorkout({ ...workout, notes })} onFinish={finishWorkout} />;
   }
 
   const unfinished = workouts.find((item) => item.status === "in_progress");

@@ -3,6 +3,10 @@ import { SIDE } from "./v2Models.js";
 
 export const WORKOUT_BEHAVIOR = Object.freeze({ COMPLETION: "completion", WEIGHT: "weight", INTERVALS: "intervals" });
 
+export function completedWorkoutHistory(workouts = []) {
+  return workouts.filter((workout) => workout.status === "completed").slice().sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")) || String(b.completedAt?.seconds || b.completedAt || "").localeCompare(String(a.completedAt?.seconds || a.completedAt || "")));
+}
+
 export function durationLabel(seconds, unit) {
   const value = Number(seconds || 0);
   if (!value) return "";

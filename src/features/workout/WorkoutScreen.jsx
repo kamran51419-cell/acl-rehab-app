@@ -180,7 +180,8 @@ export default function WorkoutScreen({ user, repository = defaultRepository, in
     setFinishError("");
     try {
       const completed = await completeWorkout(workout, saver, (latest) => repository.finishWorkoutDocument(db, user.uid, latest));
-      localWorkouts.current.delete(workout.id);
+      localWorkouts.current.set(workout.id, completed);
+      setWorkouts((current) => current.some((item) => item.id === completed.id) ? current.map((item) => item.id === completed.id ? completed : item) : [...current, completed]);
       setWorkout(null);
       setSelectedSession(null);
       setSaveStatus("");

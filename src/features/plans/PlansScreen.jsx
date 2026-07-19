@@ -227,7 +227,7 @@ function PrescriptionEditor({ exercise, onChange }) {
   return <div className="text-sm text-slate-500">No configurable prescription method is available for this legacy exercise type.</div>;
 }
 
-function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, saving, saveMessage }) {
+function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, onOpenExerciseLibrary, saving, saveMessage }) {
   const [exerciseQuery, setExerciseQuery] = useState("");
   const [pickerSession, setPickerSession] = useState(null);
   const [creatingExercise, setCreatingExercise] = useState(false);
@@ -349,7 +349,7 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
                 <div className="mt-3 max-h-72 space-y-2 overflow-y-auto">
                   {filteredExercises.length ? filteredExercises.map((exercise) => <div key={exercise.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3"><div className="min-w-0"><div className="truncate font-medium">{exercise.name}</div><div className="text-xs text-slate-500">{exerciseTypeLabel(exercise.exerciseType || exercise.trackingType)}</div></div><Button size="sm" onClick={() => addExerciseToSession(sessionIndex, exercise)}>Add</Button></div>) : <div className="rounded-xl bg-slate-50 p-4 text-center text-sm text-slate-500">No matching exercises.</div>}
                 </div>
-                <Button className="mt-3" variant="outline" onClick={() => setCreatingExercise(true)}><Plus className="mr-1 h-4 w-4" /> Create New Exercise</Button>
+                <div className="mt-3 rounded-xl bg-slate-50 p-3 text-sm text-slate-600"><div className="mb-2">Can't find your exercise?</div><Button variant="outline" onClick={() => { sessionStorage.setItem(`programme-library-return:${draft.userId}`, "1"); onOpenExerciseLibrary?.(); }}>Manage Exercise Library →</Button></div>
                 </>}
               </div> : null}
             </div>
@@ -489,7 +489,7 @@ function ExerciseLibrary({ user, exercises, onChanged }) {
   );
 }
 
-export default function PlansScreen({ user, view = "programme" }) {
+export default function PlansScreen({ user, view = "programme", onOpenExerciseLibrary }) {
   const [plans, setPlans] = useState([]);
   const [exercises, setExercises] = useState([]);
   const [plansLoading, setPlansLoading] = useState(view === "programme");
@@ -503,6 +503,26 @@ export default function PlansScreen({ user, view = "programme" }) {
   const [saveMessage, setSaveMessage] = useState("");
   const [programmeNotice, setProgrammeNotice] = useState("");
   const [deleteProgrammeCandidate, setDeleteProgrammeCandidate] = useState(null);
+  const draftStorageKey = user?.uid ? `programme-draft:${user.uid}` : "";
+
+  useEffect(() => {
+    if (!draftStorageKey || draft) return;
+    const saved = sessionStorage.getItem(draftStorageKey);
+    if (!saved) return;
+    try {
+      const parsed = JSON.parse(saved);
+      setDraft(parsed.draft || null);
+      setOriginal(parsed.original || null);
+      setLoadedToken(parsed.loadedToken || "");
+    } catch {
+      sessionStorage.removeItem(draftStorageKey);
+    }
+  }, [draftStorageKey]);
+
+  useEffect(() => {
+    if (!draftStorageKey || !draft) return;
+    sessionStorage.setItem(draftStorageKey, JSON.stringify({ draft, original, loadedToken }));
+  }, [draftStorageKey, draft, original, loadedToken]);
 
   useEffect(() => {
     if (!user?.uid) return undefined;
@@ -540,6 +560,7 @@ export default function PlansScreen({ user, view = "programme" }) {
     setDraft(null);
     setOriginal(null);
     setSaveMessage("");
+    if (draftStorageKey) sessionStorage.removeItem(draftStorageKey);
   }
 
   async function saveDraft() {
@@ -559,6 +580,8 @@ export default function PlansScreen({ user, view = "programme" }) {
       setDraft(null);
       setLoadedToken("");
       setSaveMessage("");
+      if (draftStorageKey) sessionStorage.removeItem(draftStorageKey);
+      sessionStorage.removeItem(`programme-library-return:${user.uid}`);
       setProgrammeNotice("Programme saved.");
     } catch (err) {
       setSaveMessage(friendlyErrorMessage(err, "We could not save this plan. Please try again."));
@@ -615,7 +638,7 @@ export default function PlansScreen({ user, view = "programme" }) {
       {exercisesError ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">The exercise library could not be loaded. Programme exercises already saved remain editable.</div> : null}
       {plansLoading ? <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-500">Loading programmes…</div> : null}
       {!plansLoading && plans.length === 0 ? <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center"><div className="font-semibold text-slate-900">No programmes yet</div><p className="mt-1 text-sm text-slate-500">Create your first programme and give each workout session a useful name.</p><Button className="mt-4" onClick={openNewPlan}>Create first programme</Button></div> : null}
-      {draft ? <PlanEditor draft={draft} setDraft={setDraft} original={original} exercises={exercises} onSave={saveDraft} onClose={closeEditor} saving={saving} saveMessage={saveMessage} /> : null}
+      {draft ? <PlanEditor draft={draft} setDraft={setDraft} original={original} exercises={exercises} onSave={saveDraft} onClose={closeEditor} onOpenExerciseLibrary={onOpenExerciseLibrary} saving={saving} saveMessage={saveMessage} /> : null}
       {renderSection("Active", activePlans, "Activate any plan when you are ready to use it regularly.")}
       {renderSection("Inactive", inactivePlans, "Programmes you deactivate will remain here and can be activated later.")}
       {deleteProgrammeCandidate ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"><div role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl"><h3 className="text-lg font-semibold">Delete "{deleteProgrammeCandidate.name}" permanently?</h3><p className="mt-2 text-sm text-slate-600">This programme will be removed permanently. Completed workouts will remain untouched.</p><div className="mt-5 flex justify-end gap-2"><Button variant="outline" onClick={() => setDeleteProgrammeCandidate(null)}>Cancel</Button><Button variant="danger" onClick={handleDeleteProgramme}>Delete permanently</Button></div></div></div> : null}

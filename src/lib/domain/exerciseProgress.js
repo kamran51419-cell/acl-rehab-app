@@ -98,7 +98,7 @@ export function completedExerciseGroups(workouts = []) {
   completedWorkoutHistory(workouts).forEach((workout) => {
     (workout.exercises || []).forEach((exercise) => {
       if (!exercise.exerciseId) return;
-      if (!groups.has(exercise.exerciseId)) groups.set(exercise.exerciseId, { exerciseId: exercise.exerciseId, name: exercise.exerciseNameSnapshot || "Exercise", performances: [], weightedEntries: [] });
+      if (!groups.has(exercise.exerciseId)) groups.set(exercise.exerciseId, { exerciseId: exercise.exerciseId, name: exercise.exerciseNameSnapshot || "Exercise", exerciseType: exercise.exerciseType || "other", performances: [], weightedEntries: [] });
       const group = groups.get(exercise.exerciseId);
       group.performances.push({ workoutId: workout.id, date: workout.date || workout.workoutDate || "", displayDate: formatDate(workout.date || workout.workoutDate).replaceAll("-", "/"), exercise });
     });
@@ -107,6 +107,7 @@ export function completedExerciseGroups(workouts = []) {
   return [...groups.values()].map((group) => {
     group.performances.sort((a, b) => String(b.date).localeCompare(String(a.date)));
     group.weightedEntries = weighted.get(group.exerciseId) || [];
+    group.isRehabExercise = group.weightedEntries.some((entry) => entry.side === SIDE.LEFT || entry.side === SIDE.RIGHT);
     group.latestDate = group.performances[0]?.date || "";
     return group;
   }).sort((a, b) => String(b.latestDate).localeCompare(String(a.latestDate)) || a.name.localeCompare(b.name));

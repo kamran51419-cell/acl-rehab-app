@@ -604,7 +604,7 @@ export function ExerciseLibrary({ user, exercises, onChanged }) {
         </div>
       </div>
 
-      <div className="h-[45vh] min-h-64 space-y-3 overflow-y-auto pr-1 md:h-[32rem]">
+      <div className="h-64 space-y-3 overflow-y-auto pr-1 md:h-72">
         {exercises.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center">
             <div className="font-semibold text-slate-900">No reusable exercises yet</div>

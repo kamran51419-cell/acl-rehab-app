@@ -45,18 +45,18 @@ test("Home dashboard starts a chosen session and continues without a picker", as
   assert.doesNotMatch(completedOnly, /Continue Workout/);
 });
 
-test("Home dashboard renders programme, completed-workout and empty states", async (context) => {
+test("Home dashboard renders programme and empty states without the last workout", async (context) => {
   const vite = await createServer({ server: { middlewareMode: true }, appType: "custom", logLevel: "silent" });
   context.after(() => vite.close());
   const { HomeDashboard } = await vite.ssrLoadModule("/src/features/home/HomeScreen.jsx");
   const callbacks = { onStart() {}, onContinue() {}, onChooseSession() {}, onProgramme() {}, onCycleAge() {} };
   const active = renderToStaticMarkup(React.createElement(HomeDashboard, { ...callbacks, programme: { name: "ACL Rehab", sessions: [] }, completedWorkout: { date: "2026-07-18", sessionNameSnapshot: "Lower Body" }, rehabAgeMode: "months", today: "2026-07-18" }));
   assert.match(active, /ACL Rehab/);
-  assert.match(active, /18 Jul 2026/);
-  assert.match(active, /Lower Body/);
+  assert.doesNotMatch(active, /18 Jul 2026/);
+  assert.doesNotMatch(active, /Lower Body/);
   const empty = renderToStaticMarkup(React.createElement(HomeDashboard, { ...callbacks, programme: null, completedWorkout: null, rehabAgeMode: "months", today: "2026-07-18" }));
   assert.match(empty, /No active programme/);
-  assert.match(empty, /No completed workouts yet/);
+  assert.doesNotMatch(empty, /No completed workouts yet/);
   assert.match(empty, /Start Workout/);
   assert.match(empty, /disabled=""/);
   assert.doesNotMatch(empty, /post-op/);

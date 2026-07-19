@@ -29,7 +29,6 @@ import { SIDE } from "../../lib/domain/v2Models";
 import { makeId } from "../../lib/domain/legacyWorkouts";
 import { DirectStrengthPrescription, DurationInput, Field, Input, Select, Textarea } from "./ProgrammeFormControls";
 import {
-  archiveExerciseDefinition,
   createPlan,
   duplicatePlanDocument,
   deletePlan,
@@ -260,14 +259,11 @@ function ExerciseSetupEditor({ exercise, onChange }) {
   return <div className="text-sm text-slate-500">No configurable tracking option is available for this legacy exercise type.</div>;
 }
 
-function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, saving, saveMessage }) {
+function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, onManageExerciseLibrary, saving, saveMessage }) {
   const [exerciseQuery, setExerciseQuery] = useState("");
   const [pickerSession, setPickerSession] = useState(null);
   const [replaceTarget, setReplaceTarget] = useState(null);
-  const [creatingExercise, setCreatingExercise] = useState(false);
-  const [pickerMessage, setPickerMessage] = useState("");
   const [activeExerciseId, setActiveExerciseId] = useState("");
-  const [newExercise, setNewExercise] = useState({ name: "", exerciseType: EXERCISE_TYPE.STRENGTH });
   const [draggingExercise, setDraggingExercise] = useState(null);
   const [draggingSession, setDraggingSession] = useState(null);
 
@@ -300,14 +296,12 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
   function openPickerForAdd(sessionIndex) {
     setReplaceTarget(null);
     setPickerSession(sessionIndex);
-    setCreatingExercise(false);
     setExerciseQuery("");
   }
 
   function openPickerForReplace(sessionIndex, exerciseIndex) {
     setReplaceTarget({ sessionIndex, exerciseIndex });
     setPickerSession(sessionIndex);
-    setCreatingExercise(false);
     setExerciseQuery("");
   }
 
@@ -346,20 +340,6 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
     setReplaceTarget(null);
     setExerciseQuery("");
     setPickerSession(null);
-  }
-
-  async function createAndAddExercise(sessionIndex) {
-    if (!newExercise.name.trim()) return;
-    setPickerMessage("");
-    try {
-      const libraryExercise = createLibraryExercise(newExercise);
-      await saveExerciseDefinition(db, draft.userId, libraryExercise, { updatedAtToken: token() });
-      chooseExercise(sessionIndex, libraryExercise);
-      setNewExercise({ name: "", exerciseType: EXERCISE_TYPE.STRENGTH });
-      setCreatingExercise(false);
-    } catch (error) {
-      setPickerMessage(friendlyErrorMessage(error, "We could not save and add that exercise. Please try again.", "exercise library"));
-    }
   }
 
   return (
@@ -476,40 +456,25 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
                     <Button size="sm" variant="outline" onClick={() => { setPickerSession(null); setReplaceTarget(null); }}>Close</Button>
                   </div>
 
-                  {pickerMessage ? <div className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{pickerMessage}</div> : null}
-
-                  {creatingExercise ? (
-                    <div className="space-y-3">
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <Field label="Exercise name"><Input autoFocus value={newExercise.name} onChange={(event) => setNewExercise({ ...newExercise, name: event.target.value })} /></Field>
-                        <Field label="Exercise type">
-                          <Select value={newExercise.exerciseType} onChange={(event) => setNewExercise({ ...newExercise, exerciseType: event.target.value })}>
-                            {LIBRARY_EXERCISE_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}
-                          </Select>
-                        </Field>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button onClick={() => createAndAddExercise(sessionIndex)}>{replaceTarget ? "Save and use exercise" : "Save and add to session"}</Button>
-                        <Button variant="outline" onClick={() => setCreatingExercise(false)}>Back to library</Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <Field label="Search exercises"><Input autoFocus value={exerciseQuery} onChange={(event) => setExerciseQuery(event.target.value)} placeholder="Search by exercise name" /></Field>
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                    <Input className="h-12 rounded-xl pl-10 text-base" autoFocus aria-label="Search exercises" value={exerciseQuery} onChange={(event) => setExerciseQuery(event.target.value)} placeholder="Search exercises" />
+                  </div>
                       <div className="mt-3 max-h-72 space-y-2 overflow-y-auto">
-                        {filteredExercises.length ? filteredExercises.map((libraryExercise) => (
+                        {filteredExercises.length ? filteredExercises.map((libraryExercise) => {
+                          const selected = session.exercises.some((item) => item.exerciseId === libraryExercise.id);
+                          return (
                           <div key={libraryExercise.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3">
                             <div className="min-w-0">
                               <div className="truncate font-medium">{libraryExercise.name}</div>
                               <div className="text-xs text-slate-500">{exerciseTypeLabel(libraryExercise.exerciseType || libraryExercise.trackingType)}</div>
                             </div>
-                            <Button size="sm" onClick={() => chooseExercise(sessionIndex, libraryExercise)}>{replaceTarget ? "Use" : "Add"}</Button>
+                            <Button size="sm" variant={selected && !replaceTarget ? "outline" : "primary"} disabled={selected && !replaceTarget} onClick={() => chooseExercise(sessionIndex, libraryExercise)}>{replaceTarget ? "Use" : selected ? "Selected" : "Add"}</Button>
                           </div>
-                        )) : <div className="rounded-xl bg-slate-50 p-4 text-center text-sm text-slate-500">No matching exercises.</div>}
+                          );
+                        }) : <div className="rounded-xl bg-slate-50 p-4 text-center text-sm text-slate-500">No matching exercises.</div>}
                       </div>
-                      <Button className="mt-3" variant="outline" onClick={() => setCreatingExercise(true)}><Plus className="mr-1 h-4 w-4" /> Create new exercise</Button>
-                    </>
-                  )}
+                      <Button className="mt-3 w-full" variant="outline" onClick={onManageExerciseLibrary}>Manage Exercise Library</Button>
                 </div>
               ) : null}
             </div>
@@ -525,19 +490,18 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
   );
 }
 
-function ExerciseLibrary({ user, exercises, onChanged }) {
+export function ExerciseLibrary({ user, exercises, onChanged }) {
   const [name, setName] = useState("");
   const [exerciseType, setExerciseType] = useState(EXERCISE_TYPE.STRENGTH);
   const [editingExercise, setEditingExercise] = useState(null);
   const [query, setQuery] = useState("");
-  const [includeArchived, setIncludeArchived] = useState(false);
+  const [typeFilter, setTypeFilter] = useState("all");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [deleteCandidate, setDeleteCandidate] = useState(null);
 
-  const visibleExercises = filterExerciseLibrary(exercises, { query, includeArchived });
+  const visibleExercises = filterExerciseLibrary(exercises, { query }).filter((exercise) => typeFilter === "all" || (exercise.exerciseType || exercise.trackingType) === typeFilter);
   const activeCount = exercises.filter((exercise) => !exercise.isArchived).length;
-  const archivedCount = exercises.filter((exercise) => exercise.isArchived).length;
 
   async function saveNewExercise() {
     if (!name.trim() || saving) return;
@@ -552,15 +516,6 @@ function ExerciseLibrary({ user, exercises, onChanged }) {
       setMessage(friendlyErrorMessage(error, "We could not save that exercise. Please try again."));
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function toggleArchive(exercise) {
-    try {
-      await archiveExerciseDefinition(db, user.uid, exercise.id, !exercise.isArchived, { updatedAtToken: token() });
-      setMessage(exercise.isArchived ? "Exercise restored." : "Exercise archived.");
-    } catch (error) {
-      setMessage(friendlyErrorMessage(error, "We could not update that exercise. Please try again."));
     }
   }
 
@@ -594,10 +549,21 @@ function ExerciseLibrary({ user, exercises, onChanged }) {
           <h2 className="text-lg font-semibold text-slate-900">Exercise library</h2>
           <p className="text-sm text-slate-500">Define what an exercise is. Configure it inside a programme.</p>
         </div>
-        <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">{activeCount} active{archivedCount ? ` · ${archivedCount} archived` : ""}</div>
+        <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">{activeCount} exercises</div>
       </div>
 
       {message ? <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{message}</div> : null}
+
+      <div className="space-y-3">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+          <Input className="h-12 rounded-xl pl-11 text-base" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search your exercise library" aria-label="Search exercise library" />
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          <Button size="sm" variant={typeFilter === "all" ? "primary" : "outline"} onClick={() => setTypeFilter("all")}>All</Button>
+          {LIBRARY_EXERCISE_TYPE_OPTIONS.map((type) => <Button key={type} size="sm" variant={typeFilter === type ? "primary" : "outline"} onClick={() => setTypeFilter(type)}>{exerciseTypeLabel(type)}</Button>)}
+        </div>
+      </div>
 
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
         <div className="mb-3 font-medium text-slate-900">Add an exercise</div>
@@ -613,19 +579,6 @@ function ExerciseLibrary({ user, exercises, onChanged }) {
       </div>
 
       <div className="space-y-3">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <Field label="Search exercises">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input className="pl-9" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by name" />
-            </div>
-          </Field>
-          <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
-            <input type="checkbox" checked={includeArchived} onChange={(event) => setIncludeArchived(event.target.checked)} />
-            Show archived
-          </label>
-        </div>
-
         {exercises.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center">
             <div className="font-semibold text-slate-900">No reusable exercises yet</div>
@@ -654,7 +607,6 @@ function ExerciseLibrary({ user, exercises, onChanged }) {
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  {exercise.isArchived ? <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-500">Archived</span> : null}
                   {editingExercise?.id === exercise.id ? (
                     <>
                       <Button size="sm" onClick={saveEditedExercise}>Save</Button>
@@ -664,7 +616,6 @@ function ExerciseLibrary({ user, exercises, onChanged }) {
                   ) : (
                     <Button size="sm" variant="outline" onClick={() => setEditingExercise({ ...exercise, exerciseType: exercise.exerciseType || exercise.trackingType || EXERCISE_TYPE.STRENGTH })}>Edit</Button>
                   )}
-                  <Button size="sm" variant="outline" onClick={() => toggleArchive(exercise)}>{exercise.isArchived ? "Restore" : "Archive"}</Button>
                 </div>
               </div>
             ))}
@@ -688,7 +639,7 @@ function ExerciseLibrary({ user, exercises, onChanged }) {
   );
 }
 
-export default function PlansScreen({ user, view = "programme" }) {
+export default function PlansScreen({ user, view = "programme", onManageExerciseLibrary }) {
   const [plans, setPlans] = useState([]);
   const [exercises, setExercises] = useState([]);
   const [plansLoading, setPlansLoading] = useState(view === "programme");
@@ -702,6 +653,26 @@ export default function PlansScreen({ user, view = "programme" }) {
   const [saveMessage, setSaveMessage] = useState("");
   const [programmeNotice, setProgrammeNotice] = useState("");
   const [deleteProgrammeCandidate, setDeleteProgrammeCandidate] = useState(null);
+  const draftStorageKey = `programme-draft:${user.uid}`;
+
+  useEffect(() => {
+    if (view !== "programme") return;
+    const saved = sessionStorage.getItem(draftStorageKey);
+    if (!saved) return;
+    try {
+      const restored = JSON.parse(saved);
+      setDraft(restored.draft);
+      setOriginal(restored.original);
+      setLoadedToken(restored.loadedToken || "");
+    } catch {
+      sessionStorage.removeItem(draftStorageKey);
+    }
+  }, [draftStorageKey, view]);
+
+  useEffect(() => {
+    if (view !== "programme" || !draft) return;
+    sessionStorage.setItem(draftStorageKey, JSON.stringify({ draft, original, loadedToken }));
+  }, [draft, original, loadedToken, draftStorageKey, view]);
 
   useEffect(() => {
     if (!user?.uid) return undefined;
@@ -749,6 +720,7 @@ export default function PlansScreen({ user, view = "programme" }) {
     setDraft(null);
     setOriginal(null);
     setSaveMessage("");
+    sessionStorage.removeItem(draftStorageKey);
   }
 
   async function saveDraft() {
@@ -772,6 +744,7 @@ export default function PlansScreen({ user, view = "programme" }) {
       setLoadedToken("");
       setSaveMessage("");
       setProgrammeNotice("Programme saved.");
+      sessionStorage.removeItem(draftStorageKey);
     } catch (error) {
       setSaveMessage(friendlyErrorMessage(error, "We could not save this programme. Please try again."));
     } finally {
@@ -826,7 +799,7 @@ export default function PlansScreen({ user, view = "programme" }) {
         <>
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Manage Exercises</h1>
-            <p className="text-sm text-slate-500">Create, search, archive and restore your reusable exercise library.</p>
+            <p className="text-sm text-slate-500">Create, search and manage your reusable exercise library.</p>
           </div>
           {exercisesError ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{exercisesError}</div> : null}
           {exercisesLoading ? <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-500">Loading exercise library…</div> : <ExerciseLibrary user={user} exercises={exercises} />}
@@ -853,7 +826,7 @@ export default function PlansScreen({ user, view = "programme" }) {
             </div>
           ) : null}
 
-          {draft ? <PlanEditor draft={draft} setDraft={setDraft} original={original} exercises={exercises} onSave={saveDraft} onClose={closeEditor} saving={saving} saveMessage={saveMessage} /> : null}
+          {draft ? <PlanEditor draft={draft} setDraft={setDraft} original={original} exercises={exercises} onSave={saveDraft} onClose={closeEditor} onManageExerciseLibrary={onManageExerciseLibrary} saving={saving} saveMessage={saveMessage} /> : null}
           {renderSection("Active", activePlans, "Activate any programme when you are ready to use it regularly.")}
           {renderSection("Inactive", inactivePlans, "Programmes you deactivate will remain here and can be activated later.")}
 

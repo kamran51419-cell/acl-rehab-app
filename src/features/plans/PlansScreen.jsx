@@ -493,6 +493,7 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, onM
 export function ExerciseLibrary({ user, exercises, onChanged }) {
   const [name, setName] = useState("");
   const [exerciseType, setExerciseType] = useState(EXERCISE_TYPE.STRENGTH);
+  const [addingExercise, setAddingExercise] = useState(false);
   const [editingExercise, setEditingExercise] = useState(null);
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
@@ -510,6 +511,8 @@ export function ExerciseLibrary({ user, exercises, onChanged }) {
     try {
       await saveExerciseDefinition(db, user.uid, createLibraryExercise({ name, exerciseType }), { updatedAtToken: token() });
       setName("");
+      setExerciseType(EXERCISE_TYPE.STRENGTH);
+      setAddingExercise(false);
       setMessage("Exercise added to your library.");
       onChanged?.();
     } catch (error) {
@@ -549,7 +552,10 @@ export function ExerciseLibrary({ user, exercises, onChanged }) {
           <h2 className="text-lg font-semibold text-slate-900">Exercise library</h2>
           <p className="text-sm text-slate-500">Define what an exercise is. Configure it inside a programme.</p>
         </div>
-        <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">{activeCount} exercises</div>
+        <div className="flex items-center gap-2">
+          <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">{activeCount} exercises</div>
+          <Button size="sm" onClick={() => setAddingExercise(true)}><Plus className="mr-1 h-4 w-4" /> Add exercise</Button>
+        </div>
       </div>
 
       {message ? <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{message}</div> : null}
@@ -557,24 +563,11 @@ export function ExerciseLibrary({ user, exercises, onChanged }) {
       <div className="space-y-3">
         <div className="relative">
           <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-          <Input className="h-12 rounded-xl pl-11 text-base" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search your exercise library" aria-label="Search exercise library" />
+          <Input className="h-12 rounded-xl pl-11 text-base" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search exercises" aria-label="Search exercise library" />
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1">
           <Button size="sm" variant={typeFilter === "all" ? "primary" : "outline"} onClick={() => setTypeFilter("all")}>All</Button>
           {LIBRARY_EXERCISE_TYPE_OPTIONS.map((type) => <Button key={type} size="sm" variant={typeFilter === type ? "primary" : "outline"} onClick={() => setTypeFilter(type)}>{exerciseTypeLabel(type)}</Button>)}
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-        <div className="mb-3 font-medium text-slate-900">Add an exercise</div>
-        <div className="grid gap-3 md:grid-cols-[1fr_220px_auto]">
-          <Field label="Exercise name"><Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Leg extension" /></Field>
-          <Field label="Exercise type">
-            <Select value={exerciseType} onChange={(event) => setExerciseType(event.target.value)}>
-              {LIBRARY_EXERCISE_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}
-            </Select>
-          </Field>
-          <div className="flex items-end"><Button onClick={saveNewExercise} disabled={saving || !name.trim()}>{saving ? "Saving…" : "Add exercise"}</Button></div>
         </div>
       </div>
 
@@ -587,41 +580,53 @@ export function ExerciseLibrary({ user, exercises, onChanged }) {
         ) : visibleExercises.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-center text-sm text-slate-500">No exercises match your search.</div>
         ) : (
-          <div className="grid gap-2 md:grid-cols-2">
+          <div className="space-y-1.5">
             {visibleExercises.map((exercise) => (
-              <div key={exercise.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3">
+              <div key={exercise.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
                 <div className="min-w-0">
-                  {editingExercise?.id === exercise.id ? (
-                    <div className="grid gap-2 md:grid-cols-2">
-                      <Input value={editingExercise.name} onChange={(event) => setEditingExercise({ ...editingExercise, name: event.target.value })} />
-                      <Select value={editingExercise.exerciseType || editingExercise.trackingType} onChange={(event) => setEditingExercise({ ...editingExercise, exerciseType: event.target.value })}>
-                        {!LIBRARY_EXERCISE_TYPE_OPTIONS.includes(editingExercise.exerciseType) ? <option value={editingExercise.exerciseType}>{exerciseTypeLabel(editingExercise.exerciseType)} (existing)</option> : null}
-                        {LIBRARY_EXERCISE_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}
-                      </Select>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="truncate font-medium text-slate-900">{exercise.name}</div>
-                      <div className="text-xs text-slate-500">{exerciseTypeLabel(exercise.exerciseType || exercise.trackingType)}</div>
-                    </>
-                  )}
+                  <div className="truncate text-sm font-medium text-slate-900">{exercise.name}</div>
+                  <div className="truncate text-xs text-slate-500">{exerciseTypeLabel(exercise.exerciseType || exercise.trackingType)} • {loggingMethodLabel(defaultLoggingMethodForExerciseType(exercise.exerciseType || exercise.trackingType))}</div>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  {editingExercise?.id === exercise.id ? (
-                    <>
-                      <Button size="sm" onClick={saveEditedExercise}>Save</Button>
-                      <Button size="sm" variant="outline" onClick={() => setEditingExercise(null)}>Cancel</Button>
-                      <Button size="sm" variant="danger" onClick={() => setDeleteCandidate(exercise)}>Delete exercise</Button>
-                    </>
-                  ) : (
-                    <Button size="sm" variant="outline" onClick={() => setEditingExercise({ ...exercise, exerciseType: exercise.exerciseType || exercise.trackingType || EXERCISE_TYPE.STRENGTH })}>Edit</Button>
-                  )}
-                </div>
+                <Button className="shrink-0 px-3 py-1.5" size="sm" variant="outline" onClick={() => setEditingExercise({ ...exercise, exerciseType: exercise.exerciseType || exercise.trackingType || EXERCISE_TYPE.STRENGTH })}>Edit</Button>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {addingExercise ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div role="dialog" aria-modal="true" aria-labelledby="add-exercise-title" className="max-h-[calc(100vh-2rem)] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
+            <h3 id="add-exercise-title" className="text-lg font-semibold">Add exercise</h3>
+            <div className="mt-4 space-y-4">
+              <Field label="Exercise name"><Input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="Leg extension" /></Field>
+              <Field label="Exercise type"><Select value={exerciseType} onChange={(event) => setExerciseType(event.target.value)}>{LIBRARY_EXERCISE_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}</Select></Field>
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <Button variant="outline" disabled={saving} onClick={() => { setAddingExercise(false); setName(""); setExerciseType(EXERCISE_TYPE.STRENGTH); }}>Cancel</Button>
+              <Button onClick={saveNewExercise} disabled={saving || !name.trim()}>{saving ? "Saving…" : "Add exercise"}</Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {editingExercise ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div role="dialog" aria-modal="true" aria-labelledby="edit-exercise-title" className="max-h-[calc(100vh-2rem)] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
+            <h3 id="edit-exercise-title" className="text-lg font-semibold">Edit exercise</h3>
+            <div className="mt-4 space-y-4">
+              <Field label="Exercise name"><Input autoFocus value={editingExercise.name} onChange={(event) => setEditingExercise({ ...editingExercise, name: event.target.value })} /></Field>
+              <Field label="Exercise type"><Select value={editingExercise.exerciseType || editingExercise.trackingType} onChange={(event) => setEditingExercise({ ...editingExercise, exerciseType: event.target.value })}>{!LIBRARY_EXERCISE_TYPE_OPTIONS.includes(editingExercise.exerciseType) ? <option value={editingExercise.exerciseType}>{exerciseTypeLabel(editingExercise.exerciseType)} (existing)</option> : null}{LIBRARY_EXERCISE_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}</Select></Field>
+              <Field label="Recording method"><Input value={loggingMethodLabel(defaultLoggingMethodForExerciseType(editingExercise.exerciseType || editingExercise.trackingType))} disabled /></Field>
+            </div>
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
+              <Button variant="danger" onClick={() => setDeleteCandidate(editingExercise)}>Delete</Button>
+              <Button variant="outline" onClick={() => setEditingExercise(null)}>Cancel</Button>
+              <Button onClick={saveEditedExercise} disabled={!editingExercise.name.trim()}>Save</Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {deleteCandidate ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">

@@ -3,28 +3,34 @@ import test from "node:test";
 
 import {
   EXERCISE_TYPE,
-  TARGET_WEIGHT_MODE,
+  EXERCISE_LOGGING_METHOD,
+  LIBRARY_EXERCISE_TYPE_OPTIONS,
   createBlankPlan,
   createCardioPrescription,
   createDefaultPrescription,
+  createIntervalPrescription,
   createLibraryExercise,
   createPlanExercise,
   createPlanSession,
   createStrengthBlock,
+  createStrengthPrescription,
   createTimedHoldPrescription,
   duplicatePlanExercise,
   duplicatePlan,
   filterExerciseLibrary,
   fixedReps,
   isMeaningfulPlanChange,
+  loggingMethodsForExerciseType,
   nextPlanForSave,
   planPrescriptionSummary,
   reorderItems,
+  insertItemAfter,
   repRange,
   validatePlan,
 } from "../src/lib/domain/plans.js";
 import { SIDE } from "../src/lib/domain/v2Models.js";
-import { __testables as planRepoTestables } from "../src/lib/firebase/planRepository.js";
+import { completedWorkoutHistory } from "../src/lib/domain/workoutDisplay.js";
+import { __testables as planRepoTestables, deleteExerciseDefinition, deletePlan, deleteWorkoutDocument, exclusiveActiveProgrammeStates, finishWorkoutDocument, mergeWorkoutSnapshots, updateInProgressWorkoutDocument } from "../src/lib/firebase/planRepository.js";
 
 function mixedStrengthPlan() {
   const plan = createBlankPlan({ name: "ACL Rehab Plan", isActive: true });
@@ -74,10 +80,6 @@ test("plan validation covers type-specific prescriptions", () => {
   const badRange = mixedStrengthPlan();
   badRange.sessions[0].exercises[0].prescription.blocks[0].targetReps = repRange(12, 8);
   assert.equal(validatePlan(badRange).valid, false);
-
-  const badWeight = mixedStrengthPlan();
-  badWeight.sessions[0].exercises[0].prescription.blocks[0].targetWeight = { mode: TARGET_WEIGHT_MODE.MANUAL, value: -1 };
-  assert.equal(validatePlan(badWeight).valid, false);
 
   const holdPlan = createBlankPlan({ name: "Hold", isActive: true });
   holdPlan.sessions = [createPlanSession({ name: "Balance", exercises: [createPlanExercise({ exerciseId: "bal", exerciseNameSnapshot: "Balance", exerciseType: EXERCISE_TYPE.TIMED_HOLD, prescription: createTimedHoldPrescription({ targetDurationSeconds: 0 }) })] })];
@@ -194,7 +196,7 @@ test("duplicating one plan exercise refreshes nested IDs and preserves values", 
   assert.deepEqual(holdCopy.prescription, hold.prescription);
   assert.notEqual(holdCopy.prescription, hold.prescription);
 
-  const cardio = createPlanExercise({ exerciseId: "bike", exerciseNameSnapshot: "Bike", exerciseType: EXERCISE_TYPE.CARDIO, prescription: createCardioPrescription({ targetDurationSeconds: 900, resistance: 5 }) });
+  const cardio = createPlanExercise({ exerciseId: "bike", exerciseNameSnapshot: "Bike", exerciseType: EXERCISE_TYPE.CARDIO, prescription: createCardioPrescription({ targetDurationSeconds: 900 }) });
   const cardioCopy = duplicatePlanExercise(cardio, { sortOrder: 5 });
   assert.notEqual(cardioCopy.id, cardio.id);
   assert.deepEqual(cardioCopy.prescription, cardio.prescription);
@@ -214,20 +216,160 @@ test("exercise archive filtering keeps archived references available when reques
   assert.deepEqual(filterExerciseLibrary([archived, active], { includeArchived: true }).map((exercise) => exercise.id), ["archived", "active"]);
 });
 
+test("exercise definitions stay lean and recording methods are programme-specific", () => {
+  const exercise = createLibraryExercise({ id: "squat", name: "Squat", exerciseType: EXERCISE_TYPE.STRENGTH });
+  assert.deepEqual(exercise, {
+    id: "squat",
+    userId: null,
+    name: "Squat",
+    exerciseType: EXERCISE_TYPE.STRENGTH,
+    trackingType: EXERCISE_TYPE.STRENGTH,
+    isArchived: false,
+  });
+  assert.deepEqual(loggingMethodsForExerciseType(EXERCISE_TYPE.STRENGTH), [EXERCISE_LOGGING_METHOD.REPS, EXERCISE_LOGGING_METHOD.REPS_WEIGHT]);
+  assert.deepEqual(loggingMethodsForExerciseType(EXERCISE_TYPE.CARDIO), [EXERCISE_LOGGING_METHOD.TIME, EXERCISE_LOGGING_METHOD.DISTANCE, EXERCISE_LOGGING_METHOD.INTERVALS]);
+  assert.equal(loggingMethodsForExerciseType(EXERCISE_TYPE.CARDIO).includes(EXERCISE_LOGGING_METHOD.TIME_DISTANCE), false);
+  assert.equal(LIBRARY_EXERCISE_TYPE_OPTIONS.includes(EXERCISE_TYPE.PLYOMETRIC), false);
+  assert.throws(() => createLibraryExercise({ name: "Pogos", exerciseType: EXERCISE_TYPE.PLYOMETRIC }), /supported exercise type/);
+  for (const type of LIBRARY_EXERCISE_TYPE_OPTIONS) assert.equal(loggingMethodsForExerciseType(type).includes(EXERCISE_LOGGING_METHOD.COMPLETED), false);
+  assert.deepEqual(loggingMethodsForExerciseType(EXERCISE_TYPE.OTHER), [EXERCISE_LOGGING_METHOD.REPS, EXERCISE_LOGGING_METHOD.REPS_WEIGHT, EXERCISE_LOGGING_METHOD.TIME, EXERCISE_LOGGING_METHOD.DISTANCE, EXERCISE_LOGGING_METHOD.INTERVALS]);
+});
+
+test("cardio intervals use ordered work and rest stages", () => {
+  const prescription = createIntervalPrescription();
+  assert.deepEqual(prescription.stages.map((stage) => [stage.phase, stage.durationSeconds, stage.sortOrder]), [["work", 240, 0], ["rest", 60, 1]]);
+  const plan = createBlankPlan({ name: "Running", isActive: true });
+  plan.sessions = [createPlanSession({ name: "Intervals", exercises: [createPlanExercise({ exerciseId: "run", exerciseNameSnapshot: "Run", exerciseType: EXERCISE_TYPE.CARDIO, loggingMethod: EXERCISE_LOGGING_METHOD.INTERVALS, prescription })] })];
+  assert.equal(validatePlan(plan).valid, true);
+  assert.equal(planPrescriptionSummary(plan.sessions[0].exercises[0]), "2 intervals");
+});
+
+test("duration units and interval identities survive reordering", () => {
+  const prescription = createIntervalPrescription();
+  const firstId = prescription.stages[0].id;
+  prescription.stages[0].durationSeconds = 90;
+  prescription.stages[0].durationUnit = "minutes";
+  const reordered = reorderItems(prescription.stages, 0, 1);
+  assert.equal(reordered[1].id, firstId);
+  assert.equal(reordered[1].durationSeconds, 90);
+  assert.equal(reordered[1].durationUnit, "minutes");
+  assert.deepEqual(reordered.map((stage) => stage.sortOrder), [0, 1]);
+});
+
+test("type-specific programme methods validate, including every Other method", () => {
+  const cases = [
+    [EXERCISE_TYPE.STRENGTH, EXERCISE_LOGGING_METHOD.REPS], [EXERCISE_TYPE.STRENGTH, EXERCISE_LOGGING_METHOD.REPS_WEIGHT],
+    [EXERCISE_TYPE.CARDIO, EXERCISE_LOGGING_METHOD.TIME], [EXERCISE_TYPE.CARDIO, EXERCISE_LOGGING_METHOD.DISTANCE], [EXERCISE_TYPE.CARDIO, EXERCISE_LOGGING_METHOD.INTERVALS],
+    [EXERCISE_TYPE.BALANCE, EXERCISE_LOGGING_METHOD.REPS], [EXERCISE_TYPE.BALANCE, EXERCISE_LOGGING_METHOD.TIME], [EXERCISE_TYPE.MOBILITY, EXERCISE_LOGGING_METHOD.TIME],
+    ...loggingMethodsForExerciseType(EXERCISE_TYPE.OTHER).map((method) => [EXERCISE_TYPE.OTHER, method]),
+  ];
+  cases.forEach(([exerciseType, loggingMethod]) => {
+    const plan = createBlankPlan({ name: "Methods", isActive: true });
+    plan.sessions = [createPlanSession({ name: "Session", exercises: [createPlanExercise({ exerciseId: `${exerciseType}-${loggingMethod}`, exerciseNameSnapshot: "Exercise", exerciseType, loggingMethod, prescription: createDefaultPrescription(exerciseType, loggingMethod) })] })];
+    assert.equal(validatePlan(plan).valid, true, `${exerciseType}/${loggingMethod}`);
+  });
+});
+
+test("session insertion and exclusive activation preserve ordering", () => {
+  const sessions = insertItemAfter([createPlanSession({ id: "one", name: "One", sortOrder: 0 }), createPlanSession({ id: "three", name: "Three", sortOrder: 1 })], 0, createPlanSession({ id: "two", name: "Two" }));
+  assert.deepEqual(sessions.map((session) => [session.id, session.sortOrder]), [["one", 0], ["two", 1], ["three", 2]]);
+  const states = exclusiveActiveProgrammeStates([{ id: "a", isActive: true }, { id: "b", isActive: true }], "b");
+  assert.deepEqual(states.map((state) => [state.id, state.isActive]), [["a", false], ["b", true]]);
+  assert.deepEqual(exclusiveActiveProgrammeStates([{ id: "legacy-archived", isArchived: true }, { id: "active" }], "active").map(({ id, status }) => [id, status]), [["legacy-archived", "draft"], ["active", "active"]]);
+});
+
+test("exercise deletion removes only the library document", async () => {
+  const programme = mixedStrengthPlan();
+  const before = structuredClone(programme);
+  let deletedRef;
+  await deleteExerciseDefinition({}, "uid", "le", { referenceFactory: (_db, uid, id) => `users/${uid}/exercises/${id}`, deleteDocument: async (ref) => { deletedRef = ref; } });
+  assert.equal(deletedRef, "users/uid/exercises/le");
+  assert.deepEqual(programme, before);
+});
+
+test("programme deletion removes only its document", async () => {
+  let deletedRef;
+  await deletePlan({}, "uid", "plan", { referenceFactory: (_db, uid, id) => `users/${uid}/plans/${id}`, deleteDocument: async (ref) => { deletedRef = ref; } });
+  assert.equal(deletedRef, "users/uid/plans/plan");
+});
+
+test("finishing caches a completed snapshot and stale subscriptions cannot restore it", async () => {
+  planRepoTestables.resetWorkoutCache();
+  let written;
+  const draft = { id: "workout", status: "in_progress", date: "2026-07-18", notes: "latest", exercises: [{ id: "press", completed: true, recordedSets: [{ id: "set-1", weight: 82.5 }] }] };
+  const run = async (_db, operation) => operation({ get: async () => ({ exists: () => false }), set: (ref, data) => { written = { ref, data }; } });
+  const readDocument = async () => ({ exists: () => true, data: () => written.data });
+  const completed = await finishWorkoutDocument({}, "uid", draft, { timestamp: "server-time", completedAtValue: "client-time", referenceFactory: () => "workout-ref", run, readDocument });
+  assert.equal(written.ref, "workout-ref");
+  assert.equal(written.data.status, "completed");
+  assert.equal(written.data.completed, true);
+  assert.equal(written.data.workoutDate, "2026-07-18");
+  assert.equal(written.data.userId, "uid");
+  assert.equal(written.data.completedAt, "server-time");
+  assert.equal(written.data.notes, "latest");
+  assert.equal(written.data.exercises[0].recordedSets[0].weight, 82.5);
+  assert.equal(completed.status, "completed");
+  assert.equal(completed.completedAt, "server-time");
+  planRepoTestables.resetWorkoutCache();
+  const remounted = mergeWorkoutSnapshots("uid", [{ ...written.data, id: draft.id }]);
+  assert.equal(remounted[0].status, "completed");
+  assert.deepEqual(completedWorkoutHistory(remounted).map((workout) => workout.id), [draft.id]);
+});
+
+test("completion does not use an optimistic history record when backend verification fails", async () => {
+  planRepoTestables.resetWorkoutCache();
+  const run = async (_db, operation) => operation({ get: async () => ({ exists: () => false }), set() {} });
+  await assert.rejects(finishWorkoutDocument({}, "uid", { id: "workout", date: "2026-07-18", status: "in_progress" }, { run, referenceFactory: () => "ref", readDocument: async () => ({ exists: () => false }) }), /could not be verified/);
+  assert.deepEqual(completedWorkoutHistory(mergeWorkoutSnapshots("uid", [])), []);
+});
+
+test("late autosaves cannot overwrite a completed workout", async () => {
+  planRepoTestables.resetWorkoutCache();
+  let setCalls = 0;
+  const completedTransaction = async (_db, operation) => operation({ get: async () => ({ exists: () => true, data: () => ({ status: "completed" }) }), set: () => { setCalls += 1; } });
+  const written = await updateInProgressWorkoutDocument({}, "uid", { id: "workout", status: "in_progress", notes: "stale" }, { run: completedTransaction, referenceFactory: () => "ref", timestamp: "server" });
+  assert.equal(written, false);
+  assert.equal(setCalls, 0);
+  assert.deepEqual(mergeWorkoutSnapshots("uid", [{ id: "workout", status: "completed" }]), [{ id: "workout", status: "completed" }]);
+});
+
+test("workout deletion removes only its document and suppresses stale snapshots", async () => {
+  planRepoTestables.resetWorkoutCache();
+  let deleted;
+  await deleteWorkoutDocument({}, "uid", "one", { referenceFactory: (_db, uid, id) => `users/${uid}/workouts/${id}`, deleteDocument: async (ref) => { deleted = ref; } });
+  assert.equal(deleted, "users/uid/workouts/one");
+  assert.deepEqual(mergeWorkoutSnapshots("uid", [{ id: "one", status: "completed" }, { id: "two", status: "completed" }]).map((workout) => workout.id), ["two"]);
+});
+
 test("prescription summaries are human readable", () => {
   const strength = mixedStrengthPlan().sessions[0].exercises[0];
   assert.match(planPrescriptionSummary(strength), /2 × 10 both/);
-  const cardio = createPlanExercise({ exerciseId: "bike", exerciseNameSnapshot: "Bike", exerciseType: EXERCISE_TYPE.CARDIO, prescription: createCardioPrescription({ targetDurationSeconds: 900, resistance: 5 }) });
-  assert.equal(planPrescriptionSummary(cardio), "15 min · Resistance 5");
+  const cardio = createPlanExercise({ exerciseId: "bike", exerciseNameSnapshot: "Bike", exerciseType: EXERCISE_TYPE.CARDIO, prescription: createCardioPrescription({ targetDurationSeconds: 900 }) });
+  assert.equal(planPrescriptionSummary(cardio), "15 min");
   const mobility = createPlanExercise({ exerciseId: "mob", exerciseNameSnapshot: "Mobility", exerciseType: EXERCISE_TYPE.MOBILITY, prescription: createDefaultPrescription(EXERCISE_TYPE.MOBILITY) });
-  assert.equal(planPrescriptionSummary(mobility), "1 stretches");
+  assert.equal(planPrescriptionSummary(mobility), "30 sec");
+});
+
+test("new strength exercises use one prescription and can repeat in a session", () => {
+  const first = createPlanExercise({ exerciseId: "press", exerciseNameSnapshot: "Leg Press", exerciseType: EXERCISE_TYPE.STRENGTH, prescription: createStrengthPrescription({ side: SIDE.BOTH, targetSets: 2, targetReps: fixedReps(10) }) });
+  const second = duplicatePlanExercise(first, { sortOrder: 1 });
+  second.prescription.side = SIDE.LEFT;
+  assert.equal(first.prescription.blocks, undefined);
+  assert.equal(second.exerciseId, first.exerciseId);
+  assert.notEqual(second.id, first.id);
+  assert.equal(planPrescriptionSummary(first), "2 × 10 both");
+  assert.equal(planPrescriptionSummary(second), "2 × 10 left");
 });
 
 test("plan repository helpers strip undefined fields and use v2 paths only", () => {
   const cleaned = planRepoTestables.stripUndefined({ a: 1, b: undefined, nested: { c: undefined, d: 2 } });
   assert.deepEqual(cleaned, { a: 1, nested: { d: 2 } });
+  class Sentinel { constructor() { this.value = "server"; } }
+  const sentinel = new Sentinel();
+  assert.equal(planRepoTestables.stripUndefined({ timestamp: sentinel }).timestamp, sentinel);
   const paths = planRepoTestables.planPaths("uid", "plan-1");
   assert.equal(paths.plan, "users/uid/plans/plan-1");
+  assert.equal(planRepoTestables.exerciseCollectionPath("uid"), "users/uid/exercises");
   assert.equal(Object.values(paths).some((path) => path.includes("rehabData")), false);
   const write = planRepoTestables.preparePlanWrite({ id: "p", createdAt: undefined }, { created: true, timestamp: "server", updatedAtToken: "token" });
   assert.deepEqual(write, { id: "p", updatedAt: "server", updatedAtToken: "token", createdAt: "server" });

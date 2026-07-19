@@ -148,7 +148,7 @@ function applyCategoryFilter(scope, value) {
 function markFilterCards(scope) {
   scope.querySelectorAll("button").forEach((button) => {
     const label = button.textContent?.trim();
-    if (!["Add", "Use", "Edit", "Archive", "Restore"].includes(label)) return;
+    if (!["Add", "Use", "Edit", "Selected"].includes(label)) return;
     const card = button.closest(".rounded-xl, .rounded-2xl");
     if (card) card.dataset.categoryFilterCard = "true";
   });

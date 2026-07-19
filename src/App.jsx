@@ -22,8 +22,8 @@ import {
 import { auth, db } from "./firebase";
 import PlansScreen from "./features/plans/PlansScreen";
 import WorkoutScreen from "./features/workout/WorkoutScreen";
-import WorkoutHistoryScreen from "./features/workout/WorkoutHistoryScreen";
 import HomeScreen from "./features/home/HomeScreen";
+import ProgressScreen from "./features/progress/ProgressScreen";
 import Button from "./components/ui/Button";
 import { saveLegacyRehabData, subscribeLegacyRehabData } from "./lib/firebase/legacyRehabRepository";
 import { calculateWeekFromSurgeryDate, todayString } from "./lib/domain/date";
@@ -44,6 +44,17 @@ import {
 
 function cls(...parts) {
   return parts.filter(Boolean).join(" ");
+}
+
+function authenticationMessage(error, action = "sign in") {
+  const code = error?.code || "";
+  if (["auth/invalid-credential", "auth/wrong-password", "auth/user-not-found"].includes(code)) return "The email or password is incorrect.";
+  if (code === "auth/email-already-in-use") return "An account already exists for this email.";
+  if (code === "auth/weak-password") return "Choose a stronger password with at least 6 characters.";
+  if (code === "auth/invalid-email") return "Enter a valid email address.";
+  if (code === "auth/too-many-requests") return "Too many attempts. Wait a moment and try again.";
+  if (/network|unavailable/i.test(error?.message || "")) return "Check your connection and try again.";
+  return `Something went wrong while trying to ${action}. Please try again.`;
 }
 
 function CardShell({ title, right, children }) {
@@ -168,11 +179,12 @@ export default function ACLTrackerApp() {
   const [editing, setEditing] = useState(null);
   const [showAllRows, setShowAllRows] = useState(false);
   const [activeTab, setActiveTab] = useState("home");
+  const [libraryFromProgramme, setLibraryFromProgramme] = useState(false);
   const [workoutIntent, setWorkoutIntent] = useState(null);
-  const [highlightedWorkoutId, setHighlightedWorkoutId] = useState(null);
   const [progressTab, setProgressTab] = useState("all");
   const [graphsTab, setGraphsTab] = useState("combined");
   const [surgeryDate, setSurgeryDate] = useState("");
+  const [trainingMode, setTrainingMode] = useState("gym");
   const [customExercises, setCustomExercises] = useState([]);
   const [newExerciseName, setNewExerciseName] = useState("");
   const [newExerciseSingleLeg, setNewExerciseSingleLeg] = useState(true);
@@ -184,6 +196,7 @@ export default function ACLTrackerApp() {
   const [password, setPassword] = useState("");
   const [authMode, setAuthMode] = useState("login");
   const [authError, setAuthError] = useState("");
+  const [authNotice, setAuthNotice] = useState("");
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (firebaseUser) => {
@@ -204,6 +217,7 @@ export default function ACLTrackerApp() {
       setWeeks([]);
       setCustomExercises([]);
       setSurgeryDate("");
+      setTrainingMode("gym");
       return;
     }
 
@@ -219,6 +233,7 @@ export default function ACLTrackerApp() {
         setWeeks(saved.weeks);
         setCustomExercises(saved.customExercises);
         setSurgeryDate(saved.surgeryDate);
+        setTrainingMode(saved.trainingMode);
       },
       (error) => {
         console.error("Failed to load rehab data from Firestore", error);
@@ -230,6 +245,7 @@ export default function ACLTrackerApp() {
   async function handleAuthSubmit(e) {
     e.preventDefault();
     setAuthError("");
+    setAuthNotice("");
 
     try {
       if (authMode === "signup") {
@@ -241,7 +257,8 @@ export default function ACLTrackerApp() {
       setEmail("");
       setPassword("");
     } catch (error) {
-      setAuthError(error.message || "Authentication failed");
+      console.error("Authentication failed", error);
+      setAuthError(authenticationMessage(error, authMode === "signup" ? "create your account" : "sign in"));
     }
   }
 
@@ -256,14 +273,18 @@ export default function ACLTrackerApp() {
   async function handleResetPassword() {
     if (!email) {
       setAuthError("Enter your email first");
+      setAuthNotice("");
       return;
     }
 
     try {
       await sendPasswordResetEmail(auth, email);
-      setAuthError("Password reset email sent");
+      setAuthError("");
+      setAuthNotice("Password reset email sent.");
     } catch (error) {
-      setAuthError(error.message);
+      console.error("Password reset failed", error);
+      setAuthNotice("");
+      setAuthError(authenticationMessage(error, "send the password reset email"));
     }
   }
 
@@ -329,7 +350,7 @@ export default function ACLTrackerApp() {
     if (graphsTab === exerciseId) setGraphsTab("combined");
     if (progressTab === exerciseId || progressTab === "custom") setProgressTab("all");
   }
-async function saveAllData(nextWeeks = weeks, nextCustomExercises = customExercises, nextSurgeryDate = surgeryDate) {
+async function saveAllData(nextWeeks = weeks, nextCustomExercises = customExercises, nextSurgeryDate = surgeryDate, nextTrainingMode = trainingMode) {
   if (!user?.uid) return;
 
   try {
@@ -337,6 +358,7 @@ async function saveAllData(nextWeeks = weeks, nextCustomExercises = customExerci
       weeks: nextWeeks,
       customExercises: nextCustomExercises,
       surgeryDate: nextSurgeryDate,
+      trainingMode: nextTrainingMode,
     });
   } catch (error) {
     console.error("Failed to save rehab data to Firestore", error);
@@ -493,6 +515,11 @@ async function saveSession() {
                 {authError}
               </div>
             ) : null}
+            {authNotice ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                {authNotice}
+              </div>
+            ) : null}
 
             <Button type="submit" className="w-full">
               {authMode === "signup" ? "Create account" : "Log in"}
@@ -537,7 +564,7 @@ async function saveSession() {
           <TabButton active={activeTab === "more"} onClick={() => setActiveTab("more")}>More</TabButton>
         </div>
 
-        {activeTab === "home" && <HomeScreen user={user} surgeryDate={surgeryDate} onOpenProgramme={() => setActiveTab("programme")} onOpenWorkout={(intent) => { setWorkoutIntent({ ...intent, token: Date.now() }); setActiveTab("workout"); }} />}
+        {activeTab === "home" && <HomeScreen user={user} surgeryDate={surgeryDate} trainingMode={trainingMode} fromProgramme={libraryFromProgramme} onBackToProgramme={() => { setLibraryFromProgramme(false); setActiveTab("programme"); }} onOpenProgramme={() => { setLibraryFromProgramme(false); setActiveTab("programme"); }} onOpenWorkout={(intent) => { setWorkoutIntent({ ...intent, token: Date.now() }); setActiveTab("workout"); }} />}
 
         {activeTab === "log" && (
           <div className="space-y-6">
@@ -676,11 +703,10 @@ async function saveSession() {
           </div>
         )}
 
-        {activeTab === "programme" && <PlansScreen user={user} />}
-        {activeTab === "workout" && <WorkoutScreen user={user} intent={workoutIntent} onIntentHandled={() => setWorkoutIntent(null)} onFinished={(completed) => { setHighlightedWorkoutId(completed.id); setActiveTab("workout-history"); }} onDiscarded={() => setActiveTab("home")} />}
-        {activeTab === "progress" && <div className="space-y-4"><div><h1 className="text-2xl font-semibold">Progress</h1><p className="text-sm text-slate-500">Review your workout history and rehabilitation trends.</p></div><div className="flex gap-2"><Button onClick={() => setActiveTab("workout-history")}>Workout history</Button><Button variant="outline" onClick={() => setActiveTab("graphs")}>Progress graphs</Button></div></div>}
-        {activeTab === "workout-history" && <WorkoutHistoryScreen user={user} highlightId={highlightedWorkoutId} />}
-        {activeTab === "more" && <div className="space-y-4"><div><h1 className="text-2xl font-semibold">More</h1><p className="text-sm text-slate-500">Manage your library and app preferences.</p></div><PlansScreen user={user} view="exercises" /><CardShell title="Settings"><div className="max-w-md"><Label className="text-sm font-medium text-slate-700">Surgery date (optional)</Label><Input type="date" value={surgeryDate} onChange={async (event) => { const nextDate = event.target.value; setSurgeryDate(nextDate); setWeekManuallyEdited(false); await saveAllData(weeks, customExercises, nextDate); }} /><p className="mt-2 text-sm text-slate-500">Used to calculate your rehabilitation age on Home.</p></div></CardShell></div>}
+        {activeTab === "programme" && <PlansScreen user={user} onManageExerciseLibrary={() => { setLibraryFromProgramme(true); setActiveTab("home"); requestAnimationFrame(() => document.getElementById("exercise-library")?.scrollIntoView({ behavior: "smooth" })); }} />}
+        {activeTab === "workout" && <WorkoutScreen user={user} intent={workoutIntent} onIntentHandled={() => setWorkoutIntent(null)} onFinished={() => setActiveTab("workout-history")} onDiscarded={() => setActiveTab("home")} />}
+        {["progress", "workout-history"].includes(activeTab) && <ProgressScreen key={activeTab} user={user} trainingMode={trainingMode} initialTab={activeTab === "workout-history" ? "history" : "stats"} />}
+        {activeTab === "more" && <div className="space-y-4"><div><h1 className="text-2xl font-semibold">More</h1><p className="text-sm text-slate-500">Manage app preferences.</p></div><CardShell title="Settings"><div className="max-w-md space-y-4"><div><Label>Training mode</Label><select className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm" value={trainingMode} onChange={async (event) => { const nextMode = event.target.value; setTrainingMode(nextMode); await saveAllData(weeks, customExercises, surgeryDate, nextMode); }}><option value="gym">Gym</option><option value="rehab">Rehab</option></select></div>{trainingMode === "rehab" ? <div><Label>Surgery date (optional)</Label><Input className="mt-1" type="date" value={surgeryDate} onChange={async (event) => { const nextDate = event.target.value; setSurgeryDate(nextDate); setWeekManuallyEdited(false); await saveAllData(weeks, customExercises, nextDate, trainingMode); }} />{surgeryDate ? <div className="mt-2 flex items-center justify-between gap-3"><p className="text-sm text-slate-500">{new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit", timeZone: "UTC" }).format(new Date(`${surgeryDate}T00:00:00Z`))}</p><Button size="sm" variant="outline" onClick={async () => { setSurgeryDate(""); await saveAllData(weeks, customExercises, "", trainingMode); }}>Remove</Button></div> : null}</div> : null}</div></CardShell></div>}
 
         {activeTab === "table" && (
           <div className="space-y-4">

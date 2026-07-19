@@ -11,7 +11,25 @@ function ExerciseDetails({ exercise }) {
   const side = workoutExerciseSideLabel(exercise);
   const summary = workoutItem(exercise).summary;
   const stages = (exercise.prescription?.stages || []).slice().sort((a, b) => a.sortOrder - b.sortOrder);
-  return <div className="rounded-xl border border-slate-200 p-3"><div className="font-medium">{exercise.exerciseNameSnapshot}</div>{side ? <div className="text-xs font-medium text-slate-500">{side}</div> : null}{exercise.programmeNoteSnapshot ? <div className="text-xs text-slate-500">{exercise.programmeNoteSnapshot}</div> : null}{summary ? <div className="mt-1 text-sm text-slate-600">{summary}</div> : null}{exercise.recordedSets?.length ? <div className="mt-2 space-y-1 text-sm">{exercise.recordedSets.map((set) => <div key={set.id}>Set {set.setNumber}: {set.weight === "" || set.weight === undefined ? "—" : `${set.weight} kg`}</div>)}</div> : null}{stages.length ? <div className="mt-2 space-y-1 text-sm">{stages.map((stage) => <div key={stage.id}>{stage.phase === "rest" ? "Rest" : "Work"} · {durationLabel(stage.durationSeconds, stage.durationUnit)}</div>)}</div> : null}<div className="mt-2 text-xs text-slate-500">{exercise.completed ? "Completed" : exercise.recordedSets?.length ? "Recorded" : "Not completed"}</div></div>;
+  const sets = exercise.recordedSets?.length
+    ? exercise.recordedSets
+    : (exercise.prescriptionBlocks || []).flatMap((block) => (block.actualSets || []).map((set) => ({ ...set, side: set.side || block.side })));
+  const setReps = (set) => set.actualReps ?? set.reps ?? set.rawReps ?? (set.prescribedReps?.type === "range" ? `${set.prescribedReps.min}–${set.prescribedReps.max}` : set.prescribedReps?.value);
+  return <div className="rounded-xl border border-slate-200 p-3">
+    <div className="font-medium">{exercise.exerciseNameSnapshot}</div>
+    {side ? <div className="text-xs font-medium text-slate-500">{side}</div> : null}
+    {exercise.programmeNoteSnapshot ? <div className="text-xs text-slate-500">{exercise.programmeNoteSnapshot}</div> : null}
+    {summary ? <div className="mt-1 text-sm text-slate-600">{summary}</div> : null}
+    {sets.length ? <div className="mt-2 space-y-1 text-sm">{sets.map((set, index) => {
+      const reps = setReps(set);
+      const weight = set.weight === "" || set.weight === undefined ? null : `${set.weight} ${set.unit || "kg"}`;
+      return <div key={set.id || `${set.side || "set"}-${index}`}>Set {set.setNumber || index + 1}: {[reps !== "" && reps !== undefined ? `${reps} reps` : null, weight, set.side].filter(Boolean).join(" · ") || "—"}</div>;
+    })}</div> : null}
+    {stages.length ? <div className="mt-2 space-y-1 text-sm">{stages.map((stage) => <div key={stage.id}>{stage.phase === "rest" ? "Rest" : "Work"} · {durationLabel(stage.durationSeconds, stage.durationUnit)}{stage.label ? ` · ${stage.label}` : ""}</div>)}</div> : null}
+    {exercise.intervalProgress ? <div className="mt-2 text-sm">Interval progress: {typeof exercise.intervalProgress === "object" ? JSON.stringify(exercise.intervalProgress) : exercise.intervalProgress}</div> : null}
+    {exercise.notes ? <div className="mt-2 text-sm text-slate-600">Notes: {exercise.notes}</div> : null}
+    <div className="mt-2 text-xs text-slate-500">{exercise.completed ? "Completed" : sets.length ? "Recorded" : "Not completed"}</div>
+  </div>;
 }
 
 export function WorkoutHistoryView({ workouts, selectedId, deletingId, deleteError, onSelect, onRequestDelete, onCancelDelete, onConfirmDelete }) {

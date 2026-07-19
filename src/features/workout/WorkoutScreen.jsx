@@ -17,8 +17,6 @@ const defaultRepository = {
   deleteWorkoutDocument,
 };
 
-// Retain freshly autosaved drafts across tab unmounts until Firestore listeners catch up.
-const recentWorkoutDrafts = new Map();
 const noop = () => {};
 
 function programmeFromWorkoutSnapshot(workout) {
@@ -76,13 +74,12 @@ export default function WorkoutScreen({ user, repository = defaultRepository, in
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
   const [discarding, setDiscarding] = useState(false);
   const [discardError, setDiscardError] = useState("");
-  const localWorkouts = useRef(recentWorkoutDrafts);
   const handledIntent = useRef(null);
   useEffect(() => user?.uid ? repository.subscribePlans(db, user.uid, setPlans, () => {}) : undefined, [repository, user?.uid]);
-  useEffect(() => user?.uid ? repository.subscribeWorkouts(db, user.uid, (remote) => { const recent = [...localWorkouts.current.values()].filter((item) => item.userId === user.uid); setWorkouts(remote.map((item) => localWorkouts.current.get(item.id) || item).concat(recent.filter((local) => !remote.some((item) => item.id === local.id)))); }, () => {}) : undefined, [repository, user?.uid]);
+  useEffect(() => user?.uid ? repository.subscribeWorkouts(db, user.uid, setWorkouts, () => {}) : undefined, [repository, user?.uid]);
   const saver = useMemo(() => createDebouncedSaver((value) => repository.updateInProgressWorkoutDocument(db, user.uid, value), 500, (status) => setSaveStatus(status)), [repository, user.uid]);
   useEffect(() => () => { saver.flush().catch(() => {}); }, [saver]);
-  useEffect(() => { if (workout) { localWorkouts.current.set(workout.id, workout); saver.schedule(workout); } }, [workout, saver]);
+  useEffect(() => { if (workout) saver.schedule(workout); }, [workout, saver]);
   const activeProgrammes = useMemo(() => plans.filter((plan) => plan.isActive && !plan.isArchived).sort((a, b) => String(b.activatedAt?.seconds || b.updatedAtToken || b.id).localeCompare(String(a.activatedAt?.seconds || a.updatedAtToken || a.id))), [plans]);
   const programme = activeProgrammes[0];
   const sessions = useMemo(() => (programme?.sessions || []).slice().sort((a, b) => a.sortOrder - b.sortOrder), [programme]);
@@ -122,7 +119,6 @@ export default function WorkoutScreen({ user, repository = defaultRepository, in
     setDiscardError("");
     try {
       await repository.deleteWorkoutDocument(db, user.uid, unfinished.id);
-      recentWorkoutDrafts.delete(unfinished.id);
       setWorkouts((current) => current.filter((workout) => workout.id !== unfinished.id));
       const nextSession = requestedSession;
       setRequestedSession(null);
@@ -154,7 +150,6 @@ export default function WorkoutScreen({ user, repository = defaultRepository, in
     setLeaving(true);
     try {
       await saver.flush();
-      localWorkouts.current.set(workout.id, workout);
       setWorkouts((current) => current.some((item) => item.id === workout.id) ? current.map((item) => item.id === workout.id ? workout : item) : [...current, workout]);
       setSelectedSession(null);
       setWorkout(null);
@@ -173,7 +168,6 @@ export default function WorkoutScreen({ user, repository = defaultRepository, in
     setFinishError("");
     try {
       const completed = await completeWorkout(workout, saver, (latest) => repository.finishWorkoutDocument(db, user.uid, latest));
-      localWorkouts.current.set(workout.id, completed);
       setWorkouts((current) => current.some((item) => item.id === completed.id) ? current.map((item) => item.id === completed.id ? completed : item) : [...current, completed]);
       setWorkout(null);
       setSelectedSession(null);

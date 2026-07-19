@@ -14,20 +14,6 @@ function stripUndefined(value) {
   return value;
 }
 
-const recentWorkoutSnapshots = new Map();
-const deletedWorkoutIds = new Set();
-
-function workoutCacheKey(uid, workoutId) {
-  return `${uid}:${workoutId}`;
-}
-
-export function mergeWorkoutSnapshots(uid, remote) {
-  const visible = remote.filter((workout) => !deletedWorkoutIds.has(workoutCacheKey(uid, workout.id))).map((workout) => recentWorkoutSnapshots.get(workoutCacheKey(uid, workout.id)) || workout);
-  const remoteIds = new Set(remote.map((workout) => workout.id));
-  const recent = [...recentWorkoutSnapshots.entries()].filter(([key]) => key.startsWith(`${uid}:`)).map(([, workout]) => workout).filter((workout) => !remoteIds.has(workout.id));
-  return visible.concat(recent);
-}
-
 function plansCollection(db, uid) {
   return collection(db, "users", uid, "plans");
 }
@@ -207,35 +193,38 @@ export async function deleteExerciseDefinition(db, uid, exerciseId, { deleteDocu
 }
 
 export function subscribeWorkouts(db, uid, onNext, onError) {
-  return onSnapshot(collection(db, "users", uid, "workouts"), (snapshot) => onNext(mergeWorkoutSnapshots(uid, snapshot.docs.map((item) => item.data()))), onError);
+  return onSnapshot(collection(db, "users", uid, "workouts"), (snapshot) => onNext(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))), onError);
 }
 
 export async function createInProgressWorkoutDocument(db, uid, workout) {
   const data = stripUndefined({ ...workout, userId: uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
   await setDoc(workoutRef(db, uid, workout.id), data, { merge: false });
-  const saved = { ...workout, userId: uid };
-  deletedWorkoutIds.delete(workoutCacheKey(uid, workout.id));
-  recentWorkoutSnapshots.set(workoutCacheKey(uid, workout.id), saved);
-  return saved;
+  return { ...workout, userId: uid };
 }
 
-export async function updateInProgressWorkoutDocument(db, uid, workout) {
-  await setDoc(workoutRef(db, uid, workout.id), stripUndefined({ ...workout, userId: uid, updatedAt: serverTimestamp() }), { merge: true });
-  deletedWorkoutIds.delete(workoutCacheKey(uid, workout.id));
-  recentWorkoutSnapshots.set(workoutCacheKey(uid, workout.id), { ...workout, userId: uid });
+export async function updateInProgressWorkoutDocument(db, uid, workout, { transactionRunner = runTransaction, timestamp = serverTimestamp(), referenceFactory = workoutRef } = {}) {
+  const ref = referenceFactory(db, uid, workout.id);
+  return transactionRunner(db, async (transaction) => {
+    const snapshot = await transaction.get(ref);
+    if (snapshot.exists() && snapshot.data().status === "completed") return false;
+    transaction.set(ref, stripUndefined({ ...workout, userId: uid, status: "in_progress", updatedAt: timestamp }), { merge: true });
+    return true;
+  });
 }
 
-export async function finishWorkoutDocument(db, uid, workout, { timestamp = serverTimestamp(), completedAtValue = new Date().toISOString(), setDocument = setDoc, referenceFactory = workoutRef } = {}) {
-  await setDocument(referenceFactory(db, uid, workout.id), stripUndefined({ ...workout, userId: uid, status: "completed", completedAt: timestamp, updatedAt: timestamp }), { merge: true });
-  const completed = { ...workout, userId: uid, status: "completed", completedAt: completedAtValue };
-  recentWorkoutSnapshots.set(workoutCacheKey(uid, workout.id), completed);
-  return completed;
+export async function finishWorkoutDocument(db, uid, workout, { timestamp = serverTimestamp(), completedAtValue = new Date().toISOString(), transactionRunner = runTransaction, referenceFactory = workoutRef } = {}) {
+  const ref = referenceFactory(db, uid, workout.id);
+  await transactionRunner(db, async (transaction) => {
+    const snapshot = await transaction.get(ref);
+    const current = snapshot.exists() ? snapshot.data() : null;
+    if (current?.status === "completed") return;
+    transaction.set(ref, stripUndefined({ ...workout, userId: uid, status: "completed", completedAt: timestamp, updatedAt: timestamp }), { merge: true });
+  });
+  return { ...workout, userId: uid, status: "completed", completedAt: completedAtValue };
 }
 
 export async function deleteWorkoutDocument(db, uid, workoutId, { deleteDocument = deleteDoc, referenceFactory = workoutRef } = {}) {
   await deleteDocument(referenceFactory(db, uid, workoutId));
-  recentWorkoutSnapshots.delete(workoutCacheKey(uid, workoutId));
-  deletedWorkoutIds.add(workoutCacheKey(uid, workoutId));
 }
 
 export function subscribeExerciseDefinitions(db, uid, onNext, onError) {
@@ -254,6 +243,4 @@ export function subscribeExerciseDefinitions(db, uid, onNext, onError) {
   );
 }
 
-function resetWorkoutCache() { recentWorkoutSnapshots.clear(); deletedWorkoutIds.clear(); }
-
-export const __testables = { stripUndefined, preparePlanWrite, planPaths, exerciseCollectionPath, resetWorkoutCache };
+export const __testables = { stripUndefined, preparePlanWrite, planPaths, exerciseCollectionPath };

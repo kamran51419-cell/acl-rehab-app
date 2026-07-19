@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ClipboardList, Home, Table2, LineChart as LineChartIcon, Plus, Trash2, X } from "lucide-react";
+import { ClipboardList, Home, Table2, Dumbbell, Menu, Plus, Trash2, X } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -21,8 +21,12 @@ import {
 } from "firebase/auth";
 import { auth, db } from "./firebase";
 import PlansScreen from "./features/plans/PlansScreen";
+import WorkoutScreen from "./features/workout/WorkoutScreen";
+import WorkoutHistoryScreen from "./features/workout/WorkoutHistoryScreen";
+import HomeScreen from "./features/home/HomeScreen";
+import Button from "./components/ui/Button";
 import { saveLegacyRehabData, subscribeLegacyRehabData } from "./lib/firebase/legacyRehabRepository";
-import { calculateDaysSinceSurgery, calculateWeekFromSurgeryDate, todayString } from "./lib/domain/date";
+import { calculateWeekFromSurgeryDate, todayString } from "./lib/domain/date";
 import { blankSet, defaultSets } from "./lib/domain/sets";
 import {
   DEFAULT_EXERCISES,
@@ -32,8 +36,6 @@ import {
   compactDate,
   compactExerciseSummary,
   emptyWeek,
-  latestBestSetForExercise,
-  latestSymmetryForExercise,
   makeBilateralSession,
   makeId,
   makeSingleLegSession,
@@ -56,16 +58,6 @@ function CardShell({ title, right, children }) {
   );
 }
 
-function SummaryCard({ title, value, subtitle }) {
-  return (
-    <div className="space-y-1 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="text-sm text-slate-500">{title}</div>
-      <div className="text-xl font-semibold leading-tight text-slate-900">{value}</div>
-      <div className="text-xs text-slate-500">{subtitle}</div>
-    </div>
-  );
-}
-
 function TabButton({ active, onClick, children }) {
   return (
     <button
@@ -78,23 +70,6 @@ function TabButton({ active, onClick, children }) {
     >
       {children}
     </button>
-  );
-}
-
-function Button({ variant = "primary", size = "md", className = "", ...props }) {
-  return (
-    <button
-      type="button"
-      className={cls(
-        "inline-flex items-center justify-center rounded-xl font-medium transition disabled:cursor-not-allowed disabled:opacity-60",
-        size === "sm" ? "px-3 py-2 text-xs" : "px-4 py-2 text-sm",
-        variant === "primary" && "bg-slate-900 text-white hover:bg-slate-800",
-        variant === "outline" && "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
-        variant === "destructive" && "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100",
-        className
-      )}
-      {...props}
-    />
   );
 }
 
@@ -193,6 +168,8 @@ export default function ACLTrackerApp() {
   const [editing, setEditing] = useState(null);
   const [showAllRows, setShowAllRows] = useState(false);
   const [activeTab, setActiveTab] = useState("home");
+  const [workoutIntent, setWorkoutIntent] = useState(null);
+  const [highlightedWorkoutId, setHighlightedWorkoutId] = useState(null);
   const [progressTab, setProgressTab] = useState("all");
   const [graphsTab, setGraphsTab] = useState("combined");
   const [surgeryDate, setSurgeryDate] = useState("");
@@ -210,6 +187,7 @@ export default function ACLTrackerApp() {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (firebaseUser) => {
+      if (import.meta.env.DEV) console.info("[auth] state changed", { uid: firebaseUser?.uid || null });
       setUser(firebaseUser || null);
       setAuthLoading(false);
     });
@@ -229,6 +207,11 @@ export default function ACLTrackerApp() {
       return;
     }
 
+    // Programme and Workout use only their v2 user-scoped repositories. Home
+    // and Settings retain the legacy surgery-date field until it is migrated by
+    // a future, explicit data-model change.
+    if (["programme", "workout"].includes(activeTab)) return;
+
     return subscribeLegacyRehabData(
       db,
       user.uid,
@@ -241,7 +224,7 @@ export default function ACLTrackerApp() {
         console.error("Failed to load rehab data from Firestore", error);
       }
     );
-  }, [user, authLoading]);
+  }, [user, authLoading, activeTab]);
 
 
   async function handleAuthSubmit(e) {
@@ -290,7 +273,6 @@ export default function ACLTrackerApp() {
   const customExercisesPresent = customExercises.filter((e) =>
     weeks.some((w) => (w.sessions || []).some((s) => s.exerciseId === e.id))
   );
-  const daysSinceSurgery = calculateDaysSinceSurgery(surgeryDate);
 
   const currentSymmetry = useMemo(() => {
     if (!selectedExercise?.singleLeg) return null;
@@ -308,15 +290,6 @@ export default function ACLTrackerApp() {
 
   const displayedWeeks = showAllRows ? weeks : weeks.slice(-8);
 
-  const latestLPSym = latestSymmetryForExercise(weeks, "lp");
-  const latestLESym = latestSymmetryForExercise(weeks, "le");
-  const latestHCSym = latestSymmetryForExercise(weeks, "hc");
-  const latestLPLeft = latestBestSetForExercise(weeks, "lp", "leftSets");
-  const latestLPRight = latestBestSetForExercise(weeks, "lp", "rightSets");
-  const latestLELeft = latestBestSetForExercise(weeks, "le", "leftSets");
-  const latestLERight = latestBestSetForExercise(weeks, "le", "rightSets");
-  const latestHCLeft = latestBestSetForExercise(weeks, "hc", "leftSets");
-  const latestHCRight = latestBestSetForExercise(weeks, "hc", "rightSets");
   const builtInTabs = DEFAULT_EXERCISES.filter((e) => exerciseKeys.some((x) => x.id === e.id));
 
   const graphData = weeks.map((week) => {
@@ -558,74 +531,13 @@ async function saveSession() {
 
         <div className="hidden md:flex flex-wrap gap-2">
           <TabButton active={activeTab === "home"} onClick={() => setActiveTab("home")}>Home</TabButton>
-          <TabButton active={activeTab === "log"} onClick={() => setActiveTab("log")}>Log Session</TabButton>
-          <TabButton active={activeTab === "plans"} onClick={() => setActiveTab("plans")}>Plans</TabButton>
-          <TabButton active={activeTab === "table"} onClick={() => setActiveTab("table")}>Progress</TabButton>
-          <TabButton active={activeTab === "graphs"} onClick={() => setActiveTab("graphs")}>Graphs</TabButton>
+          <TabButton active={activeTab === "programme"} onClick={() => setActiveTab("programme")}>Programme</TabButton>
+          <TabButton active={activeTab === "workout"} onClick={() => setActiveTab("workout")}>Workout</TabButton>
+          <TabButton active={["progress", "workout-history", "table", "graphs"].includes(activeTab)} onClick={() => setActiveTab("progress")}>Progress</TabButton>
+          <TabButton active={activeTab === "more"} onClick={() => setActiveTab("more")}>More</TabButton>
         </div>
 
-        {activeTab === "home" && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 md:gap-4">
-              <SummaryCard
-                title="Leg Press"
-                value={`${latestLPLeft ? `${latestLPLeft.reps} x ${latestLPLeft.weight}kg` : "—"} / ${latestLPRight ? `${latestLPRight.reps} x ${latestLPRight.weight}kg` : "—"}`}
-                subtitle="L / R"
-              />
-              <SummaryCard title="Leg Press symmetry" value={latestLPSym != null ? `${latestLPSym}%` : "—"} />
-
-              <SummaryCard
-                title="Leg Extension"
-                value={`${latestLELeft ? `${latestLELeft.reps} x ${latestLELeft.weight}kg` : "—"} / ${latestLERight ? `${latestLERight.reps} x ${latestLERight.weight}kg` : "—"}`}
-                subtitle="L / R"
-              />
-              <SummaryCard title="Leg Extension symmetry" value={latestLESym != null ? `${latestLESym}%` : "—"} />
-
-              <SummaryCard
-                title="Hamstring Curl"
-                value={`${latestHCLeft ? `${latestHCLeft.reps} x ${latestHCLeft.weight}kg` : "—"} / ${latestHCRight ? `${latestHCRight.reps} x ${latestHCRight.weight}kg` : "—"}`}
-                subtitle="L / R"
-              />
-              <SummaryCard title="Hamstring Curl symmetry" value={latestHCSym != null ? `${latestHCSym}%` : "—"} />
-            </div>
-
-            <CardShell title="Setup">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <Label className="text-sm font-medium text-slate-700">Surgery date (optional)</Label>
-                  <Input
-                    type="date"
-                    value={surgeryDate}
-                    onChange={async (e) => {
-  const newDate = e.target.value;
-  setSurgeryDate(newDate);
-  setWeekManuallyEdited(false);
-  await saveAllData(weeks, customExercises, newDate);
-}}
-                  />
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                  {surgeryDate
-                    ? "Week auto-calculates from Date by default, but you can still type over it manually if needed."
-                    : "No surgery date set. Week starts manual, then defaults to the next week after a save."}
-                </div>
-              </div>
-            </CardShell>
-
-            <CardShell title="Recovery home">
-              <div className="grid gap-4 md:grid-cols-2">
-                <SummaryCard
-                  title="Days since surgery"
-                  value={daysSinceSurgery != null ? String(daysSinceSurgery) : "—"}
-                  subtitle={surgeryDate ? "Based on today" : "Add surgery date"}
-                />
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                  This updates from the surgery date using today’s date. Add or change the surgery date above.
-                </div>
-              </div>
-            </CardShell>
-          </div>
-        )}
+        {activeTab === "home" && <HomeScreen user={user} surgeryDate={surgeryDate} onOpenProgramme={() => setActiveTab("programme")} onOpenWorkout={(intent) => { setWorkoutIntent({ ...intent, token: Date.now() }); setActiveTab("workout"); }} />}
 
         {activeTab === "log" && (
           <div className="space-y-6">
@@ -764,7 +676,11 @@ async function saveSession() {
           </div>
         )}
 
-        {activeTab === "plans" && <PlansScreen user={user} />}
+        {activeTab === "programme" && <PlansScreen user={user} />}
+        {activeTab === "workout" && <WorkoutScreen user={user} intent={workoutIntent} onIntentHandled={() => setWorkoutIntent(null)} onFinished={(completed) => { setHighlightedWorkoutId(completed.id); setActiveTab("workout-history"); }} onDiscarded={() => setActiveTab("home")} />}
+        {activeTab === "progress" && <div className="space-y-4"><div><h1 className="text-2xl font-semibold">Progress</h1><p className="text-sm text-slate-500">Review your workout history and rehabilitation trends.</p></div><div className="flex gap-2"><Button onClick={() => setActiveTab("workout-history")}>Workout history</Button><Button variant="outline" onClick={() => setActiveTab("graphs")}>Progress graphs</Button></div></div>}
+        {activeTab === "workout-history" && <WorkoutHistoryScreen user={user} highlightId={highlightedWorkoutId} />}
+        {activeTab === "more" && <div className="space-y-4"><div><h1 className="text-2xl font-semibold">More</h1><p className="text-sm text-slate-500">Manage your library and app preferences.</p></div><PlansScreen user={user} view="exercises" /><CardShell title="Settings"><div className="max-w-md"><Label className="text-sm font-medium text-slate-700">Surgery date (optional)</Label><Input type="date" value={surgeryDate} onChange={async (event) => { const nextDate = event.target.value; setSurgeryDate(nextDate); setWeekManuallyEdited(false); await saveAllData(weeks, customExercises, nextDate); }} /><p className="mt-2 text-sm text-slate-500">Used to calculate your rehabilitation age on Home.</p></div></CardShell></div>}
 
         {activeTab === "table" && (
           <div className="space-y-4">
@@ -1060,35 +976,35 @@ async function saveSession() {
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("log")}
-            className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "log" ? "bg-slate-100 font-medium" : "text-slate-500")}
-          >
-            <Plus className="h-4 w-4" />
-            Log
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("plans")}
-            className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "plans" ? "bg-slate-100 font-medium" : "text-slate-500")}
+            onClick={() => setActiveTab("programme")}
+            className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "programme" ? "bg-slate-100 font-medium" : "text-slate-500")}
           >
             <ClipboardList className="h-4 w-4" />
-            Plans
+            Programme
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("table")}
-            className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "table" ? "bg-slate-100 font-medium" : "text-slate-500")}
+            onClick={() => setActiveTab("workout")}
+            className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "workout" ? "bg-slate-100 font-medium" : "text-slate-500")}
+          >
+            <Dumbbell className="h-4 w-4" />
+            Workout
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("progress")}
+            className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", ["progress", "workout-history", "table", "graphs"].includes(activeTab) ? "bg-slate-100 font-medium" : "text-slate-500")}
           >
             <Table2 className="h-4 w-4" />
             Progress
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("graphs")}
-            className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "graphs" ? "bg-slate-100 font-medium" : "text-slate-500")}
+            onClick={() => setActiveTab("more")}
+            className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "more" ? "bg-slate-100 font-medium" : "text-slate-500")}
           >
-            <LineChartIcon className="h-4 w-4" />
-            Graphs
+            <Menu className="h-4 w-4" />
+            More
           </button>
         </div>
       </div>

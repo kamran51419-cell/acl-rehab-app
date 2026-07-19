@@ -90,6 +90,22 @@ function friendlyErrorMessage(error, fallback, resource = "rehab data") {
   return fallback;
 }
 
+function friendlyPlanValidationMessages(errors) {
+  return errors.map((error) => {
+    if (error === "Plan name is required.") return "Enter a programme name.";
+    if (error === "Active plans must include at least one valid session.") return "Add and name at least one session before activating this programme.";
+    const sessionNumber = Number(error.match(/sessions\[(\d+)\]/)?.[1] || 0) + 1;
+    const exerciseNumber = Number(error.match(/exercises\[(\d+)\]/)?.[1] || 0) + 1;
+    if (/sessions\[\d+\] needs a name/.test(error)) return `Enter a name for session ${sessionNumber}.`;
+    if (/needs an exercise|exercise name snapshot/.test(error)) return `Choose an exercise for item ${exerciseNumber} in session ${sessionNumber}.`;
+    if (/unsupported prescription method/.test(error)) return `Choose how exercise ${exerciseNumber} in session ${sessionNumber} is recorded.`;
+    if (/duration must be positive/.test(error)) return `Enter a duration greater than zero for exercise ${exerciseNumber} in session ${sessionNumber}.`;
+    if (/target sets|target reps|rep range/.test(error)) return `Check the sets and reps for exercise ${exerciseNumber} in session ${sessionNumber}.`;
+    if (/duplicate/i.test(error)) return "Remove duplicated items before saving the programme.";
+    return `Review exercise ${exerciseNumber} in session ${sessionNumber}.`;
+  });
+}
+
 function sectionPlans(plans, predicate) {
   return plans.filter(predicate);
 }
@@ -266,8 +282,10 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, onM
   const [activeExerciseId, setActiveExerciseId] = useState("");
   const [draggingExercise, setDraggingExercise] = useState(null);
   const [draggingSession, setDraggingSession] = useState(null);
+  const [removeSessionIndex, setRemoveSessionIndex] = useState(null);
 
   const validation = validatePlan(draft);
+  const validationMessages = friendlyPlanValidationMessages(validation.errors);
   const filteredExercises = filterExerciseLibrary(exercises, { query: exerciseQuery });
 
   const setSessions = (sessions) => setDraft({ ...draft, sessions });
@@ -356,7 +374,7 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, onM
       </div>
 
       {saveMessage ? <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{saveMessage}</div> : null}
-      {!validation.valid ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">{validation.errors.slice(0, 4).join(" ")}</div> : null}
+      {!validation.valid ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">{validationMessages.slice(0, 4).join(" ")}</div> : null}
 
       <div className="grid gap-3 md:grid-cols-2">
         <Field label="Programme name"><Input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="My programme" /></Field>
@@ -399,7 +417,7 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, onM
                 <Field label="Notes"><Input value={session.notes || ""} onChange={(event) => updateSession(sessionIndex, { notes: event.target.value })} /></Field>
                 <div className="flex flex-wrap items-end gap-2">
                   <Button size="sm" variant="outline" onClick={() => setSessions([...draft.sessions, { ...duplicatePlan({ ...draft, sessions: [session] }).sessions[0], sortOrder: draft.sessions.length }])}>Duplicate</Button>
-                  <Button size="sm" variant="danger" onClick={() => window.confirm("Remove this session from the programme?") && setSessions(draft.sessions.filter((_, index) => index !== sessionIndex).map((item, index) => ({ ...item, sortOrder: index })))}>Remove</Button>
+                  <Button size="sm" variant="danger" onClick={() => setRemoveSessionIndex(sessionIndex)}>Remove</Button>
                 </div>
               </div>
             </div>
@@ -486,6 +504,18 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, onM
           </div>
         ))}
       </div>
+      {removeSessionIndex !== null ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+            <h3 className="text-lg font-semibold">Remove session?</h3>
+            <p className="mt-2 text-sm text-slate-600">This session will be removed from the programme. Your other changes will not be saved until you save the programme.</p>
+            <div className="mt-5 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setRemoveSessionIndex(null)}>Keep session</Button>
+              <Button variant="danger" onClick={() => { setSessions(draft.sessions.filter((_, index) => index !== removeSessionIndex).map((item, index) => ({ ...item, sortOrder: index }))); setRemoveSessionIndex(null); }}>Remove</Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -516,6 +546,7 @@ export function ExerciseLibrary({ user, exercises, onChanged }) {
       setMessage("Exercise added to your library.");
       onChanged?.();
     } catch (error) {
+      console.error("Could not add exercise", error);
       setMessage(friendlyErrorMessage(error, "We could not save that exercise. Please try again."));
     } finally {
       setSaving(false);
@@ -529,6 +560,7 @@ export function ExerciseLibrary({ user, exercises, onChanged }) {
       setEditingExercise(null);
       setMessage("Exercise updated.");
     } catch (error) {
+      console.error("Could not update exercise", error);
       setMessage(friendlyErrorMessage(error, "We could not update that exercise. Please try again."));
     }
   }
@@ -541,6 +573,7 @@ export function ExerciseLibrary({ user, exercises, onChanged }) {
       setDeleteCandidate(null);
       setMessage("Exercise permanently deleted from the library. Existing programme and workout records were not changed.");
     } catch (error) {
+      console.error("Could not delete exercise", error);
       setMessage(friendlyErrorMessage(error, "We could not delete that exercise. Please try again.", "exercise library"));
     }
   }
@@ -659,6 +692,7 @@ export default function PlansScreen({ user, view = "programme", onManageExercise
   const [saveMessage, setSaveMessage] = useState("");
   const [programmeNotice, setProgrammeNotice] = useState("");
   const [deleteProgrammeCandidate, setDeleteProgrammeCandidate] = useState(null);
+  const [discardDraftOpen, setDiscardDraftOpen] = useState(false);
   const draftStorageKey = `programme-draft:${user.uid}`;
 
   useEffect(() => {
@@ -688,7 +722,7 @@ export default function PlansScreen({ user, view = "programme", onManageExercise
       db,
       user.uid,
       (next) => { setExercises(next); setExercisesLoading(false); },
-      (error) => { setExercisesError(friendlyErrorMessage(error, "We could not load your exercise library. Please try again.", "exercise library")); setExercisesLoading(false); },
+      (error) => { console.error("Could not load exercise library", error); setExercisesError(friendlyErrorMessage(error, "We could not load your exercise library. Please try again.", "exercise library")); setExercisesLoading(false); },
     );
     if (view === "exercises") return unsubExercises;
 
@@ -698,7 +732,7 @@ export default function PlansScreen({ user, view = "programme", onManageExercise
       db,
       user.uid,
       (next) => { setPlans(next); setPlansLoading(false); },
-      (error) => { setPlansError(friendlyErrorMessage(error, "We could not load your programmes. Please try again.", "programmes")); setPlansLoading(false); },
+      (error) => { console.error("Could not load programmes", error); setPlansError(friendlyErrorMessage(error, "We could not load your programmes. Please try again.", "programmes")); setPlansLoading(false); },
     );
     return () => { unsubPlans(); unsubExercises(); };
   }, [user?.uid, view]);
@@ -721,11 +755,18 @@ export default function PlansScreen({ user, view = "programme", onManageExercise
   }
 
   function closeEditor() {
-    if (draft && original && JSON.stringify(draft) !== JSON.stringify(original) && !window.confirm("Discard unsaved programme changes?")) return;
-    if (draft && !original && !window.confirm("Discard this new unsaved programme?")) return;
+    if ((draft && original && JSON.stringify(draft) !== JSON.stringify(original)) || (draft && !original)) {
+      setDiscardDraftOpen(true);
+      return;
+    }
+    discardDraft();
+  }
+
+  function discardDraft() {
     setDraft(null);
     setOriginal(null);
     setSaveMessage("");
+    setDiscardDraftOpen(false);
     sessionStorage.removeItem(draftStorageKey);
   }
 
@@ -733,7 +774,7 @@ export default function PlansScreen({ user, view = "programme", onManageExercise
     if (!draft || saving) return;
     const validation = validatePlan(draft);
     if (!validation.valid) {
-      setSaveMessage(validation.errors.join(" "));
+      setSaveMessage(friendlyPlanValidationMessages(validation.errors).join(" "));
       return;
     }
     setSaving(true);
@@ -752,7 +793,8 @@ export default function PlansScreen({ user, view = "programme", onManageExercise
       setProgrammeNotice("Programme saved.");
       sessionStorage.removeItem(draftStorageKey);
     } catch (error) {
-      setSaveMessage(friendlyErrorMessage(error, "We could not save this programme. Please try again."));
+      console.error("Could not save programme", error);
+      setSaveMessage(friendlyErrorMessage(error, "Your changes were not saved. Please try again."));
     } finally {
       setSaving(false);
     }
@@ -763,7 +805,9 @@ export default function PlansScreen({ user, view = "programme", onManageExercise
     setSaving(true);
     try {
       await duplicatePlanDocument(db, user.uid, plan, { newPlanId: `plan-${makeId()}`, updatedAtToken: token() });
+      setProgrammeNotice("Programme duplicated.");
     } catch (error) {
+      console.error("Could not duplicate programme", error);
       setPlansError(friendlyErrorMessage(error, "We could not duplicate that programme. Please try again.", "programmes"));
     } finally {
       setSaving(false);
@@ -773,7 +817,9 @@ export default function PlansScreen({ user, view = "programme", onManageExercise
   async function handleToggleActive(plan) {
     try {
       await setPlanActive(db, user.uid, plan, !plan.isActive, { updatedAtToken: token() });
+      setProgrammeNotice(plan.isActive ? "Programme deactivated." : "Programme activated.");
     } catch (error) {
+      console.error("Could not update programme status", error);
       setPlansError(friendlyErrorMessage(error, "We could not update that programme. Please try again.", "programmes"));
     }
   }
@@ -786,6 +832,7 @@ export default function PlansScreen({ user, view = "programme", onManageExercise
       setDeleteProgrammeCandidate(null);
       setProgrammeNotice("Programme permanently deleted. Completed workouts were not changed.");
     } catch (error) {
+      console.error("Could not delete programme", error);
       setPlansError(friendlyErrorMessage(error, "We could not delete that programme. Please try again.", "programmes"));
     }
   }
@@ -844,6 +891,18 @@ export default function PlansScreen({ user, view = "programme", onManageExercise
                 <div className="mt-5 flex justify-end gap-2">
                   <Button variant="outline" onClick={() => setDeleteProgrammeCandidate(null)}>Cancel</Button>
                   <Button variant="danger" onClick={handleDeleteProgramme}>Delete permanently</Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+          {discardDraftOpen ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+              <div role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+                <h3 className="text-lg font-semibold">Discard changes?</h3>
+                <p className="mt-2 text-sm text-slate-600">Your changes have not been saved.</p>
+                <div className="mt-5 flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setDiscardDraftOpen(false)}>Keep editing</Button>
+                  <Button variant="danger" onClick={discardDraft}>Discard</Button>
                 </div>
               </div>
             </div>

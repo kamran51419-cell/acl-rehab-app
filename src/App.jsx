@@ -46,6 +46,17 @@ function cls(...parts) {
   return parts.filter(Boolean).join(" ");
 }
 
+function authenticationMessage(error, action = "sign in") {
+  const code = error?.code || "";
+  if (["auth/invalid-credential", "auth/wrong-password", "auth/user-not-found"].includes(code)) return "The email or password is incorrect.";
+  if (code === "auth/email-already-in-use") return "An account already exists for this email.";
+  if (code === "auth/weak-password") return "Choose a stronger password with at least 6 characters.";
+  if (code === "auth/invalid-email") return "Enter a valid email address.";
+  if (code === "auth/too-many-requests") return "Too many attempts. Wait a moment and try again.";
+  if (/network|unavailable/i.test(error?.message || "")) return "Check your connection and try again.";
+  return `Something went wrong while trying to ${action}. Please try again.`;
+}
+
 function CardShell({ title, right, children }) {
   return (
     <div className="rounded-3xl border border-slate-200 bg-white shadow-md">
@@ -185,6 +196,7 @@ export default function ACLTrackerApp() {
   const [password, setPassword] = useState("");
   const [authMode, setAuthMode] = useState("login");
   const [authError, setAuthError] = useState("");
+  const [authNotice, setAuthNotice] = useState("");
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (firebaseUser) => {
@@ -231,6 +243,7 @@ export default function ACLTrackerApp() {
   async function handleAuthSubmit(e) {
     e.preventDefault();
     setAuthError("");
+    setAuthNotice("");
 
     try {
       if (authMode === "signup") {
@@ -242,7 +255,8 @@ export default function ACLTrackerApp() {
       setEmail("");
       setPassword("");
     } catch (error) {
-      setAuthError(error.message || "Authentication failed");
+      console.error("Authentication failed", error);
+      setAuthError(authenticationMessage(error, authMode === "signup" ? "create your account" : "sign in"));
     }
   }
 
@@ -257,14 +271,18 @@ export default function ACLTrackerApp() {
   async function handleResetPassword() {
     if (!email) {
       setAuthError("Enter your email first");
+      setAuthNotice("");
       return;
     }
 
     try {
       await sendPasswordResetEmail(auth, email);
-      setAuthError("Password reset email sent");
+      setAuthError("");
+      setAuthNotice("Password reset email sent.");
     } catch (error) {
-      setAuthError(error.message);
+      console.error("Password reset failed", error);
+      setAuthNotice("");
+      setAuthError(authenticationMessage(error, "send the password reset email"));
     }
   }
 
@@ -492,6 +510,11 @@ async function saveSession() {
             {authError ? (
               <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                 {authError}
+              </div>
+            ) : null}
+            {authNotice ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                {authNotice}
               </div>
             ) : null}
 

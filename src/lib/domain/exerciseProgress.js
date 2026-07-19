@@ -92,3 +92,44 @@ export function symmetryEntries(group) {
 export function resultLabel(entry) {
   return entry ? `${entry.weight} kg × ${entry.reps || "—"}` : "—";
 }
+
+export function completedExerciseGroups(workouts = []) {
+  const groups = new Map();
+  completedWorkoutHistory(workouts).forEach((workout) => {
+    (workout.exercises || []).forEach((exercise) => {
+      if (!exercise.exerciseId) return;
+      if (!groups.has(exercise.exerciseId)) groups.set(exercise.exerciseId, { exerciseId: exercise.exerciseId, name: exercise.exerciseNameSnapshot || "Exercise", performances: [], weightedEntries: [] });
+      const group = groups.get(exercise.exerciseId);
+      group.performances.push({ workoutId: workout.id, date: workout.date || workout.workoutDate || "", displayDate: formatDate(workout.date || workout.workoutDate).replaceAll("-", "/"), exercise });
+    });
+  });
+  const weighted = new Map(groupExerciseProgress(workouts).map((group) => [group.exerciseId, group.entries]));
+  return [...groups.values()].map((group) => {
+    group.performances.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    group.weightedEntries = weighted.get(group.exerciseId) || [];
+    group.latestDate = group.performances[0]?.date || "";
+    return group;
+  }).sort((a, b) => String(b.latestDate).localeCompare(String(a.latestDate)) || a.name.localeCompare(b.name));
+}
+
+export function weightedPersonalBests(entries = []) {
+  if (!entries.length) return null;
+  const heaviest = heaviestEntry(entries);
+  const bestSet = entries.slice().sort((a, b) => (b.weight * b.reps) - (a.weight * a.reps) || b.weight - a.weight)[0];
+  const workoutVolumes = new Map();
+  entries.forEach((entry) => workoutVolumes.set(entry.workoutId, (workoutVolumes.get(entry.workoutId) || 0) + entry.weight * entry.reps));
+  const highestVolume = [...workoutVolumes.entries()].map(([workoutId, volume]) => ({ workoutId, volume, date: entries.find((entry) => entry.workoutId === workoutId)?.date || "", displayDate: entries.find((entry) => entry.workoutId === workoutId)?.displayDate || "" })).sort((a, b) => b.volume - a.volume || String(b.date).localeCompare(String(a.date)))[0];
+  return { heaviest, bestSet, highestVolume };
+}
+
+export function exerciseProgressSummary(group) {
+  const chronological = (group?.performances || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const weightedChronological = (group?.weightedEntries || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const byDate = new Map();
+  weightedChronological.forEach((entry) => { const current = byDate.get(entry.date); if (!current || entry.weight > current.weight || (entry.weight === current.weight && entry.reps > current.reps)) byDate.set(entry.date, entry); });
+  const daily = [...byDate.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const firstBest = daily[0] || null;
+  const latestBest = daily.at(-1) || null;
+  const improvement = firstBest && latestBest ? latestBest.weight - firstBest.weight : null;
+  return { first: chronological[0] || null, latest: chronological.at(-1) || null, firstBest, latestBest, improvement };
+}

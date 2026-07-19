@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { dailyHeaviest, EXERCISE_VARIANT, groupExerciseProgress, heaviestEntry, symmetryEntries, variantEntries } from "../src/lib/domain/exerciseProgress.js";
+import { completedExerciseGroups, dailyHeaviest, exerciseProgressSummary, EXERCISE_VARIANT, groupExerciseProgress, heaviestEntry, symmetryEntries, variantEntries, weightedPersonalBests } from "../src/lib/domain/exerciseProgress.js";
 
 const exercise = (id, name, side, weights) => ({ id: `${id}-${side}`, exerciseId: id, exerciseNameSnapshot: name, loggingMethod: "reps_weight", sideSnapshot: side, recordedSets: weights.map(([weight, reps], index) => ({ id: `set-${index}`, setNumber: index + 1, weight, prescribedReps: { type: "fixed", value: reps } })) });
 const workouts = [
@@ -25,4 +25,17 @@ test("variants retain every set while graph points use the daily heaviest", () =
 test("symmetry requires comparable left and right entries on the same date", () => {
   const symmetry = symmetryEntries(groupExerciseProgress(workouts)[0]);
   assert.deepEqual(symmetry.map(({ date, symmetry: value }) => [date, value]), [["2026-07-19", 92]]);
+});
+
+test("stats calculate weighted personal bests and first-to-latest improvement", () => {
+  const group = completedExerciseGroups(workouts)[0];
+  const bests = weightedPersonalBests(group.weightedEntries);
+  assert.equal(bests.heaviest.weight, 130);
+  assert.equal(bests.bestSet.weight, 100);
+  assert.equal(bests.bestSet.reps, 10);
+  assert.equal(bests.highestVolume.volume, 3110);
+  const summary = exerciseProgressSummary(group);
+  assert.equal(summary.first.displayDate, "15/07/26");
+  assert.equal(summary.latest.displayDate, "19/07/26");
+  assert.equal(summary.improvement, -10);
 });

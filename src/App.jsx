@@ -24,6 +24,7 @@ import PlansScreen from "./features/plans/PlansScreen";
 import WorkoutScreen from "./features/workout/WorkoutScreen";
 import WorkoutHistoryScreen from "./features/workout/WorkoutHistoryScreen";
 import HomeScreen from "./features/home/HomeScreen";
+import ExerciseLibraryHome from "./features/home/ExerciseLibraryHome";
 import Button from "./components/ui/Button";
 import { saveLegacyRehabData, subscribeLegacyRehabData } from "./lib/firebase/legacyRehabRepository";
 import { calculateWeekFromSurgeryDate, todayString } from "./lib/domain/date";
@@ -537,7 +538,7 @@ async function saveSession() {
           <TabButton active={activeTab === "more"} onClick={() => setActiveTab("more")}>More</TabButton>
         </div>
 
-        {activeTab === "home" && <HomeScreen user={user} surgeryDate={surgeryDate} onOpenProgramme={() => setActiveTab("programme")} onOpenWorkout={(intent) => { setWorkoutIntent({ ...intent, token: Date.now() }); setActiveTab("workout"); }} />}
+        {activeTab === "home" && <div className="space-y-8"><HomeScreen user={user} surgeryDate={surgeryDate} onOpenProgramme={() => setActiveTab("programme")} onOpenWorkout={(intent) => { setWorkoutIntent({ ...intent, token: Date.now() }); setActiveTab("workout"); }} /><ExerciseLibraryHome user={user} onBackToProgramme={() => setActiveTab("programme")} /></div>}
 
         {activeTab === "log" && (
           <div className="space-y-6">
@@ -676,12 +677,12 @@ async function saveSession() {
           </div>
         )}
 
-        {activeTab === "programme" && <PlansScreen user={user} />}
+        {activeTab === "programme" && <PlansScreen user={user} onOpenExerciseLibrary={() => setActiveTab("home")} />}
         {activeTab === "workout" && <WorkoutScreen user={user} intent={workoutIntent} onIntentHandled={() => setWorkoutIntent(null)} onFinished={(completed) => { setHighlightedWorkoutId(completed.id); setActiveTab("workout-history"); }} onDiscarded={() => setActiveTab("home")} />}
         {activeTab === "workout" && <WorkoutScreen user={user} intent={workoutIntent} onIntentHandled={() => setWorkoutIntent(null)} onFinished={(completed) => { setHighlightedWorkoutId(completed.id); setActiveTab("workout-history"); }} />}
         {activeTab === "progress" && <div className="space-y-4"><div><h1 className="text-2xl font-semibold">Progress</h1><p className="text-sm text-slate-500">Review your workout history and rehabilitation trends.</p></div><div className="flex gap-2"><Button onClick={() => setActiveTab("workout-history")}>Workout history</Button><Button variant="outline" onClick={() => setActiveTab("graphs")}>Progress graphs</Button></div></div>}
         {activeTab === "workout-history" && <WorkoutHistoryScreen user={user} highlightId={highlightedWorkoutId} />}
-        {activeTab === "more" && <div className="space-y-4"><div><h1 className="text-2xl font-semibold">More</h1><p className="text-sm text-slate-500">Manage your library and app preferences.</p></div><PlansScreen user={user} view="exercises" /><CardShell title="Settings"><div className="max-w-md"><Label className="text-sm font-medium text-slate-700">Surgery date (optional)</Label><Input type="date" value={surgeryDate} onChange={async (event) => { const nextDate = event.target.value; setSurgeryDate(nextDate); setWeekManuallyEdited(false); await saveAllData(weeks, customExercises, nextDate); }} /><p className="mt-2 text-sm text-slate-500">Used to calculate your rehabilitation age on Home.</p></div></CardShell></div>}
+        {activeTab === "more" && <div className="space-y-4"><div><h1 className="text-2xl font-semibold">More</h1><p className="text-sm text-slate-500">Manage app preferences.</p></div><CardShell title="Settings"><div className="max-w-md"><Label className="text-sm font-medium text-slate-700">Surgery date (optional)</Label><Input type="date" value={surgeryDate} onChange={async (event) => { const nextDate = event.target.value; setSurgeryDate(nextDate); setWeekManuallyEdited(false); await saveAllData(weeks, customExercises, nextDate); }} /><p className="mt-2 text-sm text-slate-500">Used to calculate your rehabilitation age on Home.</p></div></CardShell></div>}
 
         {activeTab === "table" && (
           <div className="space-y-4">

@@ -224,7 +224,7 @@ export async function updateInProgressWorkoutDocument(db, uid, workout, { run = 
   const ref = referenceFactory(db, uid, workout.id);
   const written = await run(db, async (transaction) => {
     const snapshot = await transaction.get(ref);
-    if (snapshot.exists() && snapshot.data()?.status === "completed") return false;
+    if (snapshot.exists() && (snapshot.data()?.status === "completed" || snapshot.data()?.completed === true)) return false;
     transaction.set(ref, stripUndefined({ ...workout, userId: uid, status: "in_progress", updatedAt: timestamp }), { merge: true });
     return true;
   });
@@ -235,9 +235,28 @@ export async function updateInProgressWorkoutDocument(db, uid, workout, { run = 
   return written;
 }
 
-export async function finishWorkoutDocument(db, uid, workout, { timestamp = serverTimestamp(), completedAtValue = new Date().toISOString(), setDocument = setDoc, referenceFactory = workoutRef } = {}) {
-  await setDocument(referenceFactory(db, uid, workout.id), stripUndefined({ ...workout, userId: uid, status: "completed", completedAt: timestamp, updatedAt: timestamp }), { merge: true });
-  const completed = { ...workout, userId: uid, status: "completed", completedAt: completedAtValue };
+export async function finishWorkoutDocument(db, uid, workout, { timestamp = serverTimestamp(), completedAtValue = new Date().toISOString(), run = runTransaction, referenceFactory = workoutRef } = {}) {
+  const ref = referenceFactory(db, uid, workout.id);
+  const persisted = stripUndefined({
+    ...workout,
+    id: workout.id,
+    userId: uid,
+    planId: workout.planId,
+    programmeId: workout.programmeId || workout.planId,
+    sessionId: workout.sessionId,
+    date: workout.date || workout.workoutDate,
+    workoutDate: workout.workoutDate || workout.date,
+    status: "completed",
+    completed: true,
+    completedAt: timestamp,
+    updatedAt: timestamp,
+  });
+  await run(db, async (transaction) => {
+    const snapshot = await transaction.get(ref);
+    if (snapshot.exists() && (snapshot.data()?.status === "completed" || snapshot.data()?.completed === true)) return;
+    transaction.set(ref, persisted, { merge: true });
+  });
+  const completed = { ...persisted, completedAt: completedAtValue, updatedAt: completedAtValue };
   recentWorkoutSnapshots.set(workoutCacheKey(uid, workout.id), completed);
   return completed;
 }

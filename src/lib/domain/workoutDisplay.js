@@ -3,8 +3,12 @@ import { SIDE } from "./v2Models.js";
 
 export const WORKOUT_BEHAVIOR = Object.freeze({ COMPLETION: "completion", WEIGHT: "weight", INTERVALS: "intervals" });
 
+export function isCompletedWorkout(workout) {
+  return workout?.status === "completed" || workout?.completed === true;
+}
+
 export function completedWorkoutHistory(workouts = []) {
-  return workouts.filter((workout) => workout.status === "completed").slice().sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")) || String(b.completedAt?.seconds || b.completedAt || "").localeCompare(String(a.completedAt?.seconds || a.completedAt || "")));
+  return workouts.filter(isCompletedWorkout).slice().sort((a, b) => String(b.date || b.workoutDate || "").localeCompare(String(a.date || a.workoutDate || "")) || String(b.completedAt?.seconds || b.completedAt || "").localeCompare(String(a.completedAt?.seconds || a.completedAt || "")));
 }
 
 export function sessionWorkoutStatus(programmeId, sessionId, workouts = [], today) {

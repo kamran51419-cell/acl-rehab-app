@@ -29,6 +29,7 @@ import {
   validatePlan,
 } from "../src/lib/domain/plans.js";
 import { SIDE } from "../src/lib/domain/v2Models.js";
+import { completedWorkoutHistory } from "../src/lib/domain/workoutDisplay.js";
 import { __testables as planRepoTestables, deleteExerciseDefinition, deletePlan, deleteWorkoutDocument, exclusiveActiveProgrammeStates, finishWorkoutDocument, mergeWorkoutSnapshots, updateInProgressWorkoutDocument } from "../src/lib/firebase/planRepository.js";
 
 function mixedStrengthPlan() {
@@ -296,9 +297,13 @@ test("finishing caches a completed snapshot and stale subscriptions cannot resto
   planRepoTestables.resetWorkoutCache();
   let written;
   const draft = { id: "workout", status: "in_progress", date: "2026-07-18", notes: "latest", exercises: [{ id: "press", completed: true, recordedSets: [{ id: "set-1", weight: 82.5 }] }] };
-  const completed = await finishWorkoutDocument({}, "uid", draft, { timestamp: "server-time", completedAtValue: "client-time", referenceFactory: () => "workout-ref", setDocument: async (ref, data) => { written = { ref, data }; } });
+  const run = async (_db, operation) => operation({ get: async () => ({ exists: () => false }), set: (ref, data) => { written = { ref, data }; } });
+  const completed = await finishWorkoutDocument({}, "uid", draft, { timestamp: "server-time", completedAtValue: "client-time", referenceFactory: () => "workout-ref", run });
   assert.equal(written.ref, "workout-ref");
   assert.equal(written.data.status, "completed");
+  assert.equal(written.data.completed, true);
+  assert.equal(written.data.workoutDate, "2026-07-18");
+  assert.equal(written.data.userId, "uid");
   assert.equal(written.data.completedAt, "server-time");
   assert.equal(written.data.notes, "latest");
   assert.equal(written.data.exercises[0].recordedSets[0].weight, 82.5);
@@ -306,7 +311,9 @@ test("finishing caches a completed snapshot and stale subscriptions cannot resto
   assert.equal(completed.completedAt, "client-time");
   assert.equal(mergeWorkoutSnapshots("uid", [{ ...draft }])[0].status, "completed");
   planRepoTestables.resetWorkoutCache();
-  assert.equal(mergeWorkoutSnapshots("uid", [{ ...written.data, id: draft.id }])[0].status, "completed");
+  const remounted = mergeWorkoutSnapshots("uid", [{ ...written.data, id: draft.id }]);
+  assert.equal(remounted[0].status, "completed");
+  assert.deepEqual(completedWorkoutHistory(remounted).map((workout) => workout.id), [draft.id]);
 });
 
 test("late autosaves cannot overwrite a completed workout", async () => {

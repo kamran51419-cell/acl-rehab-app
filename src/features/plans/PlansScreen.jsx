@@ -99,10 +99,10 @@ function PlanCard({ plan, onEdit, onDuplicate, onToggleActive, onDelete }) {
   return (
     <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-lg font-semibold text-slate-900">{plan.name || "Untitled programme"}</div>
-        </div>
-        <span className={cls("rounded-full px-2 py-1 text-xs font-medium", plan.isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600")}>{plan.isActive ? "Active" : "Inactive"}</span>
+        <div className="text-lg font-semibold text-slate-900">{plan.name || "Untitled programme"}</div>
+        <span className={cls("rounded-full px-2 py-1 text-xs font-medium", plan.isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600")}>
+          {plan.isActive ? "Active" : "Inactive"}
+        </span>
       </div>
       <div className="text-xs text-slate-500">{plan.sessions?.length || 0} sessions</div>
       <div className="flex flex-wrap gap-2">
@@ -115,81 +115,235 @@ function PlanCard({ plan, onEdit, onDuplicate, onToggleActive, onDelete }) {
   );
 }
 
-function PrescriptionEditor({ exercise, onChange }) {
+function zeroIntervalPrescription() {
+  return {
+    stages: [
+      createIntervalStage({ phase: INTERVAL_PHASE.WORK, durationSeconds: 0, durationUnit: "seconds", sortOrder: 0 }),
+      createIntervalStage({ phase: INTERVAL_PHASE.REST, durationSeconds: 0, durationUnit: "seconds", sortOrder: 1 }),
+    ],
+  };
+}
+
+function ExerciseSetupEditor({ exercise, onChange }) {
   const updatePrescription = (prescription) => onChange({ ...exercise, prescription });
   const methods = loggingMethodsForExerciseType(exercise.exerciseType);
   const isLegacyCompleted = exercise.loggingMethod === EXERCISE_LOGGING_METHOD.COMPLETED;
   const selectedMethod = methods.includes(exercise.loggingMethod) ? exercise.loggingMethod : methods[0];
-  const changeLoggingMethod = (loggingMethod) => onChange({ ...exercise, loggingMethod, prescription: createDefaultPrescription(exercise.exerciseType, loggingMethod) });
-  const methodField = <Field label="Prescription method"><Select value={selectedMethod} onChange={(event) => changeLoggingMethod(event.target.value)}>{methods.map((method) => <option key={method} value={method}>{loggingMethodLabel(method)}</option>)}</Select></Field>;
-  if (isLegacyCompleted) return <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">Existing completion-only prescription. It remains available in workouts for compatibility.</div>;
-  if (exercise.exerciseType === EXERCISE_TYPE.PLYOMETRIC) return <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">Existing Plyometric exercise: {planPrescriptionSummary(exercise)}</div>;
-  if (exercise.exerciseType === EXERCISE_TYPE.STRENGTH && exercise.prescription?.blocks) return <div className="space-y-3"><div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">This existing exercise uses the earlier multi-prescription format. It remains readable below.</div>{exercise.prescription.blocks.map((item, index) => <div key={item.id || index} className="rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="font-medium">Prescription {index + 1}</div><div className="text-sm text-slate-600">{item.side === SIDE.LEFT ? "Left only" : item.side === SIDE.RIGHT ? "Right only" : "Both legs"} · {item.targetSets} × {item.targetReps?.type === REP_TARGET_TYPE.RANGE ? `${item.targetReps.min}–${item.targetReps.max}` : item.targetReps?.value}</div></div>)}</div>;
+
+  const changeLoggingMethod = (loggingMethod) => {
+    const prescription = loggingMethod === EXERCISE_LOGGING_METHOD.INTERVALS
+      ? zeroIntervalPrescription()
+      : createDefaultPrescription(exercise.exerciseType, loggingMethod);
+    onChange({ ...exercise, loggingMethod, prescription });
+  };
+
+  const methodField = (
+    <Field label="Track by">
+      <Select value={selectedMethod} onChange={(event) => changeLoggingMethod(event.target.value)}>
+        {methods.map((method) => <option key={method} value={method}>{loggingMethodLabel(method)}</option>)}
+      </Select>
+    </Field>
+  );
+
+  if (isLegacyCompleted) {
+    return <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">This existing task-based exercise remains available in workouts.</div>;
+  }
+
+  if (exercise.exerciseType === EXERCISE_TYPE.PLYOMETRIC) {
+    return <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">Existing Plyometric exercise: {planPrescriptionSummary(exercise)}</div>;
+  }
+
+  if (exercise.exerciseType === EXERCISE_TYPE.STRENGTH && exercise.prescription?.blocks) {
+    return (
+      <div className="space-y-3">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">This existing exercise uses the earlier multi-block format. It remains readable below.</div>
+        {exercise.prescription.blocks.map((item, index) => (
+          <div key={item.id || index} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="font-medium">Set-up {index + 1}</div>
+            <div className="text-sm text-slate-600">
+              {item.side === SIDE.LEFT ? "Left only" : item.side === SIDE.RIGHT ? "Right only" : "Both legs"} · {item.targetSets} × {item.targetReps?.type === REP_TARGET_TYPE.RANGE ? `${item.targetReps.min}–${item.targetReps.max}` : item.targetReps?.value}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   if ([EXERCISE_LOGGING_METHOD.REPS, EXERCISE_LOGGING_METHOD.REPS_WEIGHT].includes(selectedMethod)) {
-    return <div className="space-y-3"><div className="max-w-xs">{methodField}</div><DirectStrengthPrescription prescription={exercise.prescription || {}} onChange={updatePrescription} bothLabel={exercise.exerciseType === EXERCISE_TYPE.BALANCE ? "Both sides" : "Both legs"} /></div>;
+    return (
+      <div className="space-y-3">
+        <div className="max-w-xs">{methodField}</div>
+        <DirectStrengthPrescription
+          prescription={exercise.prescription || {}}
+          onChange={updatePrescription}
+          showNotes={false}
+          bothLabel={exercise.exerciseType === EXERCISE_TYPE.BALANCE ? "Both sides" : "Both legs"}
+        />
+      </div>
+    );
   }
 
   if (selectedMethod === EXERCISE_LOGGING_METHOD.TIME) {
     const p = exercise.prescription || {};
-    const duration = <DurationInput seconds={p.targetDurationSeconds} durationUnit={p.durationUnit} onChange={({ seconds, unit }) => updatePrescription({ ...p, targetDurationSeconds: seconds, durationUnit: unit })} />;
-    if (exercise.exerciseType === EXERCISE_TYPE.BALANCE || exercise.exerciseType === EXERCISE_TYPE.TIMED_HOLD) return <div className="space-y-3"><div className="max-w-xs">{methodField}</div><div className="grid gap-3 md:grid-cols-3"><Field label="Side"><Select value={p.side || SIDE.BOTH} onChange={(event) => updatePrescription({ ...p, side: event.target.value })}><option value={SIDE.BOTH}>Both sides</option><option value={SIDE.LEFT}>Left only</option><option value={SIDE.RIGHT}>Right only</option></Select></Field><Field label="Sets"><Input inputMode="numeric" value={p.targetSets || ""} onChange={(event) => updatePrescription({ ...p, targetSets: Number(event.target.value) })} /></Field>{duration}</div></div>;
+    const duration = (
+      <DurationInput
+        seconds={p.targetDurationSeconds}
+        durationUnit={p.durationUnit}
+        onChange={({ seconds, unit }) => updatePrescription({ ...p, targetDurationSeconds: seconds, durationUnit: unit })}
+      />
+    );
+    if (exercise.exerciseType === EXERCISE_TYPE.BALANCE || exercise.exerciseType === EXERCISE_TYPE.TIMED_HOLD) {
+      return (
+        <div className="space-y-3">
+          <div className="max-w-xs">{methodField}</div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <Field label="Side">
+              <Select value={p.side || SIDE.BOTH} onChange={(event) => updatePrescription({ ...p, side: event.target.value })}>
+                <option value={SIDE.BOTH}>Both sides</option>
+                <option value={SIDE.LEFT}>Left only</option>
+                <option value={SIDE.RIGHT}>Right only</option>
+              </Select>
+            </Field>
+            <Field label="Sets"><Input inputMode="numeric" value={p.targetSets || ""} onChange={(event) => updatePrescription({ ...p, targetSets: Number(event.target.value) })} /></Field>
+            {duration}
+          </div>
+        </div>
+      );
+    }
     return <div className="space-y-3"><div className="max-w-xs">{methodField}</div>{duration}</div>;
   }
 
   if (selectedMethod === EXERCISE_LOGGING_METHOD.DISTANCE) {
     const p = exercise.prescription || {};
-    return <div className="space-y-3"><div className="max-w-xs">{methodField}</div><Field label="Distance (km)"><Input inputMode="decimal" value={p.targetDistance ?? p.distance ?? ""} onChange={(event) => updatePrescription({ ...p, targetDistance: Number(event.target.value) })} /></Field></div>;
+    return (
+      <div className="space-y-3">
+        <div className="max-w-xs">{methodField}</div>
+        <Field label="Distance (km)"><Input inputMode="decimal" value={p.targetDistance ?? p.distance ?? ""} onChange={(event) => updatePrescription({ ...p, targetDistance: Number(event.target.value) })} /></Field>
+      </div>
+    );
   }
 
   if (selectedMethod === EXERCISE_LOGGING_METHOD.INTERVALS) {
     const p = exercise.prescription || {};
     const stages = p.stages || [];
     const updateStages = (next) => updatePrescription({ ...p, stages: next.map((stage, index) => ({ ...stage, sortOrder: index })) });
-    return <div className="space-y-3"><div className="max-w-xs">{methodField}</div>{stages.map((stage, index) => <div key={stage.id} className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="grid gap-2 md:grid-cols-[140px_1fr_1fr]"><Field label="Stage"><Select value={stage.phase} onChange={(event) => updateStages(stages.map((item, itemIndex) => itemIndex === index ? { ...item, phase: event.target.value } : item))}><option value={INTERVAL_PHASE.WORK}>Work</option><option value={INTERVAL_PHASE.REST}>Rest</option></Select></Field><DurationInput seconds={stage.durationSeconds} durationUnit={stage.durationUnit} onChange={({ seconds, unit }) => updateStages(stages.map((item, itemIndex) => itemIndex === index ? { ...item, durationSeconds: seconds, durationUnit: unit } : item))} /><Field label="Label (optional)"><Input value={stage.label || ""} onChange={(event) => updateStages(stages.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item))} /></Field></div><div className="flex gap-2"><Button size="sm" variant="outline" disabled={index === 0} onClick={() => updateStages(reorderItems(stages, index, index - 1))}>Up</Button><Button size="sm" variant="outline" disabled={index === stages.length - 1} onClick={() => updateStages(reorderItems(stages, index, index + 1))}>Down</Button><Button size="sm" variant="danger" onClick={() => updateStages(stages.filter((_, itemIndex) => itemIndex !== index))}>Remove</Button></div></div>)}<div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => updateStages([...stages, createIntervalStage({ phase: INTERVAL_PHASE.WORK, sortOrder: stages.length })])}>Add work</Button><Button variant="outline" onClick={() => updateStages([...stages, createIntervalStage({ phase: INTERVAL_PHASE.REST, sortOrder: stages.length })])}>Add rest</Button></div></div>;
+    return (
+      <div className="space-y-3">
+        <div className="max-w-xs">{methodField}</div>
+        {stages.map((stage, index) => (
+          <div key={stage.id} className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="grid gap-2 md:grid-cols-[140px_1fr_1fr]">
+              <Field label="Stage">
+                <Select value={stage.phase} onChange={(event) => updateStages(stages.map((item, itemIndex) => itemIndex === index ? { ...item, phase: event.target.value } : item))}>
+                  <option value={INTERVAL_PHASE.WORK}>Work</option>
+                  <option value={INTERVAL_PHASE.REST}>Rest</option>
+                </Select>
+              </Field>
+              <DurationInput
+                seconds={stage.durationSeconds}
+                durationUnit={stage.durationUnit}
+                onChange={({ seconds, unit }) => updateStages(stages.map((item, itemIndex) => itemIndex === index ? { ...item, durationSeconds: seconds, durationUnit: unit } : item))}
+              />
+              <Field label="Label (optional)"><Input value={stage.label || ""} onChange={(event) => updateStages(stages.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item))} /></Field>
+            </div>
+            <Button size="sm" variant="danger" onClick={() => updateStages(stages.filter((_, itemIndex) => itemIndex !== index))}>Remove</Button>
+          </div>
+        ))}
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => updateStages([...stages, createIntervalStage({ phase: INTERVAL_PHASE.WORK, durationSeconds: 0, durationUnit: "seconds", sortOrder: stages.length })])}>Add work</Button>
+          <Button variant="outline" onClick={() => updateStages([...stages, createIntervalStage({ phase: INTERVAL_PHASE.REST, durationSeconds: 0, durationUnit: "seconds", sortOrder: stages.length })])}>Add rest</Button>
+        </div>
+      </div>
+    );
   }
 
-  return <div className="text-sm text-slate-500">No configurable prescription method is available for this legacy exercise type.</div>;
+  return <div className="text-sm text-slate-500">No configurable tracking option is available for this legacy exercise type.</div>;
 }
 
 function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, saving, saveMessage }) {
   const [exerciseQuery, setExerciseQuery] = useState("");
   const [pickerSession, setPickerSession] = useState(null);
+  const [replaceTarget, setReplaceTarget] = useState(null);
   const [creatingExercise, setCreatingExercise] = useState(false);
   const [pickerMessage, setPickerMessage] = useState("");
-  const [activePrescriptionId, setActivePrescriptionId] = useState("");
+  const [activeExerciseId, setActiveExerciseId] = useState("");
   const [newExercise, setNewExercise] = useState({ name: "", exerciseType: EXERCISE_TYPE.STRENGTH });
   const [draggingExercise, setDraggingExercise] = useState(null);
+  const [draggingSession, setDraggingSession] = useState(null);
+
   const validation = validatePlan(draft);
   const filteredExercises = filterExerciseLibrary(exercises, { query: exerciseQuery });
 
   const setSessions = (sessions) => setDraft({ ...draft, sessions });
-  const updateSession = (sessionIndex, patch) => setSessions(draft.sessions.map((session, index) => (index === sessionIndex ? { ...session, ...patch } : session)));
+  const updateSession = (sessionIndex, patch) => setSessions(draft.sessions.map((session, index) => index === sessionIndex ? { ...session, ...patch } : session));
+
+  const moveSession = (fromIndex, toIndex) => {
+    if (fromIndex === toIndex) return;
+    setSessions(reorderItems(draft.sessions, fromIndex, toIndex));
+    setDraggingSession(toIndex);
+  };
+
   const moveExercise = (sessionIndex, fromIndex, toIndex) => {
     if (fromIndex === toIndex) return;
     updateSession(sessionIndex, { exercises: reorderItems(draft.sessions[sessionIndex].exercises, fromIndex, toIndex) });
     setDraggingExercise({ sessionIndex, exerciseIndex: toIndex });
   };
+
   const addSession = () => setSessions([...draft.sessions, createPlanSession({ name: "New session", sortOrder: draft.sessions.length })]);
+
   const insertSessionAfter = (sessionIndex) => {
     const session = createPlanSession({ name: "New session", sortOrder: sessionIndex + 1 });
     setSessions(insertItemAfter(draft.sessions, sessionIndex, session));
     requestAnimationFrame(() => document.getElementById(`programme-session-${session.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
 
-  function addExerciseToSession(sessionIndex, libraryExercise) {
-    const session = draft.sessions[sessionIndex];
+  function openPickerForAdd(sessionIndex) {
+    setReplaceTarget(null);
+    setPickerSession(sessionIndex);
+    setCreatingExercise(false);
+    setExerciseQuery("");
+  }
+
+  function openPickerForReplace(sessionIndex, exerciseIndex) {
+    setReplaceTarget({ sessionIndex, exerciseIndex });
+    setPickerSession(sessionIndex);
+    setCreatingExercise(false);
+    setExerciseQuery("");
+  }
+
+  function chooseExercise(sessionIndex, libraryExercise) {
     const exerciseType = libraryExercise.exerciseType || libraryExercise.trackingType || EXERCISE_TYPE.STRENGTH;
-    const planExercise = createPlanExercise({
-      exerciseId: libraryExercise.id,
-      exerciseNameSnapshot: libraryExercise.name,
-      exerciseType,
-      sortOrder: session.exercises.length,
-      prescription: createDefaultPrescription(exerciseType),
-      loggingMethod: defaultLoggingMethodForExerciseType(exerciseType),
-    });
-    updateSession(sessionIndex, { exercises: [...session.exercises, planExercise] });
-    setActivePrescriptionId(planExercise.id);
+    const session = draft.sessions[sessionIndex];
+
+    if (replaceTarget?.sessionIndex === sessionIndex) {
+      const current = session.exercises[replaceTarget.exerciseIndex];
+      const compatible = loggingMethodsForExerciseType(exerciseType).includes(current.loggingMethod);
+      const replacement = {
+        ...current,
+        exerciseId: libraryExercise.id,
+        exerciseNameSnapshot: libraryExercise.name,
+        exerciseType,
+        loggingMethod: compatible ? current.loggingMethod : defaultLoggingMethodForExerciseType(exerciseType),
+        prescription: compatible ? current.prescription : createDefaultPrescription(exerciseType),
+      };
+      updateSession(sessionIndex, {
+        exercises: session.exercises.map((item, index) => index === replaceTarget.exerciseIndex ? replacement : item),
+      });
+      setActiveExerciseId(replacement.id);
+    } else {
+      const planExercise = createPlanExercise({
+        exerciseId: libraryExercise.id,
+        exerciseNameSnapshot: libraryExercise.name,
+        exerciseType,
+        sortOrder: session.exercises.length,
+        prescription: createDefaultPrescription(exerciseType),
+        loggingMethod: defaultLoggingMethodForExerciseType(exerciseType),
+      });
+      updateSession(sessionIndex, { exercises: [...session.exercises, planExercise] });
+      setActiveExerciseId(planExercise.id);
+    }
+
+    setReplaceTarget(null);
     setExerciseQuery("");
     setPickerSession(null);
   }
@@ -200,7 +354,7 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
     try {
       const libraryExercise = createLibraryExercise(newExercise);
       await saveExerciseDefinition(db, draft.userId, libraryExercise, { updatedAtToken: token() });
-      addExerciseToSession(sessionIndex, libraryExercise);
+      chooseExercise(sessionIndex, libraryExercise);
       setNewExercise({ name: "", exerciseType: EXERCISE_TYPE.STRENGTH });
       setCreatingExercise(false);
     } catch (error) {
@@ -215,70 +369,155 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, sav
           <h2 className="text-xl font-semibold text-slate-900">{original ? "Edit programme" : "Create programme"}</h2>
           <p className="text-sm text-slate-500">Programme changes do not alter completed workouts.</p>
         </div>
-        <div className="flex gap-2"><Button variant="outline" onClick={onClose}>Close</Button><Button onClick={onSave} disabled={saving || !validation.valid}>{saving ? "Saving…" : "Save programme"}</Button></div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={onClose}>Close</Button>
+          <Button onClick={onSave} disabled={saving || !validation.valid}>{saving ? "Saving…" : "Save programme"}</Button>
+        </div>
       </div>
 
       {saveMessage ? <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{saveMessage}</div> : null}
       {!validation.valid ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">{validation.errors.slice(0, 4).join(" ")}</div> : null}
 
       <div className="grid gap-3 md:grid-cols-2">
-        <Field label="Programme name"><Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="ACL rehab programme" /></Field>
-        <Field label="Description"><Input value={draft.description || ""} onChange={(e) => setDraft({ ...draft, description: e.target.value })} placeholder="Optional" /></Field>
-        <label className="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm"><input type="checkbox" checked={draft.isActive} onChange={(e) => setDraft({ ...draft, isActive: e.target.checked })} /> Active programme</label>
+        <Field label="Programme name"><Input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="My programme" /></Field>
+        <Field label="Description"><Input value={draft.description || ""} onChange={(event) => setDraft({ ...draft, description: event.target.value })} placeholder="Optional" /></Field>
+        <label className="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm">
+          <input type="checkbox" checked={draft.isActive} onChange={(event) => setDraft({ ...draft, isActive: event.target.checked })} />
+          Active programme
+        </label>
       </div>
 
       <div className="space-y-4">
-        <div className="flex items-center justify-between"><h3 className="text-lg font-semibold">Sessions</h3><Button variant="outline" onClick={addSession}><Plus className="mr-1 h-4 w-4" /> Add session</Button></div>
-        {draft.sessions.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">No sessions yet. Add Lower A, Upper, ACL Rehab, Push, Pull, or any reusable session name.</div> : null}
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Sessions</h3>
+          <Button variant="outline" onClick={addSession}><Plus className="mr-1 h-4 w-4" /> Add session</Button>
+        </div>
+
+        {draft.sessions.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">No sessions yet. Add a reusable workout session.</div> : null}
+
         {draft.sessions.map((session, sessionIndex) => (
-          <div id={`programme-session-${session.id}`} key={session.id} className="scroll-mt-4 space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
-              <Field label="Session name"><Input value={session.name} onChange={(e) => updateSession(sessionIndex, { name: e.target.value })} /></Field>
-              <Field label="Notes"><Input value={session.notes || ""} onChange={(e) => updateSession(sessionIndex, { notes: e.target.value })} /></Field>
-              <div className="flex flex-wrap items-end gap-2">
-                <Button size="sm" variant="outline" onClick={() => setSessions(reorderItems(draft.sessions, sessionIndex, sessionIndex - 1))} disabled={sessionIndex === 0}>Up</Button>
-                <Button size="sm" variant="outline" onClick={() => setSessions(reorderItems(draft.sessions, sessionIndex, sessionIndex + 1))} disabled={sessionIndex === draft.sessions.length - 1}>Down</Button>
-                <Button size="sm" variant="outline" onClick={() => setSessions([...draft.sessions, { ...duplicatePlan({ ...draft, sessions: [session] }).sessions[0], sortOrder: draft.sessions.length }])}>Duplicate</Button>
-                <Button size="sm" variant="danger" onClick={() => window.confirm("Remove this session from the plan editor?") && setSessions(draft.sessions.filter((_, index) => index !== sessionIndex).map((item, index) => ({ ...item, sortOrder: index })))}>Remove</Button>
+          <div
+            id={`programme-session-${session.id}`}
+            key={session.id}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={() => draggingSession !== null && moveSession(draggingSession, sessionIndex)}
+            className="scroll-mt-4 space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4"
+          >
+            <div className="flex items-start gap-2">
+              <button
+                type="button"
+                draggable
+                onDragStart={() => setDraggingSession(sessionIndex)}
+                onDragEnd={() => setDraggingSession(null)}
+                className="mt-6 cursor-grab rounded p-1 text-slate-400"
+                aria-label={`Drag ${session.name || "session"}`}
+              >
+                <GripVertical className="h-5 w-5" />
+              </button>
+              <div className="grid min-w-0 flex-1 gap-3 md:grid-cols-[1fr_1fr_auto]">
+                <Field label="Session name"><Input value={session.name} onChange={(event) => updateSession(sessionIndex, { name: event.target.value })} /></Field>
+                <Field label="Notes"><Input value={session.notes || ""} onChange={(event) => updateSession(sessionIndex, { notes: event.target.value })} /></Field>
+                <div className="flex flex-wrap items-end gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setSessions([...draft.sessions, { ...duplicatePlan({ ...draft, sessions: [session] }).sessions[0], sortOrder: draft.sessions.length }])}>Duplicate</Button>
+                  <Button size="sm" variant="danger" onClick={() => window.confirm("Remove this session from the programme?") && setSessions(draft.sessions.filter((_, index) => index !== sessionIndex).map((item, index) => ({ ...item, sortOrder: index })))}>Remove</Button>
+                </div>
               </div>
             </div>
 
             <div className="space-y-3">
               {session.exercises.map((exercise, exerciseIndex) => (
-                <div key={exercise.id} onDragOver={(event) => event.preventDefault()} onDrop={() => draggingExercise?.sessionIndex === sessionIndex && moveExercise(sessionIndex, draggingExercise.exerciseIndex, exerciseIndex)} onPointerEnter={(event) => event.pointerType === "touch" && draggingExercise?.sessionIndex === sessionIndex && moveExercise(sessionIndex, draggingExercise.exerciseIndex, exerciseIndex)} className={cls("space-y-3 rounded-xl border bg-white p-3", activePrescriptionId === exercise.id ? "border-emerald-400 ring-2 ring-emerald-100" : "border-slate-200")}>
+                <div
+                  key={exercise.id}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={() => draggingExercise?.sessionIndex === sessionIndex && moveExercise(sessionIndex, draggingExercise.exerciseIndex, exerciseIndex)}
+                  className={cls("space-y-3 rounded-xl border bg-white p-3", activeExerciseId === exercise.id ? "border-emerald-400 ring-2 ring-emerald-100" : "border-slate-200")}
+                >
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-start gap-2"><button type="button" draggable onDragStart={() => setDraggingExercise({ sessionIndex, exerciseIndex })} onDragEnd={() => setDraggingExercise(null)} onPointerDown={() => setDraggingExercise({ sessionIndex, exerciseIndex })} onPointerUp={() => setDraggingExercise(null)} className="cursor-grab touch-none rounded p-1 text-slate-400" aria-label={`Drag ${exercise.exerciseNameSnapshot}`}><GripVertical className="h-5 w-5" /></button><div><div className="font-semibold">{exercise.exerciseNameSnapshot}</div><div className="text-sm text-slate-500">{planPrescriptionSummary(exercise)}</div></div></div>
+                    <div className="flex items-start gap-2">
+                      <button
+                        type="button"
+                        draggable
+                        onDragStart={() => setDraggingExercise({ sessionIndex, exerciseIndex })}
+                        onDragEnd={() => setDraggingExercise(null)}
+                        className="cursor-grab rounded p-1 text-slate-400"
+                        aria-label={`Drag ${exercise.exerciseNameSnapshot}`}
+                      >
+                        <GripVertical className="h-5 w-5" />
+                      </button>
+                      <div>
+                        <div className="font-semibold">{exercise.exerciseNameSnapshot}</div>
+                        <div className="text-sm text-slate-500">{planPrescriptionSummary(exercise)}</div>
+                      </div>
+                    </div>
                     <div className="flex flex-wrap gap-2">
-                      <Button size="sm" variant="outline" onClick={() => updateSession(sessionIndex, { exercises: reorderItems(session.exercises, exerciseIndex, exerciseIndex - 1) })} disabled={exerciseIndex === 0}>Up</Button>
-                      <Button size="sm" variant="outline" onClick={() => updateSession(sessionIndex, { exercises: reorderItems(session.exercises, exerciseIndex, exerciseIndex + 1) })} disabled={exerciseIndex === session.exercises.length - 1}>Down</Button>
+                      <Button size="sm" variant="outline" onClick={() => openPickerForReplace(sessionIndex, exerciseIndex)}>Change exercise</Button>
                       <Button size="sm" variant="outline" onClick={() => updateSession(sessionIndex, { exercises: [...session.exercises, duplicatePlanExercise(exercise, { sortOrder: session.exercises.length })] })}>Duplicate</Button>
-                      <Button size="sm" variant="danger" onClick={() => updateSession(sessionIndex, { exercises: session.exercises.filter((_, index) => index !== exerciseIndex).map((item, index) => ({ ...item, sortOrder: index })) })}><Trash2 className="mr-1 h-4 w-4" /> Remove</Button>
+                      <Button size="sm" variant="danger" onClick={() => updateSession(sessionIndex, { exercises: session.exercises.filter((_, index) => index !== exerciseIndex).map((item, index) => ({ ...item, sortOrder: index })) })}>
+                        <Trash2 className="mr-1 h-4 w-4" /> Remove
+                      </Button>
                     </div>
                   </div>
-                  <Field label="Session-specific notes"><Textarea value={exercise.notes || ""} onChange={(e) => updateSession(sessionIndex, { exercises: session.exercises.map((item, index) => (index === exerciseIndex ? { ...item, notes: e.target.value } : item)) })} /></Field>
-                  <div className="border-t border-slate-100 pt-3"><div className="mb-3"><div className="font-semibold text-slate-900">Prescription</div><p className="text-xs text-slate-500">Configure this exercise for this session.</p></div><PrescriptionEditor exercise={exercise} onChange={(next) => updateSession(sessionIndex, { exercises: session.exercises.map((item, index) => (index === exerciseIndex ? next : item)) })} /></div>
+
+                  <ExerciseSetupEditor
+                    exercise={exercise}
+                    onChange={(next) => updateSession(sessionIndex, { exercises: session.exercises.map((item, index) => index === exerciseIndex ? next : item) })}
+                  />
+
+                  <Field label="Notes">
+                    <Textarea value={exercise.notes || ""} onChange={(event) => updateSession(sessionIndex, { exercises: session.exercises.map((item, index) => index === exerciseIndex ? { ...item, notes: event.target.value } : item) })} />
+                  </Field>
                 </div>
               ))}
 
-              {pickerSession === sessionIndex ? <div className="rounded-xl border border-dashed border-slate-300 bg-white p-3">
-                <div className="mb-3 flex items-center justify-between"><strong>Exercise Picker</strong><Button size="sm" variant="outline" onClick={() => setPickerSession(null)}>Close</Button></div>
-                {pickerMessage ? <div className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{pickerMessage}</div> : null}
-                {creatingExercise ? <div className="space-y-3">
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <Field label="Exercise name"><Input autoFocus value={newExercise.name} onChange={(e) => setNewExercise({ ...newExercise, name: e.target.value })} /></Field>
-                    <Field label="Exercise type"><Select value={newExercise.exerciseType} onChange={(e) => setNewExercise({ ...newExercise, exerciseType: e.target.value })}>{LIBRARY_EXERCISE_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}</Select></Field>
+              {pickerSession === sessionIndex ? (
+                <div className="rounded-xl border border-dashed border-slate-300 bg-white p-3">
+                  <div className="mb-3 flex items-center justify-between">
+                    <strong>{replaceTarget ? "Change exercise" : "Exercise picker"}</strong>
+                    <Button size="sm" variant="outline" onClick={() => { setPickerSession(null); setReplaceTarget(null); }}>Close</Button>
                   </div>
-                  <div className="flex gap-2"><Button onClick={() => createAndAddExercise(sessionIndex)}>Save and add to session</Button><Button variant="outline" onClick={() => setCreatingExercise(false)}>Back to library</Button></div>
-                </div> : <>
-                <Field label="Search exercises"><Input autoFocus value={exerciseQuery} onChange={(e) => setExerciseQuery(e.target.value)} placeholder="Search by exercise name" /></Field>
-                <div className="mt-3 max-h-72 space-y-2 overflow-y-auto">
-                  {filteredExercises.length ? filteredExercises.map((exercise) => <div key={exercise.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3"><div className="min-w-0"><div className="truncate font-medium">{exercise.name}</div><div className="text-xs text-slate-500">{exerciseTypeLabel(exercise.exerciseType || exercise.trackingType)}</div></div><Button size="sm" onClick={() => addExerciseToSession(sessionIndex, exercise)}>Add</Button></div>) : <div className="rounded-xl bg-slate-50 p-4 text-center text-sm text-slate-500">No matching exercises.</div>}
+
+                  {pickerMessage ? <div className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{pickerMessage}</div> : null}
+
+                  {creatingExercise ? (
+                    <div className="space-y-3">
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <Field label="Exercise name"><Input autoFocus value={newExercise.name} onChange={(event) => setNewExercise({ ...newExercise, name: event.target.value })} /></Field>
+                        <Field label="Exercise type">
+                          <Select value={newExercise.exerciseType} onChange={(event) => setNewExercise({ ...newExercise, exerciseType: event.target.value })}>
+                            {LIBRARY_EXERCISE_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}
+                          </Select>
+                        </Field>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button onClick={() => createAndAddExercise(sessionIndex)}>{replaceTarget ? "Save and use exercise" : "Save and add to session"}</Button>
+                        <Button variant="outline" onClick={() => setCreatingExercise(false)}>Back to library</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <Field label="Search exercises"><Input autoFocus value={exerciseQuery} onChange={(event) => setExerciseQuery(event.target.value)} placeholder="Search by exercise name" /></Field>
+                      <div className="mt-3 max-h-72 space-y-2 overflow-y-auto">
+                        {filteredExercises.length ? filteredExercises.map((libraryExercise) => (
+                          <div key={libraryExercise.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3">
+                            <div className="min-w-0">
+                              <div className="truncate font-medium">{libraryExercise.name}</div>
+                              <div className="text-xs text-slate-500">{exerciseTypeLabel(libraryExercise.exerciseType || libraryExercise.trackingType)}</div>
+                            </div>
+                            <Button size="sm" onClick={() => chooseExercise(sessionIndex, libraryExercise)}>{replaceTarget ? "Use" : "Add"}</Button>
+                          </div>
+                        )) : <div className="rounded-xl bg-slate-50 p-4 text-center text-sm text-slate-500">No matching exercises.</div>}
+                      </div>
+                      <Button className="mt-3" variant="outline" onClick={() => setCreatingExercise(true)}><Plus className="mr-1 h-4 w-4" /> Create new exercise</Button>
+                    </>
+                  )}
                 </div>
-                <Button className="mt-3" variant="outline" onClick={() => setCreatingExercise(true)}><Plus className="mr-1 h-4 w-4" /> Create New Exercise</Button>
-                </>}
-              </div> : null}
+              ) : null}
             </div>
-            <div className="flex items-center justify-between gap-3"><Button variant="outline" onClick={() => { setPickerSession(sessionIndex); setCreatingExercise(false); }}><Plus className="mr-1 h-4 w-4" /> Add exercise</Button><Button variant="outline" onClick={() => insertSessionAfter(sessionIndex)}><Plus className="mr-1 h-4 w-4" /> Add session</Button></div>
+
+            <div className="flex items-center justify-between gap-3">
+              <Button variant="outline" onClick={() => openPickerForAdd(sessionIndex)}><Plus className="mr-1 h-4 w-4" /> Add exercise</Button>
+              <Button variant="outline" onClick={() => insertSessionAfter(sessionIndex)}><Plus className="mr-1 h-4 w-4" /> Add session</Button>
+            </div>
           </div>
         ))}
       </div>
@@ -353,11 +592,9 @@ function ExerciseLibrary({ user, exercises, onChanged }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-slate-900">Exercise library</h2>
-          <p className="text-sm text-slate-500">Define what an exercise is. Configure how to perform it inside a programme.</p>
+          <p className="text-sm text-slate-500">Define what an exercise is. Configure it inside a programme.</p>
         </div>
-        <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-          {activeCount} active{archivedCount ? ` · ${archivedCount} archived` : ""}
-        </div>
+        <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">{activeCount} active{archivedCount ? ` · ${archivedCount} archived` : ""}</div>
       </div>
 
       {message ? <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{message}</div> : null}
@@ -365,8 +602,12 @@ function ExerciseLibrary({ user, exercises, onChanged }) {
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
         <div className="mb-3 font-medium text-slate-900">Add an exercise</div>
         <div className="grid gap-3 md:grid-cols-[1fr_220px_auto]">
-          <Field label="Exercise name"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Leg extension" /></Field>
-          <Field label="Exercise type"><Select value={exerciseType} onChange={(e) => setExerciseType(e.target.value)}>{LIBRARY_EXERCISE_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}</Select></Field>
+          <Field label="Exercise name"><Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Leg extension" /></Field>
+          <Field label="Exercise type">
+            <Select value={exerciseType} onChange={(event) => setExerciseType(event.target.value)}>
+              {LIBRARY_EXERCISE_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}
+            </Select>
+          </Field>
           <div className="flex items-end"><Button onClick={saveNewExercise} disabled={saving || !name.trim()}>{saving ? "Saving…" : "Add exercise"}</Button></div>
         </div>
       </div>
@@ -376,11 +617,11 @@ function ExerciseLibrary({ user, exercises, onChanged }) {
           <Field label="Search exercises">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input className="pl-9" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name" />
+              <Input className="pl-9" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by name" />
             </div>
           </Field>
           <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
-            <input type="checkbox" checked={includeArchived} onChange={(e) => setIncludeArchived(e.target.checked)} />
+            <input type="checkbox" checked={includeArchived} onChange={(event) => setIncludeArchived(event.target.checked)} />
             Show archived
           </label>
         </div>
@@ -388,7 +629,7 @@ function ExerciseLibrary({ user, exercises, onChanged }) {
         {exercises.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center">
             <div className="font-semibold text-slate-900">No reusable exercises yet</div>
-            <p className="mt-1 text-sm text-slate-500">Add your common gym, rehab and mobility exercises here so plan building feels quick later.</p>
+            <p className="mt-1 text-sm text-slate-500">Add your common gym, rehab and mobility exercises here.</p>
           </div>
         ) : visibleExercises.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-center text-sm text-slate-500">No exercises match your search.</div>
@@ -397,11 +638,32 @@ function ExerciseLibrary({ user, exercises, onChanged }) {
             {visibleExercises.map((exercise) => (
               <div key={exercise.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3">
                 <div className="min-w-0">
-                  {editingExercise?.id === exercise.id ? <div className="grid gap-2 md:grid-cols-2"><Input value={editingExercise.name} onChange={(event) => setEditingExercise({ ...editingExercise, name: event.target.value })} /><Select value={editingExercise.exerciseType || editingExercise.trackingType} onChange={(event) => setEditingExercise({ ...editingExercise, exerciseType: event.target.value })}>{!LIBRARY_EXERCISE_TYPE_OPTIONS.includes(editingExercise.exerciseType) ? <option value={editingExercise.exerciseType}>{exerciseTypeLabel(editingExercise.exerciseType)} (existing)</option> : null}{LIBRARY_EXERCISE_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}</Select></div> : <><div className="truncate font-medium text-slate-900">{exercise.name}</div><div className="text-xs text-slate-500">{exerciseTypeLabel(exercise.exerciseType || exercise.trackingType)}</div></>}
+                  {editingExercise?.id === exercise.id ? (
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <Input value={editingExercise.name} onChange={(event) => setEditingExercise({ ...editingExercise, name: event.target.value })} />
+                      <Select value={editingExercise.exerciseType || editingExercise.trackingType} onChange={(event) => setEditingExercise({ ...editingExercise, exerciseType: event.target.value })}>
+                        {!LIBRARY_EXERCISE_TYPE_OPTIONS.includes(editingExercise.exerciseType) ? <option value={editingExercise.exerciseType}>{exerciseTypeLabel(editingExercise.exerciseType)} (existing)</option> : null}
+                        {LIBRARY_EXERCISE_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}
+                      </Select>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="truncate font-medium text-slate-900">{exercise.name}</div>
+                      <div className="text-xs text-slate-500">{exerciseTypeLabel(exercise.exerciseType || exercise.trackingType)}</div>
+                    </>
+                  )}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   {exercise.isArchived ? <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-500">Archived</span> : null}
-                  {editingExercise?.id === exercise.id ? <><Button size="sm" onClick={saveEditedExercise}>Save</Button><Button size="sm" variant="outline" onClick={() => setEditingExercise(null)}>Cancel</Button><Button size="sm" variant="danger" onClick={() => setDeleteCandidate(exercise)}>Delete exercise</Button></> : <Button size="sm" variant="outline" onClick={() => setEditingExercise({ ...exercise, exerciseType: exercise.exerciseType || exercise.trackingType || EXERCISE_TYPE.STRENGTH })}>Edit</Button>}
+                  {editingExercise?.id === exercise.id ? (
+                    <>
+                      <Button size="sm" onClick={saveEditedExercise}>Save</Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditingExercise(null)}>Cancel</Button>
+                      <Button size="sm" variant="danger" onClick={() => setDeleteCandidate(exercise)}>Delete exercise</Button>
+                    </>
+                  ) : (
+                    <Button size="sm" variant="outline" onClick={() => setEditingExercise({ ...exercise, exerciseType: exercise.exerciseType || exercise.trackingType || EXERCISE_TYPE.STRENGTH })}>Edit</Button>
+                  )}
                   <Button size="sm" variant="outline" onClick={() => toggleArchive(exercise)}>{exercise.isArchived ? "Restore" : "Archive"}</Button>
                 </div>
               </div>
@@ -409,7 +671,19 @@ function ExerciseLibrary({ user, exercises, onChanged }) {
           </div>
         )}
       </div>
-      {deleteCandidate ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"><div role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl"><h3 className="text-lg font-semibold">Delete {deleteCandidate.name} permanently?</h3><p className="mt-2 text-sm text-slate-600">It will be removed from your Exercise Library and cannot be added to new programme sessions. Existing programme and workout records will not be rewritten.</p><div className="mt-5 flex justify-end gap-2"><Button variant="outline" onClick={() => setDeleteCandidate(null)}>Cancel</Button><Button variant="danger" onClick={deleteExercise}>Delete permanently</Button></div></div></div> : null}
+
+      {deleteCandidate ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+            <h3 className="text-lg font-semibold">Delete {deleteCandidate.name} permanently?</h3>
+            <p className="mt-2 text-sm text-slate-600">It will be removed from your Exercise Library. Existing programme and workout records will not be rewritten.</p>
+            <div className="mt-5 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDeleteCandidate(null)}>Cancel</Button>
+              <Button variant="danger" onClick={deleteExercise}>Delete permanently</Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -433,12 +707,22 @@ export default function PlansScreen({ user, view = "programme" }) {
     if (!user?.uid) return undefined;
     setExercisesLoading(true);
     setExercisesError("");
-    const unsubExercises = subscribeExerciseDefinitions(db, user.uid, (next) => { setExercises(next); setExercisesLoading(false); }, (err) => { setExercisesError(friendlyErrorMessage(err, "We could not load your exercise library. Please try again.", "exercise library")); setExercisesLoading(false); });
+    const unsubExercises = subscribeExerciseDefinitions(
+      db,
+      user.uid,
+      (next) => { setExercises(next); setExercisesLoading(false); },
+      (error) => { setExercisesError(friendlyErrorMessage(error, "We could not load your exercise library. Please try again.", "exercise library")); setExercisesLoading(false); },
+    );
     if (view === "exercises") return unsubExercises;
 
     setPlansLoading(true);
     setPlansError("");
-    const unsubPlans = subscribePlans(db, user.uid, (next) => { setPlans(next); setPlansLoading(false); }, (err) => { setPlansError(friendlyErrorMessage(err, "We could not load your programmes. Please try again.", "programmes")); setPlansLoading(false); });
+    const unsubPlans = subscribePlans(
+      db,
+      user.uid,
+      (next) => { setPlans(next); setPlansLoading(false); },
+      (error) => { setPlansError(friendlyErrorMessage(error, "We could not load your programmes. Please try again.", "programmes")); setPlansLoading(false); },
+    );
     return () => { unsubPlans(); unsubExercises(); };
   }, [user?.uid, view]);
 
@@ -460,8 +744,8 @@ export default function PlansScreen({ user, view = "programme" }) {
   }
 
   function closeEditor() {
-    if (draft && original && JSON.stringify(draft) !== JSON.stringify(original) && !window.confirm("Discard unsaved plan changes?")) return;
-    if (draft && !original && !window.confirm("Discard this new unsaved plan?")) return;
+    if (draft && original && JSON.stringify(draft) !== JSON.stringify(original) && !window.confirm("Discard unsaved programme changes?")) return;
+    if (draft && !original && !window.confirm("Discard this new unsaved programme?")) return;
     setDraft(null);
     setOriginal(null);
     setSaveMessage("");
@@ -470,7 +754,10 @@ export default function PlansScreen({ user, view = "programme" }) {
   async function saveDraft() {
     if (!draft || saving) return;
     const validation = validatePlan(draft);
-    if (!validation.valid) { setSaveMessage(validation.errors.join(" ")); return; }
+    if (!validation.valid) {
+      setSaveMessage(validation.errors.join(" "));
+      return;
+    }
     setSaving(true);
     setSaveMessage("");
     try {
@@ -485,8 +772,8 @@ export default function PlansScreen({ user, view = "programme" }) {
       setLoadedToken("");
       setSaveMessage("");
       setProgrammeNotice("Programme saved.");
-    } catch (err) {
-      setSaveMessage(friendlyErrorMessage(err, "We could not save this plan. Please try again."));
+    } catch (error) {
+      setSaveMessage(friendlyErrorMessage(error, "We could not save this programme. Please try again."));
     } finally {
       setSaving(false);
     }
@@ -497,15 +784,19 @@ export default function PlansScreen({ user, view = "programme" }) {
     setSaving(true);
     try {
       await duplicatePlanDocument(db, user.uid, plan, { newPlanId: `plan-${makeId()}`, updatedAtToken: token() });
-    } catch (err) {
-      setPlansError(friendlyErrorMessage(err, "We could not duplicate that programme. Please try again.", "programmes"));
+    } catch (error) {
+      setPlansError(friendlyErrorMessage(error, "We could not duplicate that programme. Please try again.", "programmes"));
     } finally {
       setSaving(false);
     }
   }
 
   async function handleToggleActive(plan) {
-    try { await setPlanActive(db, user.uid, plan, !plan.isActive, { updatedAtToken: token() }); } catch (err) { setPlansError(friendlyErrorMessage(err, "We could not update that programme. Please try again.", "programmes")); }
+    try {
+      await setPlanActive(db, user.uid, plan, !plan.isActive, { updatedAtToken: token() });
+    } catch (error) {
+      setPlansError(friendlyErrorMessage(error, "We could not update that programme. Please try again.", "programmes"));
+    }
   }
 
   async function handleDeleteProgramme() {
@@ -515,35 +806,71 @@ export default function PlansScreen({ user, view = "programme" }) {
       setPlans((current) => current.filter((plan) => plan.id !== deleteProgrammeCandidate.id));
       setDeleteProgrammeCandidate(null);
       setProgrammeNotice("Programme permanently deleted. Completed workouts were not changed.");
-    } catch (err) {
-      setPlansError(friendlyErrorMessage(err, "We could not delete that programme. Please try again.", "programmes"));
+    } catch (error) {
+      setPlansError(friendlyErrorMessage(error, "We could not delete that programme. Please try again.", "programmes"));
     }
   }
 
   const renderSection = (title, items, empty) => (
     <section className="space-y-3">
       <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-      {items.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">{empty}</div> : <div className="grid gap-3 lg:grid-cols-2">{items.map((plan) => <PlanCard key={plan.id} plan={plan} onEdit={openPlan} onDuplicate={handleDuplicate} onToggleActive={handleToggleActive} onDelete={setDeleteProgrammeCandidate} />)}</div>}
+      {items.length === 0
+        ? <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">{empty}</div>
+        : <div className="grid gap-3 lg:grid-cols-2">{items.map((plan) => <PlanCard key={plan.id} plan={plan} onEdit={openPlan} onDuplicate={handleDuplicate} onToggleActive={handleToggleActive} onDelete={setDeleteProgrammeCandidate} />)}</div>}
     </section>
   );
 
   return (
     <div className="space-y-6">
-      {view === "exercises" ? <><div><h1 className="text-2xl font-semibold tracking-tight">Manage Exercises</h1><p className="text-sm text-slate-500">Create, search, archive and restore your reusable exercise library.</p></div>{exercisesError ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{exercisesError}</div> : null}{exercisesLoading ? <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-500">Loading exercise library…</div> : <ExerciseLibrary user={user} exercises={exercises} />}</> : <>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><h1 className="text-2xl font-semibold tracking-tight">Programme</h1><p className="text-sm text-slate-500">Build reusable, named sessions and train them in any order.</p></div>
-        <Button onClick={openNewPlan}><Plus className="mr-1 h-4 w-4" /> Create programme</Button>
-      </div>
-      {programmeNotice ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{programmeNotice}</div> : null}
-      {plansError ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{plansError}</div> : null}
-      {exercisesError ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">The exercise library could not be loaded. Programme exercises already saved remain editable.</div> : null}
-      {plansLoading ? <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-500">Loading programmes…</div> : null}
-      {!plansLoading && plans.length === 0 ? <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center"><div className="font-semibold text-slate-900">No programmes yet</div><p className="mt-1 text-sm text-slate-500">Create your first programme and give each workout session a useful name.</p><Button className="mt-4" onClick={openNewPlan}>Create first programme</Button></div> : null}
-      {draft ? <PlanEditor draft={draft} setDraft={setDraft} original={original} exercises={exercises} onSave={saveDraft} onClose={closeEditor} saving={saving} saveMessage={saveMessage} /> : null}
-      {renderSection("Active", activePlans, "Activate any plan when you are ready to use it regularly.")}
-      {renderSection("Inactive", inactivePlans, "Programmes you deactivate will remain here and can be activated later.")}
-      {deleteProgrammeCandidate ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"><div role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl"><h3 className="text-lg font-semibold">Delete "{deleteProgrammeCandidate.name}" permanently?</h3><p className="mt-2 text-sm text-slate-600">This programme will be removed permanently. Completed workouts will remain untouched.</p><div className="mt-5 flex justify-end gap-2"><Button variant="outline" onClick={() => setDeleteProgrammeCandidate(null)}>Cancel</Button><Button variant="danger" onClick={handleDeleteProgramme}>Delete permanently</Button></div></div></div> : null}
-      </>}
+      {view === "exercises" ? (
+        <>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Manage Exercises</h1>
+            <p className="text-sm text-slate-500">Create, search, archive and restore your reusable exercise library.</p>
+          </div>
+          {exercisesError ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{exercisesError}</div> : null}
+          {exercisesLoading ? <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-500">Loading exercise library…</div> : <ExerciseLibrary user={user} exercises={exercises} />}
+        </>
+      ) : (
+        <>
+          <div className="space-y-3">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">Programme</h1>
+              <p className="text-sm text-slate-500">Build reusable, named sessions and train them in any order.</p>
+            </div>
+            <Button className="w-fit" onClick={openNewPlan}><Plus className="mr-1 h-4 w-4" /> Create programme</Button>
+          </div>
+
+          {programmeNotice ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{programmeNotice}</div> : null}
+          {plansError ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{plansError}</div> : null}
+          {exercisesError ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">The exercise library could not be loaded. Programme exercises already saved remain editable.</div> : null}
+          {plansLoading ? <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-500">Loading programmes…</div> : null}
+          {!plansLoading && plans.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center">
+              <div className="font-semibold text-slate-900">No programmes yet</div>
+              <p className="mt-1 text-sm text-slate-500">Create your first programme and give each workout session a useful name.</p>
+              <Button className="mt-4" onClick={openNewPlan}>Create first programme</Button>
+            </div>
+          ) : null}
+
+          {draft ? <PlanEditor draft={draft} setDraft={setDraft} original={original} exercises={exercises} onSave={saveDraft} onClose={closeEditor} saving={saving} saveMessage={saveMessage} /> : null}
+          {renderSection("Active", activePlans, "Activate any programme when you are ready to use it regularly.")}
+          {renderSection("Inactive", inactivePlans, "Programmes you deactivate will remain here and can be activated later.")}
+
+          {deleteProgrammeCandidate ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+              <div role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+                <h3 className="text-lg font-semibold">Delete "{deleteProgrammeCandidate.name}" permanently?</h3>
+                <p className="mt-2 text-sm text-slate-600">This programme will be removed permanently. Completed workouts will remain untouched.</p>
+                <div className="mt-5 flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setDeleteProgrammeCandidate(null)}>Cancel</Button>
+                  <Button variant="danger" onClick={handleDeleteProgramme}>Delete permanently</Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }

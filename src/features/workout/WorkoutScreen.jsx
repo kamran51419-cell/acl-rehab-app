@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, ChevronUp, Dumbbell, GripVertical } from "lucide-react";
+import { Check, ChevronRight, ChevronUp, ChevronDown, Dumbbell, GripVertical } from "lucide-react";
 import { db } from "../../firebase";
 import { todayString } from "../../lib/domain/date";
 import { durationLabel, previousWeightsForExercise, sessionWorkoutStatus, workoutExerciseSideLabel, workoutItem } from "../../lib/domain/workoutDisplay";
@@ -26,14 +26,21 @@ function repsLabel(target = {}) {
   return target.type === "range" ? `${target.min}–${target.max} reps` : `${target.value || "?"} reps`;
 }
 
-function ExerciseCard({ exercise, onToggle, onWeight, draggableProps, index, total, onNudge }) {
+function ExerciseCard({ exercise, onToggle, onWeight, index, total, onNudge, drag }) {
   const item = workoutItem(exercise);
   const weighted = Array.isArray(exercise.recordedSets) && exercise.recordedSets.length > 0;
   const stages = (exercise.prescription?.stages || []).slice().sort((a, b) => a.sortOrder - b.sortOrder);
   const complete = weighted ? isWeightedExerciseComplete(exercise) : Boolean(exercise.completed);
 
   return (
-    <section {...draggableProps} className={`rounded-2xl border border-slate-200 bg-white p-4 ${draggableProps.className || ""}`}>
+    <section
+      draggable
+      onDragStart={drag.onStart}
+      onDragEnd={drag.onEnd}
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={drag.onDrop}
+      className={`rounded-2xl border bg-white p-4 transition ${complete ? "border-emerald-300 ring-1 ring-emerald-100" : "border-slate-200"} ${drag.active ? "opacity-50" : ""}`}
+    >
       <div className="flex items-start gap-3">
         <GripVertical className="mt-0.5 h-5 w-5 shrink-0 cursor-grab text-slate-400" />
         {!weighted ? <input className="mt-1" type="checkbox" checked={Boolean(exercise.completed)} onChange={() => onToggle(exercise.id)} /> : null}
@@ -44,15 +51,14 @@ function ExerciseCard({ exercise, onToggle, onWeight, draggableProps, index, tot
               <ExerciseGuidance exercise={exercise} />
               {item.summary ? <div className="text-sm text-slate-500">{item.summary}</div> : null}
             </div>
-            {complete ? <span className="shrink-0 text-xs font-medium text-emerald-700">Complete</span> : null}
+            {complete ? <Check aria-label="Exercise complete" className="h-5 w-5 shrink-0 text-emerald-600" /> : null}
           </div>
 
           {weighted ? <div className="mt-3 space-y-1.5">{exercise.recordedSets.map((set) => <label key={set.id} className="grid grid-cols-[auto_1fr_minmax(80px,120px)_auto] items-center gap-2 text-sm"><span className="font-medium">Set {set.setNumber}:</span><span className="text-slate-600">{repsLabel(set.prescribedReps)}</span><input aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} weight`} className="h-9 rounded-lg border border-slate-200 px-2" inputMode="decimal" value={set.rawWeight ?? set.weight ?? ""} onFocus={(event) => event.currentTarget.select()} onChange={(event) => onWeight(exercise.id, set.id, event.target.value)} /><span className="text-slate-500">kg</span></label>)}</div> : null}
-
           {stages.length ? <div className="mt-3 space-y-1 text-sm text-slate-600">{stages.map((stage) => <div key={stage.id}>{stage.phase === "rest" ? "Rest" : "Work"} · {durationLabel(stage.durationSeconds, stage.durationUnit)}{stage.label ? ` · ${stage.label}` : ""}</div>)}</div> : null}
         </div>
 
-        <div className="flex shrink-0 gap-1">
+        <div className="flex shrink-0 gap-1 opacity-60 hover:opacity-100">
           <button type="button" aria-label={`Move ${exercise.exerciseNameSnapshot} up`} disabled={index === 0} onClick={() => onNudge(index, -1)} className="rounded-lg border border-slate-200 p-1.5 disabled:opacity-30"><ChevronUp className="h-4 w-4" /></button>
           <button type="button" aria-label={`Move ${exercise.exerciseNameSnapshot} down`} disabled={index === total - 1} onClick={() => onNudge(index, 1)} className="rounded-lg border border-slate-200 p-1.5 disabled:opacity-30"><ChevronDown className="h-4 w-4" /></button>
         </div>
@@ -64,12 +70,8 @@ function ExerciseCard({ exercise, onToggle, onWeight, draggableProps, index, tot
 export function WorkoutForm({ workout, saveStatus = "", leaving = false, finishing = false, finishError = "", onBack, onToggle, onWeight, onDate, onNotes, onFinish, onDiscard, onReorder }) {
   const [draggedId, setDraggedId] = useState(null);
   const ordered = (workout.exercises || []).slice().sort((a, b) => a.sortOrder - b.sortOrder);
-
-  function applyOrder(next) {
-    onReorder(next.map((exercise, index) => ({ ...exercise, sortOrder: index })));
-  }
-
-  function move(fromId, toId) {
+  const applyOrder = (next) => onReorder(next.map((exercise, index) => ({ ...exercise, sortOrder: index })));
+  const move = (fromId, toId) => {
     if (!fromId || fromId === toId) return;
     const next = ordered.slice();
     const from = next.findIndex((item) => item.id === fromId);
@@ -78,17 +80,16 @@ export function WorkoutForm({ workout, saveStatus = "", leaving = false, finishi
     const [item] = next.splice(from, 1);
     next.splice(to, 0, item);
     applyOrder(next);
-  }
-
-  function nudge(index, direction) {
+  };
+  const nudge = (index, direction) => {
     const target = index + direction;
     if (target < 0 || target >= ordered.length) return;
     const next = ordered.slice();
     [next[index], next[target]] = [next[target], next[index]];
     applyOrder(next);
-  }
+  };
 
-  return <div className="space-y-5"><button disabled={leaving || finishing} className="text-sm font-medium text-slate-600 disabled:opacity-50" onClick={onBack}>{leaving ? "Saving..." : "← All sessions"}</button><div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><div className="flex items-center justify-between gap-3"><div><div className="text-sm font-medium text-emerald-700">Workout in progress</div><h1 className="mt-1 text-2xl font-semibold">{workout.sessionNameSnapshot}</h1></div><span className={`text-xs ${saveStatus === "error" ? "text-red-600" : "text-slate-500"}`}>{saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved" : saveStatus === "error" ? "Could not save" : ""}</span></div><div className="mt-4 grid gap-3 md:grid-cols-2"><label className="text-sm font-medium text-slate-700">Workout date<input type="date" className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3" value={workout.date} onChange={(event) => onDate(event.target.value)} /></label><label className="text-sm font-medium text-slate-700">Workout notes<input className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3" value={workout.notes || ""} onChange={(event) => onNotes(event.target.value)} /></label></div><p className="mt-5 text-xs text-slate-500">Drag the exercise cards into your preferred order. The arrows also work on mobile.</p><div className="mt-3 space-y-3">{ordered.map((exercise, index) => <ExerciseCard key={exercise.id} exercise={exercise} onToggle={onToggle} onWeight={onWeight} index={index} total={ordered.length} onNudge={nudge} draggableProps={{ draggable: true, onDragStart: () => setDraggedId(exercise.id), onDragEnd: () => setDraggedId(null), onDragOver: (event) => event.preventDefault(), onDrop: () => { move(draggedId, exercise.id); setDraggedId(null); }, className: draggedId === exercise.id ? "opacity-50" : "" }} />)}</div>{finishError ? <p className="mt-4 text-sm font-medium text-red-600">{finishError}</p> : null}<div className="mt-6 flex flex-wrap gap-2"><Button disabled={finishing} onClick={onFinish}>{finishing ? "Finishing…" : "Finish workout"}</Button>{onDiscard ? <Button variant="danger" disabled={finishing} onClick={onDiscard}>Discard Workout</Button> : null}</div></div></div>;
+  return <div className="space-y-5"><button disabled={leaving || finishing} className="text-sm font-medium text-slate-600 disabled:opacity-50" onClick={onBack}>{leaving ? "Saving..." : "← All sessions"}</button><div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><div className="flex items-center justify-between gap-3"><div><div className="text-sm font-medium text-emerald-700">Workout in progress</div><h1 className="mt-1 text-2xl font-semibold">{workout.sessionNameSnapshot}</h1></div><span className={`text-xs ${saveStatus === "error" ? "text-red-600" : "text-slate-500"}`}>{saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved" : saveStatus === "error" ? "Could not save" : ""}</span></div><div className="mt-4 grid gap-3 md:grid-cols-2"><label className="text-sm font-medium text-slate-700">Workout date<input type="date" className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3" value={workout.date} onChange={(event) => onDate(event.target.value)} /></label><label className="text-sm font-medium text-slate-700">Workout notes<input className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3" value={workout.notes || ""} onChange={(event) => onNotes(event.target.value)} /></label></div><div className="mt-5 space-y-3">{ordered.map((exercise, index) => <ExerciseCard key={exercise.id} exercise={exercise} onToggle={onToggle} onWeight={onWeight} index={index} total={ordered.length} onNudge={nudge} drag={{ active: draggedId === exercise.id, onStart: () => setDraggedId(exercise.id), onEnd: () => setDraggedId(null), onDrop: () => { move(draggedId, exercise.id); setDraggedId(null); } }} />)}</div>{finishError ? <p className="mt-4 text-sm font-medium text-red-600">{finishError}</p> : null}<div className="mt-6 flex flex-wrap gap-2"><Button disabled={finishing} onClick={onFinish}>{finishing ? "Finishing…" : "Finish workout"}</Button>{onDiscard ? <Button variant="danger" disabled={finishing} onClick={onDiscard}>Discard Workout</Button> : null}</div></div></div>;
 }
 
 export function DiscardWorkoutDialog({ discarding, error, onCancel, onConfirm }) { return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"><div role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl bg-white p-5"><h2 className="text-lg font-semibold">Discard Workout?</h2><p className="mt-2 text-sm text-slate-600">This will permanently delete this unfinished workout and its recorded data. Completed workouts will not be affected.</p>{error ? <p className="mt-3 text-sm font-medium text-red-600">{error}</p> : null}<div className="mt-5 flex justify-end gap-2"><Button variant="outline" disabled={discarding} onClick={onCancel}>Cancel</Button><Button variant="danger" disabled={discarding} onClick={onConfirm}>{discarding ? "Discarding…" : "Discard Workout"}</Button></div></div></div>; }

@@ -22,9 +22,12 @@ function workoutCacheKey(uid, workoutId) {
 }
 
 export function mergeWorkoutSnapshots(uid, remote) {
-  const visible = remote.filter((workout) => !deletedWorkoutIds.has(workoutCacheKey(uid, workout.id))).map((workout) => recentWorkoutSnapshots.get(workoutCacheKey(uid, workout.id)) || workout);
+  const visible = remote.filter((workout) => !deletedWorkoutIds.has(workoutCacheKey(uid, workout.id))).map((workout) => {
+    const recent = recentWorkoutSnapshots.get(workoutCacheKey(uid, workout.id));
+    return workout.status === "in_progress" && recent?.status === "in_progress" ? recent : workout;
+  });
   const remoteIds = new Set(remote.map((workout) => workout.id));
-  const recent = [...recentWorkoutSnapshots.entries()].filter(([key]) => key.startsWith(`${uid}:`)).map(([, workout]) => workout).filter((workout) => !remoteIds.has(workout.id));
+  const recent = [...recentWorkoutSnapshots.entries()].filter(([key]) => key.startsWith(`${uid}:`)).map(([, workout]) => workout).filter((workout) => workout.status === "in_progress" && !remoteIds.has(workout.id));
   return visible.concat(recent);
 }
 
@@ -235,7 +238,7 @@ export async function updateInProgressWorkoutDocument(db, uid, workout, { run = 
   return written;
 }
 
-export async function finishWorkoutDocument(db, uid, workout, { timestamp = serverTimestamp(), completedAtValue = new Date().toISOString(), run = runTransaction, referenceFactory = workoutRef } = {}) {
+export async function finishWorkoutDocument(db, uid, workout, { timestamp = serverTimestamp(), completedAtValue = new Date().toISOString(), run = runTransaction, referenceFactory = workoutRef, readDocument = getDoc } = {}) {
   const ref = referenceFactory(db, uid, workout.id);
   const persisted = stripUndefined({
     ...workout,
@@ -256,8 +259,11 @@ export async function finishWorkoutDocument(db, uid, workout, { timestamp = serv
     if (snapshot.exists() && (snapshot.data()?.status === "completed" || snapshot.data()?.completed === true)) return;
     transaction.set(ref, persisted, { merge: true });
   });
-  const completed = { ...persisted, completedAt: completedAtValue, updatedAt: completedAtValue };
-  recentWorkoutSnapshots.set(workoutCacheKey(uid, workout.id), completed);
+  const verifiedSnapshot = await readDocument(ref);
+  if (!verifiedSnapshot.exists() || (verifiedSnapshot.data()?.status !== "completed" && verifiedSnapshot.data()?.completed !== true)) throw new Error("Completed workout could not be verified after saving.");
+  const verified = verifiedSnapshot.data();
+  const completed = { ...persisted, ...verified, completedAt: verified.completedAt || completedAtValue, updatedAt: verified.updatedAt || completedAtValue };
+  recentWorkoutSnapshots.delete(workoutCacheKey(uid, workout.id));
   return completed;
 }
 

@@ -17,7 +17,7 @@ test("completed workout history is ordered and renders snapshot details", async 
       id: "press", exerciseId: "leg-press", exerciseNameSnapshot: "Leg Press", exerciseType: "strength",
       loggingMethod: "reps_weight", sideSnapshot: "left", programmeNoteSnapshot: "Slow lowering", completed: true,
       prescription: { targetSets: 1, targetReps: { type: "fixed", value: 10 } },
-      recordedSets: [{ id: "set", setNumber: 1, weight: 85 }],
+      recordedSets: [{ id: "set", setNumber: 1, prescribedReps: { type: "fixed", value: 10 }, weight: 85 }],
     }],
   };
   assert.deepEqual(completedWorkoutHistory([{ id: "draft", status: "in_progress" }, older, latest]).map((workout) => workout.id), ["latest", "older"]);
@@ -28,7 +28,9 @@ test("completed workout history is ordered and renders snapshot details", async 
   assert.match(markup, /Left only/);
   assert.match(markup, /Slow lowering/);
   assert.match(markup, /85 kg/);
+  assert.match(markup, /10 reps/);
   assert.match(markup, /Felt strong/);
+  assert.match(markup, /Completed/);
 });
 
 test("workout deletion confirmation and error states render safely", async (context) => {
@@ -40,6 +42,7 @@ test("workout deletion confirmation and error states render safely", async (cont
   assert.match(confirm, /Delete workout\?/);
   assert.match(confirm, /permanently remove/);
   assert.match(confirm, /Cancel/);
+  assert.match(confirm, /Delete Workout/);
   const deleting = renderToStaticMarkup(React.createElement(WorkoutHistoryView, { workouts: [workout], selectedId: "one", deletingId: "pending", onSelect() {}, onRequestDelete() {}, onCancelDelete() {}, onConfirmDelete() {} }));
   assert.match(deleting, /Deleting…/);
   const failed = renderToStaticMarkup(React.createElement(WorkoutHistoryView, { workouts: [workout], selectedId: "one", deleteError: "Could not delete workout", onSelect() {}, onRequestDelete() {}, onCancelDelete() {}, onConfirmDelete() {} }));

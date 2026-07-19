@@ -298,7 +298,8 @@ test("finishing caches a completed snapshot and stale subscriptions cannot resto
   let written;
   const draft = { id: "workout", status: "in_progress", date: "2026-07-18", notes: "latest", exercises: [{ id: "press", completed: true, recordedSets: [{ id: "set-1", weight: 82.5 }] }] };
   const run = async (_db, operation) => operation({ get: async () => ({ exists: () => false }), set: (ref, data) => { written = { ref, data }; } });
-  const completed = await finishWorkoutDocument({}, "uid", draft, { timestamp: "server-time", completedAtValue: "client-time", referenceFactory: () => "workout-ref", run });
+  const readDocument = async () => ({ exists: () => true, data: () => written.data });
+  const completed = await finishWorkoutDocument({}, "uid", draft, { timestamp: "server-time", completedAtValue: "client-time", referenceFactory: () => "workout-ref", run, readDocument });
   assert.equal(written.ref, "workout-ref");
   assert.equal(written.data.status, "completed");
   assert.equal(written.data.completed, true);
@@ -308,12 +309,18 @@ test("finishing caches a completed snapshot and stale subscriptions cannot resto
   assert.equal(written.data.notes, "latest");
   assert.equal(written.data.exercises[0].recordedSets[0].weight, 82.5);
   assert.equal(completed.status, "completed");
-  assert.equal(completed.completedAt, "client-time");
-  assert.equal(mergeWorkoutSnapshots("uid", [{ ...draft }])[0].status, "completed");
+  assert.equal(completed.completedAt, "server-time");
   planRepoTestables.resetWorkoutCache();
   const remounted = mergeWorkoutSnapshots("uid", [{ ...written.data, id: draft.id }]);
   assert.equal(remounted[0].status, "completed");
   assert.deepEqual(completedWorkoutHistory(remounted).map((workout) => workout.id), [draft.id]);
+});
+
+test("completion does not use an optimistic history record when backend verification fails", async () => {
+  planRepoTestables.resetWorkoutCache();
+  const run = async (_db, operation) => operation({ get: async () => ({ exists: () => false }), set() {} });
+  await assert.rejects(finishWorkoutDocument({}, "uid", { id: "workout", date: "2026-07-18", status: "in_progress" }, { run, referenceFactory: () => "ref", readDocument: async () => ({ exists: () => false }) }), /could not be verified/);
+  assert.deepEqual(completedWorkoutHistory(mergeWorkoutSnapshots("uid", [])), []);
 });
 
 test("late autosaves cannot overwrite a completed workout", async () => {

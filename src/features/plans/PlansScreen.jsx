@@ -571,7 +571,7 @@ export function ExerciseLibrary({ user, exercises, onChanged }) {
         </div>
       </div>
 
-      <div className="space-y-3">
+      <div className="h-[45vh] min-h-64 space-y-3 overflow-y-auto pr-1 md:h-[32rem]">
         {exercises.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center">
             <div className="font-semibold text-slate-900">No reusable exercises yet</div>
@@ -585,7 +585,7 @@ export function ExerciseLibrary({ user, exercises, onChanged }) {
               <div key={exercise.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
                 <div className="min-w-0">
                   <div className="truncate text-sm font-medium text-slate-900">{exercise.name}</div>
-                  <div className="truncate text-xs text-slate-500">{exerciseTypeLabel(exercise.exerciseType || exercise.trackingType)} • {loggingMethodLabel(defaultLoggingMethodForExerciseType(exercise.exerciseType || exercise.trackingType))}</div>
+                  <div className="truncate text-xs text-slate-500">{exerciseTypeLabel(exercise.exerciseType || exercise.trackingType)}</div>
                 </div>
                 <Button className="shrink-0 px-3 py-1.5" size="sm" variant="outline" onClick={() => setEditingExercise({ ...exercise, exerciseType: exercise.exerciseType || exercise.trackingType || EXERCISE_TYPE.STRENGTH })}>Edit</Button>
               </div>
@@ -601,6 +601,7 @@ export function ExerciseLibrary({ user, exercises, onChanged }) {
             <div className="mt-4 space-y-4">
               <Field label="Exercise name"><Input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="Leg extension" /></Field>
               <Field label="Exercise type"><Select value={exerciseType} onChange={(event) => setExerciseType(event.target.value)}>{LIBRARY_EXERCISE_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}</Select></Field>
+              <Field label="Recording method"><Input value={loggingMethodLabel(defaultLoggingMethodForExerciseType(exerciseType))} disabled /></Field>
             </div>
             <div className="mt-6 flex justify-end gap-2">
               <Button variant="outline" disabled={saving} onClick={() => { setAddingExercise(false); setName(""); setExerciseType(EXERCISE_TYPE.STRENGTH); }}>Cancel</Button>

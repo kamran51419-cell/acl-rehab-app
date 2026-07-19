@@ -29,7 +29,8 @@ import {
   validatePlan,
 } from "../src/lib/domain/plans.js";
 import { SIDE } from "../src/lib/domain/v2Models.js";
-import { __testables as planRepoTestables, deleteExerciseDefinition, deletePlan, deleteWorkoutDocument, exclusiveActiveProgrammeStates, finishWorkoutDocument, mergeWorkoutSnapshots } from "../src/lib/firebase/planRepository.js";
+import { completedWorkoutHistory } from "../src/lib/domain/workoutDisplay.js";
+import { __testables as planRepoTestables, deleteExerciseDefinition, deletePlan, deleteWorkoutDocument, exclusiveActiveProgrammeStates, finishWorkoutDocument, mergeWorkoutSnapshots, updateInProgressWorkoutDocument } from "../src/lib/firebase/planRepository.js";
 
 function mixedStrengthPlan() {
   const plan = createBlankPlan({ name: "ACL Rehab Plan", isActive: true });
@@ -274,6 +275,7 @@ test("session insertion and exclusive activation preserve ordering", () => {
   assert.deepEqual(sessions.map((session) => [session.id, session.sortOrder]), [["one", 0], ["two", 1], ["three", 2]]);
   const states = exclusiveActiveProgrammeStates([{ id: "a", isActive: true }, { id: "b", isActive: true }], "b");
   assert.deepEqual(states.map((state) => [state.id, state.isActive]), [["a", false], ["b", true]]);
+  assert.deepEqual(exclusiveActiveProgrammeStates([{ id: "legacy-archived", isArchived: true }, { id: "active" }], "active").map(({ id, status }) => [id, status]), [["legacy-archived", "draft"], ["active", "active"]]);
 });
 
 test("exercise deletion removes only the library document", async () => {
@@ -295,15 +297,40 @@ test("finishing caches a completed snapshot and stale subscriptions cannot resto
   planRepoTestables.resetWorkoutCache();
   let written;
   const draft = { id: "workout", status: "in_progress", date: "2026-07-18", notes: "latest", exercises: [{ id: "press", completed: true, recordedSets: [{ id: "set-1", weight: 82.5 }] }] };
-  const completed = await finishWorkoutDocument({}, "uid", draft, { timestamp: "server-time", completedAtValue: "client-time", referenceFactory: () => "workout-ref", setDocument: async (ref, data) => { written = { ref, data }; } });
+  const run = async (_db, operation) => operation({ get: async () => ({ exists: () => false }), set: (ref, data) => { written = { ref, data }; } });
+  const readDocument = async () => ({ exists: () => true, data: () => written.data });
+  const completed = await finishWorkoutDocument({}, "uid", draft, { timestamp: "server-time", completedAtValue: "client-time", referenceFactory: () => "workout-ref", run, readDocument });
   assert.equal(written.ref, "workout-ref");
   assert.equal(written.data.status, "completed");
+  assert.equal(written.data.completed, true);
+  assert.equal(written.data.workoutDate, "2026-07-18");
+  assert.equal(written.data.userId, "uid");
   assert.equal(written.data.completedAt, "server-time");
   assert.equal(written.data.notes, "latest");
   assert.equal(written.data.exercises[0].recordedSets[0].weight, 82.5);
   assert.equal(completed.status, "completed");
-  assert.equal(completed.completedAt, "client-time");
-  assert.equal(mergeWorkoutSnapshots("uid", [{ ...draft }])[0].status, "completed");
+  assert.equal(completed.completedAt, "server-time");
+  planRepoTestables.resetWorkoutCache();
+  const remounted = mergeWorkoutSnapshots("uid", [{ ...written.data, id: draft.id }]);
+  assert.equal(remounted[0].status, "completed");
+  assert.deepEqual(completedWorkoutHistory(remounted).map((workout) => workout.id), [draft.id]);
+});
+
+test("completion does not use an optimistic history record when backend verification fails", async () => {
+  planRepoTestables.resetWorkoutCache();
+  const run = async (_db, operation) => operation({ get: async () => ({ exists: () => false }), set() {} });
+  await assert.rejects(finishWorkoutDocument({}, "uid", { id: "workout", date: "2026-07-18", status: "in_progress" }, { run, referenceFactory: () => "ref", readDocument: async () => ({ exists: () => false }) }), /could not be verified/);
+  assert.deepEqual(completedWorkoutHistory(mergeWorkoutSnapshots("uid", [])), []);
+});
+
+test("late autosaves cannot overwrite a completed workout", async () => {
+  planRepoTestables.resetWorkoutCache();
+  let setCalls = 0;
+  const completedTransaction = async (_db, operation) => operation({ get: async () => ({ exists: () => true, data: () => ({ status: "completed" }) }), set: () => { setCalls += 1; } });
+  const written = await updateInProgressWorkoutDocument({}, "uid", { id: "workout", status: "in_progress", notes: "stale" }, { run: completedTransaction, referenceFactory: () => "ref", timestamp: "server" });
+  assert.equal(written, false);
+  assert.equal(setCalls, 0);
+  assert.deepEqual(mergeWorkoutSnapshots("uid", [{ id: "workout", status: "completed" }]), [{ id: "workout", status: "completed" }]);
 });
 
 test("workout deletion removes only its document and suppresses stale snapshots", async () => {

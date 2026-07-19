@@ -22,9 +22,12 @@ function workoutCacheKey(uid, workoutId) {
 }
 
 export function mergeWorkoutSnapshots(uid, remote) {
-  const visible = remote.filter((workout) => !deletedWorkoutIds.has(workoutCacheKey(uid, workout.id))).map((workout) => recentWorkoutSnapshots.get(workoutCacheKey(uid, workout.id)) || workout);
+  const visible = remote.filter((workout) => !deletedWorkoutIds.has(workoutCacheKey(uid, workout.id))).map((workout) => {
+    const recent = recentWorkoutSnapshots.get(workoutCacheKey(uid, workout.id));
+    return workout.status === "in_progress" && recent?.status === "in_progress" ? recent : workout;
+  });
   const remoteIds = new Set(remote.map((workout) => workout.id));
-  const recent = [...recentWorkoutSnapshots.entries()].filter(([key]) => key.startsWith(`${uid}:`)).map(([, workout]) => workout).filter((workout) => !remoteIds.has(workout.id));
+  const recent = [...recentWorkoutSnapshots.entries()].filter(([key]) => key.startsWith(`${uid}:`)).map(([, workout]) => workout).filter((workout) => workout.status === "in_progress" && !remoteIds.has(workout.id));
   return visible.concat(recent);
 }
 
@@ -122,14 +125,15 @@ export async function setPlanActive(db, uid, plan, isActive, { updatedAtToken })
     snapshot.docs.forEach((item) => {
       const current = item.data();
       const selected = states.find((state) => state.id === item.id)?.isActive;
-      if (current.isActive !== selected) batch.update(item.ref, stripUndefined({ isActive: selected, status: current.isArchived ? "archived" : selected ? "active" : "draft", activatedAt: selected ? serverTimestamp() : null, updatedAt: serverTimestamp(), updatedAtToken: selected ? updatedAtToken : `deactivated-${updatedAtToken}` }));
+      if (current.isActive !== selected || current.isArchived) batch.update(item.ref, stripUndefined({ isActive: selected, isArchived: false, status: selected ? "active" : "draft", activatedAt: selected ? serverTimestamp() : null, updatedAt: serverTimestamp(), updatedAtToken: selected ? updatedAtToken : `deactivated-${updatedAtToken}` }));
     });
     await batch.commit();
     return;
   }
   await updateDoc(planRef(db, uid, plan.id), stripUndefined({
     isActive,
-    status: plan.isArchived ? "archived" : isActive ? "active" : "draft",
+    isArchived: false,
+    status: isActive ? "active" : "draft",
     activatedAt: isActive ? serverTimestamp() : null,
     updatedAt: serverTimestamp(),
     updatedAtToken,
@@ -137,7 +141,7 @@ export async function setPlanActive(db, uid, plan, isActive, { updatedAtToken })
 }
 
 export function exclusiveActiveProgrammeStates(plans, selectedId) {
-  return plans.map((plan) => ({ id: plan.id, isActive: plan.id === selectedId, status: plan.isArchived ? "archived" : plan.id === selectedId ? "active" : "draft" }));
+  return plans.map((plan) => ({ id: plan.id, isActive: plan.id === selectedId, status: plan.id === selectedId ? "active" : "draft" }));
 }
 
 export async function archivePlan(db, uid, plan, { updatedAtToken }) {
@@ -219,16 +223,47 @@ export async function createInProgressWorkoutDocument(db, uid, workout) {
   return saved;
 }
 
-export async function updateInProgressWorkoutDocument(db, uid, workout) {
-  await setDoc(workoutRef(db, uid, workout.id), stripUndefined({ ...workout, userId: uid, updatedAt: serverTimestamp() }), { merge: true });
-  deletedWorkoutIds.delete(workoutCacheKey(uid, workout.id));
-  recentWorkoutSnapshots.set(workoutCacheKey(uid, workout.id), { ...workout, userId: uid });
+export async function updateInProgressWorkoutDocument(db, uid, workout, { run = runTransaction, referenceFactory = workoutRef, timestamp = serverTimestamp() } = {}) {
+  const ref = referenceFactory(db, uid, workout.id);
+  const written = await run(db, async (transaction) => {
+    const snapshot = await transaction.get(ref);
+    if (snapshot.exists() && (snapshot.data()?.status === "completed" || snapshot.data()?.completed === true)) return false;
+    transaction.set(ref, stripUndefined({ ...workout, userId: uid, status: "in_progress", updatedAt: timestamp }), { merge: true });
+    return true;
+  });
+  if (written) {
+    deletedWorkoutIds.delete(workoutCacheKey(uid, workout.id));
+    recentWorkoutSnapshots.set(workoutCacheKey(uid, workout.id), { ...workout, userId: uid, status: "in_progress" });
+  }
+  return written;
 }
 
-export async function finishWorkoutDocument(db, uid, workout, { timestamp = serverTimestamp(), completedAtValue = new Date().toISOString(), setDocument = setDoc, referenceFactory = workoutRef } = {}) {
-  await setDocument(referenceFactory(db, uid, workout.id), stripUndefined({ ...workout, userId: uid, status: "completed", completedAt: timestamp, updatedAt: timestamp }), { merge: true });
-  const completed = { ...workout, userId: uid, status: "completed", completedAt: completedAtValue };
-  recentWorkoutSnapshots.set(workoutCacheKey(uid, workout.id), completed);
+export async function finishWorkoutDocument(db, uid, workout, { timestamp = serverTimestamp(), completedAtValue = new Date().toISOString(), run = runTransaction, referenceFactory = workoutRef, readDocument = getDoc } = {}) {
+  const ref = referenceFactory(db, uid, workout.id);
+  const persisted = stripUndefined({
+    ...workout,
+    id: workout.id,
+    userId: uid,
+    planId: workout.planId,
+    programmeId: workout.programmeId || workout.planId,
+    sessionId: workout.sessionId,
+    date: workout.date || workout.workoutDate,
+    workoutDate: workout.workoutDate || workout.date,
+    status: "completed",
+    completed: true,
+    completedAt: timestamp,
+    updatedAt: timestamp,
+  });
+  await run(db, async (transaction) => {
+    const snapshot = await transaction.get(ref);
+    if (snapshot.exists() && (snapshot.data()?.status === "completed" || snapshot.data()?.completed === true)) return;
+    transaction.set(ref, persisted, { merge: true });
+  });
+  const verifiedSnapshot = await readDocument(ref);
+  if (!verifiedSnapshot.exists() || (verifiedSnapshot.data()?.status !== "completed" && verifiedSnapshot.data()?.completed !== true)) throw new Error("Completed workout could not be verified after saving.");
+  const verified = verifiedSnapshot.data();
+  const completed = { ...persisted, ...verified, completedAt: verified.completedAt || completedAtValue, updatedAt: verified.updatedAt || completedAtValue };
+  recentWorkoutSnapshots.delete(workoutCacheKey(uid, workout.id));
   return completed;
 }
 

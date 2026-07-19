@@ -125,7 +125,7 @@ export function createDebouncedSaver(save, delay = 500, onStatus = () => {}) {
       const current = revision;
       await persist(latest, current);
     },
-    cancel() { clearTimeout(timer); timer = null; },
+    async cancel() { clearTimeout(timer); timer = null; await queue.catch(() => {}); },
   };
 }
 

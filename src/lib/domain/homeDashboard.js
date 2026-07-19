@@ -1,3 +1,5 @@
+import { isCompletedWorkout } from "./workoutDisplay.js";
+
 export const REHAB_AGE_MODES = Object.freeze(["months", "weeks", "days", "date"]);
 
 export function nextRehabAgeMode(mode) {
@@ -43,5 +45,5 @@ export function rehabAgeLabel(surgeryDate, mode, today) {
 }
 
 export function latestCompletedWorkout(workouts = []) {
-  return workouts.filter((workout) => workout.status === "completed").slice().sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")) || String(b.completedAt?.seconds || b.completedAt || "").localeCompare(String(a.completedAt?.seconds || a.completedAt || "")))[0] || null;
+  return workouts.filter(isCompletedWorkout).slice().sort((a, b) => String(b.date || b.workoutDate || "").localeCompare(String(a.date || a.workoutDate || "")) || String(b.completedAt?.seconds || b.completedAt || "").localeCompare(String(a.completedAt?.seconds || a.completedAt || "")))[0] || null;
 }

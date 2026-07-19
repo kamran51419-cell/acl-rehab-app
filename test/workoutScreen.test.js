@@ -53,6 +53,30 @@ test("workout form shows finishing and failure states", async (context) => {
   assert.match(failed, /Finish workout/);
 });
 
+test("weight inputs select their current value on first focus", async (context) => {
+  const vite = await createServer({ server: { middlewareMode: true }, appType: "custom", logLevel: "silent" });
+  context.after(() => vite.close());
+  const { WeightCard } = await vite.ssrLoadModule("/src/features/workout/WorkoutScreen.jsx");
+  const workout = { id: "workout", date: "2026-07-19", sessionNameSnapshot: "Lower", exercises: [{ id: "press", exerciseId: "press", exerciseNameSnapshot: "Leg Press", exerciseType: "strength", loggingMethod: "reps_weight", prescription: {}, recordedSets: [{ id: "set", setNumber: 1, prescribedReps: { type: "fixed", value: 10 }, weight: 75, rawWeight: "75" }] }] };
+  const element = WeightCard({ exercise: workout.exercises[0], onWeight() {} });
+  let weightInput;
+  function visit(node) { if (!node || typeof node !== "object") return; if (node.props?.["aria-label"]?.includes("weight")) weightInput = node; React.Children.forEach(node.props?.children, visit); }
+  visit(element);
+  let selected = false;
+  weightInput.props.onFocus({ currentTarget: { select() { selected = true; } } });
+  assert.equal(selected, true);
+});
+
+test("unfinished workout exposes a confirmed standalone discard action", async (context) => {
+  const vite = await createServer({ server: { middlewareMode: true }, appType: "custom", logLevel: "silent" });
+  context.after(() => vite.close());
+  const { DiscardWorkoutDialog } = await vite.ssrLoadModule("/src/features/workout/WorkoutScreen.jsx");
+  const markup = renderToStaticMarkup(React.createElement(DiscardWorkoutDialog, { onCancel() {}, onConfirm() {} }));
+  assert.match(markup, /Discard Workout\?/);
+  assert.match(markup, /Cancel/);
+  assert.match(markup, /Completed workouts will not be affected/);
+});
+
 test("Workout programme list always shows all sessions with independent status", async (context) => {
   const vite = await createServer({ server: { middlewareMode: true }, appType: "custom", logLevel: "silent" });
   context.after(() => vite.close());

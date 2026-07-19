@@ -31,7 +31,6 @@ import { SIDE } from "../../lib/domain/v2Models";
 import { makeId } from "../../lib/domain/legacyWorkouts";
 import {
   archiveExerciseDefinition,
-  archivePlan,
   createPlan,
   duplicatePlanDocument,
   deletePlan,
@@ -119,29 +118,48 @@ function sectionPlans(plans, predicate) {
   return plans.filter(predicate);
 }
 
-function PlanCard({ plan, onEdit, onDuplicate, onToggleActive, onArchive, onRestore, onDelete }) {
+function PlanCard({ plan, onEdit, onDuplicate, onToggleActive, onDelete }) {
   return (
     <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-lg font-semibold text-slate-900">{plan.name || "Untitled programme"}</div>
         </div>
-        <span className={cls("rounded-full px-2 py-1 text-xs font-medium", plan.isArchived ? "bg-slate-100 text-slate-600" : plan.isActive ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>{plan.isArchived ? "Archived" : plan.isActive ? "Active" : "Inactive"}</span>
+        <span className={cls("rounded-full px-2 py-1 text-xs font-medium", plan.isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600")}>{plan.isActive ? "Active" : "Inactive"}</span>
       </div>
       <div className="text-xs text-slate-500">{plan.sessions?.length || 0} sessions</div>
       <div className="flex flex-wrap gap-2">
         <Button size="sm" onClick={() => onEdit(plan)}>Open / edit</Button>
         <Button size="sm" variant="outline" onClick={() => onDuplicate(plan)}>Duplicate</Button>
-        {plan.isArchived ? (
-          <Button size="sm" variant="outline" onClick={() => onRestore(plan)}>Restore</Button>
-        ) : (
-          <>
-            <Button size="sm" variant="outline" onClick={() => onToggleActive(plan)}>{plan.isActive ? "Deactivate" : "Activate"}</Button>
-            <Button size="sm" variant="danger" onClick={() => onArchive(plan)}>Archive</Button>
-          </>
-        )}
+        <Button size="sm" variant="outline" onClick={() => onToggleActive(plan)}>{plan.isActive ? "Deactivate" : "Activate"}</Button>
         <Button size="sm" variant="danger" onClick={() => onDelete(plan)}>Delete programme</Button>
       </div>
+    </div>
+  );
+}
+
+function DurationInput({ seconds, durationUnit, onChange }) {
+  const unit = durationUnit || (Number(seconds || 0) >= 60 && Number(seconds || 0) % 60 === 0 ? "minutes" : "seconds");
+  const value = unit === "minutes" ? Number(seconds || 0) / 60 : Number(seconds || 0);
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <Field label="Duration"><Input inputMode="decimal" value={value || ""} onChange={(event) => onChange({ seconds: Number(event.target.value) * (unit === "minutes" ? 60 : 1), unit })} /></Field>
+      <Field label="Unit"><Select value={unit} onChange={(event) => onChange({ seconds: Number(seconds || 0), unit: event.target.value })}><option value="seconds">Seconds</option><option value="minutes">Minutes</option></Select></Field>
+    </div>
+  );
+}
+
+function DirectStrengthPrescription({ prescription, onChange, showNotes = true, bothLabel = "Both legs" }) {
+  const updateReps = (patch) => onChange({ ...prescription, targetReps: { ...prescription.targetReps, ...patch } });
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 md:grid-cols-4">
+        <Field label="Side"><Select value={prescription.side || SIDE.BOTH} onChange={(event) => onChange({ ...prescription, side: event.target.value })}><option value={SIDE.BOTH}>{bothLabel}</option><option value={SIDE.LEFT}>Left only</option><option value={SIDE.RIGHT}>Right only</option></Select></Field>
+        <Field label="Sets"><Input inputMode="numeric" value={prescription.targetSets || ""} onChange={(event) => onChange({ ...prescription, targetSets: Number(event.target.value) })} /></Field>
+        <Field label="Reps type"><Select value={prescription.targetReps?.type || REP_TARGET_TYPE.FIXED} onChange={(event) => onChange({ ...prescription, targetReps: event.target.value === REP_TARGET_TYPE.RANGE ? repRange(8, 12) : fixedReps(10) })}><option value={REP_TARGET_TYPE.FIXED}>Fixed</option><option value={REP_TARGET_TYPE.RANGE}>Range</option></Select></Field>
+        {prescription.targetReps?.type === REP_TARGET_TYPE.RANGE ? <div className="grid grid-cols-2 gap-2"><Field label="Min"><Input inputMode="numeric" value={prescription.targetReps.min} onChange={(event) => updateReps({ min: Number(event.target.value) })} /></Field><Field label="Max"><Input inputMode="numeric" value={prescription.targetReps.max} onChange={(event) => updateReps({ max: Number(event.target.value) })} /></Field></div> : <Field label="Reps"><Input inputMode="numeric" value={prescription.targetReps?.value || ""} onChange={(event) => updateReps({ value: Number(event.target.value) })} /></Field>}
+      </div>
+      {showNotes ? <Field label="Notes"><Input value={prescription.notes || ""} onChange={(event) => onChange({ ...prescription, notes: event.target.value })} /></Field> : null}
     </div>
   );
 }
@@ -499,9 +517,8 @@ export default function PlansScreen({ user, view = "programme" }) {
     return () => { unsubPlans(); unsubExercises(); };
   }, [user?.uid, view]);
 
-  const activePlans = useMemo(() => sectionPlans(plans, (plan) => !plan.isArchived && plan.isActive), [plans]);
-  const inactivePlans = useMemo(() => sectionPlans(plans, (plan) => !plan.isArchived && !plan.isActive), [plans]);
-  const archivedPlans = useMemo(() => sectionPlans(plans, (plan) => plan.isArchived), [plans]);
+  const activePlans = useMemo(() => sectionPlans(plans, (plan) => plan.isActive), [plans]);
+  const inactivePlans = useMemo(() => sectionPlans(plans, (plan) => !plan.isActive), [plans]);
 
   function openNewPlan() {
     setOriginal(null);
@@ -566,15 +583,6 @@ export default function PlansScreen({ user, view = "programme" }) {
     try { await setPlanActive(db, user.uid, plan, !plan.isActive, { updatedAtToken: token() }); } catch (err) { setPlansError(friendlyErrorMessage(err, "We could not update that programme. Please try again.", "programmes")); }
   }
 
-  async function handleArchive(plan) {
-    if (!window.confirm(`Archive ${plan.name}? Archived plans stay readable and can be restored.`)) return;
-    try { await archivePlan(db, user.uid, plan, { updatedAtToken: token() }); } catch (err) { setPlansError(friendlyErrorMessage(err, "We could not archive that programme. Please try again.", "programmes")); }
-  }
-
-  async function handleRestore(plan) {
-    try { await restorePlan(db, user.uid, plan, { updatedAtToken: token() }); } catch (err) { setPlansError(friendlyErrorMessage(err, "We could not restore that programme. Please try again.", "programmes")); }
-  }
-
   async function handleDeleteProgramme() {
     if (!deleteProgrammeCandidate) return;
     try {
@@ -590,6 +598,7 @@ export default function PlansScreen({ user, view = "programme" }) {
   const renderSection = (title, items, empty) => (
     <section className="space-y-3">
       <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
+      {items.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">{empty}</div> : <div className="grid gap-3 lg:grid-cols-2">{items.map((plan) => <PlanCard key={plan.id} plan={plan} onEdit={openPlan} onDuplicate={handleDuplicate} onToggleActive={handleToggleActive} onDelete={setDeleteProgrammeCandidate} />)}</div>}
       {items.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">{empty}</div> : <div className="grid gap-3 lg:grid-cols-2">{items.map((plan) => <PlanCard key={plan.id} plan={plan} onEdit={openPlan} onDuplicate={handleDuplicate} onToggleActive={handleToggleActive} onArchive={handleArchive} onRestore={handleRestore} onDelete={setDeleteProgrammeCandidate} />)}</div>}
     </section>
   );
@@ -608,8 +617,7 @@ export default function PlansScreen({ user, view = "programme" }) {
       {!plansLoading && plans.length === 0 ? <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center"><div className="font-semibold text-slate-900">No programmes yet</div><p className="mt-1 text-sm text-slate-500">Create your first programme and give each workout session a useful name.</p><Button className="mt-4" onClick={openNewPlan}>Create first programme</Button></div> : null}
       {draft ? <PlanEditor draft={draft} setDraft={setDraft} original={original} exercises={exercises} onSave={saveDraft} onClose={closeEditor} saving={saving} saveMessage={saveMessage} /> : null}
       {renderSection("Active", activePlans, "Activate any plan when you are ready to use it regularly.")}
-      {renderSection("Inactive and draft", inactivePlans, "Plans you deactivate will appear here.")}
-      {renderSection("Archived", archivedPlans, "Archived plans will appear here and can be restored later.")}
+      {renderSection("Inactive", inactivePlans, "Programmes you deactivate will remain here and can be activated later.")}
       {deleteProgrammeCandidate ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"><div role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl"><h3 className="text-lg font-semibold">Delete "{deleteProgrammeCandidate.name}" permanently?</h3><p className="mt-2 text-sm text-slate-600">This programme will be removed permanently. Completed workouts will remain untouched.</p><div className="mt-5 flex justify-end gap-2"><Button variant="outline" onClick={() => setDeleteProgrammeCandidate(null)}>Cancel</Button><Button variant="danger" onClick={handleDeleteProgramme}>Delete permanently</Button></div></div></div> : null}
       </>}
     </div>

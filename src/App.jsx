@@ -677,6 +677,7 @@ async function saveSession() {
         )}
 
         {activeTab === "programme" && <PlansScreen user={user} />}
+        {activeTab === "workout" && <WorkoutScreen user={user} intent={workoutIntent} onIntentHandled={() => setWorkoutIntent(null)} onFinished={(completed) => { setHighlightedWorkoutId(completed.id); setActiveTab("workout-history"); }} onDiscarded={() => setActiveTab("home")} />}
         {activeTab === "workout" && <WorkoutScreen user={user} intent={workoutIntent} onIntentHandled={() => setWorkoutIntent(null)} onFinished={(completed) => { setHighlightedWorkoutId(completed.id); setActiveTab("workout-history"); }} />}
         {activeTab === "progress" && <div className="space-y-4"><div><h1 className="text-2xl font-semibold">Progress</h1><p className="text-sm text-slate-500">Review your workout history and rehabilitation trends.</p></div><div className="flex gap-2"><Button onClick={() => setActiveTab("workout-history")}>Workout history</Button><Button variant="outline" onClick={() => setActiveTab("graphs")}>Progress graphs</Button></div></div>}
         {activeTab === "workout-history" && <WorkoutHistoryScreen user={user} highlightId={highlightedWorkoutId} />}

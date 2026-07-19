@@ -1,1 +1,15 @@
 @import "tailwindcss";
+
+/* The primary navigation already names each screen, so repeated page labels and
+   introductory headings are hidden to keep the app compact. */
+.mx-auto.max-w-2xl.space-y-8 > div:first-child,
+.space-y-5 > div:first-child:has(> p.text-emerald-700),
+.space-y-6 > .flex.flex-wrap.items-start.justify-between.gap-3 > div:first-child,
+.space-y-4 > div:first-child:has(> h1.text-2xl.font-semibold) {
+  display: none;
+}
+
+/* Keep the Programme action aligned cleanly after its repeated heading is removed. */
+.space-y-6 > .flex.flex-wrap.items-start.justify-between.gap-3 {
+  justify-content: flex-end;
+}

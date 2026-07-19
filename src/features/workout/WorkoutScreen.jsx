@@ -2,9 +2,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ChevronRight, Dumbbell } from "lucide-react";
 import { db } from "../../firebase";
 import { todayString } from "../../lib/domain/date";
-import { durationLabel, groupSessionExercises, previousWeightsForExercise, workoutExerciseSideLabel, workoutItem } from "../../lib/domain/workoutDisplay";
+import { durationLabel, groupSessionExercises, previousWeightsForExercise, sessionWorkoutStatus, workoutExerciseSideLabel, workoutItem } from "../../lib/domain/workoutDisplay";
 import { completeWorkout, createDebouncedSaver, createInProgressWorkout, findInProgressWorkout, isWeightedExerciseComplete, resumeWorkout, updateRecordedSetWeight } from "../../lib/domain/workoutSession";
-import { createInProgressWorkoutDocument, finishWorkoutDocument, subscribePlans, subscribeWorkouts, updateInProgressWorkoutDocument } from "../../lib/firebase/planRepository";
+import { createInProgressWorkoutDocument, deleteWorkoutDocument, finishWorkoutDocument, subscribePlans, subscribeWorkouts, updateInProgressWorkoutDocument } from "../../lib/firebase/planRepository";
 import { makeId } from "../../lib/domain/legacyWorkouts";
 import Button from "../../components/ui/Button";
 
@@ -14,6 +14,7 @@ const defaultRepository = {
   createInProgressWorkoutDocument,
   updateInProgressWorkoutDocument,
   finishWorkoutDocument,
+  deleteWorkoutDocument,
 };
 
 // Retain freshly autosaved drafts across tab unmounts until Firestore listeners catch up.
@@ -54,6 +55,14 @@ export function WorkoutForm({ workout, saveStatus = "", leaving = false, finishi
   return <div className="space-y-5"><button disabled={leaving || finishing} className="text-sm font-medium text-slate-600 disabled:opacity-50" onClick={onBack}>{leaving ? "Saving..." : "← All sessions"}</button><div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><div className="flex items-center justify-between gap-3"><div><div className="text-sm font-medium text-emerald-700">Workout in progress</div><h1 className="mt-1 text-2xl font-semibold">{workout.sessionNameSnapshot}</h1></div><span className={`text-xs ${saveStatus === "error" ? "text-red-600" : "text-slate-500"}`}>{saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved" : saveStatus === "error" ? "Could not save" : ""}</span></div><div className="mt-4 grid gap-3 md:grid-cols-2"><label className="text-sm font-medium text-slate-700">Workout date<input type="date" className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3" value={workout.date} onChange={(event) => onDate(event.target.value)} /></label><label className="text-sm font-medium text-slate-700">Workout notes<input className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3" value={workout.notes || ""} onChange={(event) => onNotes(event.target.value)} /></label></div><div className="mt-5 space-y-3"><CompletionList title="Exercises" exercises={standard} onToggle={onToggle} /><CompletionList title="Mobility / Stretch" exercises={mobility} onToggle={onToggle} /><CompletionList title="Other" exercises={other} onToggle={onToggle} />{weighted.map((exercise) => <WeightCard key={exercise.id} exercise={exercise} onWeight={onWeight} />)}{intervals.map((exercise) => <IntervalCard key={exercise.id} exercise={exercise} onToggle={onToggle} />)}</div>{finishError ? <p className="mt-4 text-sm font-medium text-red-600">{finishError}</p> : null}<Button disabled={finishing} className="mt-6 w-full md:w-auto" onClick={onFinish}>{finishing ? "Finishing…" : "Finish workout"}</Button></div></div>;
 }
 
+export function ProgrammeSessionList({ programme, sessions, workouts, today, onSelect }) {
+  return <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="text-lg font-semibold">{programme.name}</h2><div className="mt-4 space-y-2">{sessions.map((session) => { const status = sessionWorkoutStatus(programme.id, session.id, workouts, today); return <button key={session.id} onClick={() => onSelect(session)} className="flex w-full items-center justify-between rounded-2xl border border-slate-200 p-4 text-left hover:bg-slate-50"><span><span className="block font-semibold">{session.name}</span><span className="text-sm text-slate-500">{session.exercises?.length || 0} exercises{status.label ? ` · ${status.label}` : ""}</span></span><ChevronRight className="h-5 w-5 text-slate-400"/></button>; })}</div></div>;
+}
+
+export function UnfinishedWorkoutDialog({ unfinishedName, requestedName, confirming, discarding, error, onContinue, onRequestDiscard, onDiscard, onBack, onCancel }) {
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"><div role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl bg-white p-5"><h2 className="text-lg font-semibold">Unfinished workout in progress</h2><p className="mt-2 text-sm text-slate-600">You currently have:</p><p className="mt-1 font-medium">{unfinishedName}</p>{requestedName ? <p className="mt-2 text-sm text-slate-500">Start instead: {requestedName}</p> : null}{error ? <p className="mt-3 text-sm font-medium text-red-600">{error}</p> : null}{confirming ? <><p className="mt-4 text-sm font-medium text-red-700">Permanently discard this unfinished workout and its recorded data?</p><div className="mt-5 flex flex-wrap justify-end gap-2"><Button variant="outline" disabled={discarding} onClick={onBack}>Back</Button><Button variant="danger" disabled={discarding} onClick={onDiscard}>{discarding ? "Discarding…" : "Discard and start"}</Button></div></> : <div className="mt-5 flex flex-col gap-2"><Button onClick={onContinue}>Continue workout</Button><Button variant="danger" onClick={onRequestDiscard}>Discard unfinished workout and start this session</Button><Button variant="outline" onClick={onCancel}>Cancel</Button></div>}</div></div>;
+}
+
 export default function WorkoutScreen({ user, repository = defaultRepository, intent = null, onIntentHandled = noop, onFinished = noop }) {
   const [plans, setPlans] = useState([]);
   const [workouts, setWorkouts] = useState([]);
@@ -63,6 +72,10 @@ export default function WorkoutScreen({ user, repository = defaultRepository, in
   const [leaving, setLeaving] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [finishError, setFinishError] = useState("");
+  const [requestedSession, setRequestedSession] = useState(null);
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
+  const [discardError, setDiscardError] = useState("");
   const localWorkouts = useRef(recentWorkoutDrafts);
   const handledIntent = useRef(null);
   useEffect(() => user?.uid ? repository.subscribePlans(db, user.uid, setPlans, () => {}) : undefined, [repository, user?.uid]);
@@ -74,8 +87,8 @@ export default function WorkoutScreen({ user, repository = defaultRepository, in
   const programme = activeProgrammes[0];
   const sessions = useMemo(() => (programme?.sessions || []).slice().sort((a, b) => a.sortOrder - b.sortOrder), [programme]);
 
-  const chooseSession = useCallback(async (requestedProgramme, requestedSession) => {
-    const unfinished = workouts.find((item) => item.status === "in_progress");
+  const chooseSession = useCallback(async (requestedProgramme, requestedSession, { ignoreUnfinished = false } = {}) => {
+    const unfinished = ignoreUnfinished ? null : workouts.find((item) => item.status === "in_progress");
     const workoutProgramme = unfinished ? plans.find((plan) => plan.id === unfinished.planId) || programmeFromWorkoutSnapshot(unfinished) : requestedProgramme;
     const session = unfinished ? workoutProgramme?.sessions?.find((item) => item.id === unfinished.sessionId) : requestedSession;
     if (!workoutProgramme || !session) return;
@@ -90,6 +103,38 @@ export default function WorkoutScreen({ user, repository = defaultRepository, in
     setSaveStatus("saved");
     onIntentHandled();
   }, [onIntentHandled, plans, repository, user.uid, workouts]);
+
+  function requestSession(session) {
+    const unfinished = workouts.find((item) => item.status === "in_progress");
+    if (unfinished && unfinished.sessionId !== session.id) {
+      setRequestedSession(session);
+      setConfirmingDiscard(false);
+      setDiscardError("");
+      return;
+    }
+    chooseSession(programme, session);
+  }
+
+  async function discardAndStart() {
+    const unfinished = workouts.find((item) => item.status === "in_progress");
+    if (!unfinished || !requestedSession || discarding) return;
+    setDiscarding(true);
+    setDiscardError("");
+    try {
+      await repository.deleteWorkoutDocument(db, user.uid, unfinished.id);
+      recentWorkoutDrafts.delete(unfinished.id);
+      setWorkouts((current) => current.filter((workout) => workout.id !== unfinished.id));
+      const nextSession = requestedSession;
+      setRequestedSession(null);
+      setConfirmingDiscard(false);
+      await chooseSession(programme, nextSession, { ignoreUnfinished: true });
+    } catch (error) {
+      console.error("Could not discard unfinished workout", error);
+      setDiscardError("Could not discard unfinished workout. Please try again.");
+    } finally {
+      setDiscarding(false);
+    }
+  }
 
   useEffect(() => {
     if (!intent || handledIntent.current === intent.token || !plans.length) return;
@@ -149,5 +194,5 @@ export default function WorkoutScreen({ user, repository = defaultRepository, in
   const unfinished = workouts.find((item) => item.status === "in_progress");
   const unfinishedProgramme = unfinished ? plans.find((plan) => plan.id === unfinished.planId) || programmeFromWorkoutSnapshot(unfinished) : null;
   const unfinishedSession = unfinishedProgramme?.sessions?.find((session) => session.id === unfinished.sessionId);
-  return <div className="space-y-5"><div><p className="text-sm font-medium text-emerald-700">Current Programme</p><h1 className="text-2xl font-semibold">Workout</h1><p className="text-sm text-slate-500">{unfinished ? "Continue your unfinished workout before starting another." : "Choose the session you are performing. There is no fixed day or required order."}</p></div>{activeProgrammes.length > 1 ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Multiple legacy programmes are active. Activate your preferred programme again to normalize this to one.</div> : null}{unfinished && unfinishedProgramme && unfinishedSession ? <Button onClick={() => chooseSession(unfinishedProgramme, unfinishedSession)}>Continue {unfinished.sessionNameSnapshot || unfinishedSession.name}</Button> : !programme ? <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center"><Dumbbell className="mx-auto mb-3 text-slate-400"/><h2 className="font-semibold">No active programme</h2><p className="text-sm text-slate-500">Activate a programme before starting a workout.</p></div> : <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="text-lg font-semibold">{programme.name}</h2><div className="mt-4 space-y-2">{sessions.map((session) => <button key={session.id} onClick={() => chooseSession(programme, session)} className="flex w-full items-center justify-between rounded-2xl border border-slate-200 p-4 text-left hover:bg-slate-50"><span><span className="block font-semibold">{session.name}</span><span className="text-sm text-slate-500">{session.exercises?.length || 0} exercises</span></span><ChevronRight className="h-5 w-5 text-slate-400"/></button>)}</div></div>}</div>;
+  return <div className="space-y-5"><div><p className="text-sm font-medium text-emerald-700">Current Programme</p><h1 className="text-2xl font-semibold">Workout</h1><p className="text-sm text-slate-500">Choose any session from your active programme.</p></div>{activeProgrammes.length > 1 ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Multiple legacy programmes are active. Activate your preferred programme again to normalize this to one.</div> : null}{!programme ? <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center"><Dumbbell className="mx-auto mb-3 text-slate-400"/><h2 className="font-semibold">No active programme</h2><p className="text-sm text-slate-500">Activate a programme before starting a workout.</p></div> : <ProgrammeSessionList programme={programme} sessions={sessions} workouts={workouts} today={todayString()} onSelect={requestSession} />}{requestedSession && unfinished ? <UnfinishedWorkoutDialog unfinishedName={unfinished.sessionNameSnapshot || unfinishedSession?.name || "Workout"} requestedName={requestedSession.name} confirming={confirmingDiscard} discarding={discarding} error={discardError} onContinue={() => chooseSession(unfinishedProgramme, unfinishedSession)} onRequestDiscard={() => setConfirmingDiscard(true)} onDiscard={discardAndStart} onBack={() => setConfirmingDiscard(false)} onCancel={() => setRequestedSession(null)} /> : null}</div>;
 }

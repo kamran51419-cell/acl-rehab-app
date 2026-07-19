@@ -52,3 +52,33 @@ test("workout form shows finishing and failure states", async (context) => {
   assert.match(failed, /Could not finish workout/);
   assert.match(failed, /Finish workout/);
 });
+
+test("Workout programme list always shows all sessions with independent status", async (context) => {
+  const vite = await createServer({ server: { middlewareMode: true }, appType: "custom", logLevel: "silent" });
+  context.after(() => vite.close());
+  const { ProgrammeSessionList } = await vite.ssrLoadModule("/src/features/workout/WorkoutScreen.jsx");
+  const programme = { id: "plan", name: "Programme" };
+  const sessions = [{ id: "press", name: "Press + Legs", exercises: [] }, { id: "pull", name: "Pull + Legs", exercises: [] }, { id: "full", name: "Full Body", exercises: [] }];
+  const workouts = [{ status: "completed", planId: "plan", sessionId: "press", date: "2026-07-18" }, { status: "completed", planId: "plan", sessionId: "press", date: "2026-07-19" }, { status: "in_progress", planId: "plan", sessionId: "full", date: "2026-07-19" }];
+  const markup = renderToStaticMarkup(React.createElement(ProgrammeSessionList, { programme, sessions, workouts, today: "2026-07-19", onSelect() {} }));
+  assert.match(markup, /Press \+ Legs/);
+  assert.match(markup, /Pull \+ Legs/);
+  assert.match(markup, /Full Body/);
+  assert.match(markup, /Done 2 times this week/);
+  assert.match(markup, /Continue workout/);
+});
+
+test("selecting another session presents Continue, Discard and Cancel choices", async (context) => {
+  const vite = await createServer({ server: { middlewareMode: true }, appType: "custom", logLevel: "silent" });
+  context.after(() => vite.close());
+  const { UnfinishedWorkoutDialog } = await vite.ssrLoadModule("/src/features/workout/WorkoutScreen.jsx");
+  const choices = renderToStaticMarkup(React.createElement(UnfinishedWorkoutDialog, { unfinishedName: "Full Body", requestedName: "Press + Legs", onContinue() {}, onRequestDiscard() {}, onDiscard() {}, onBack() {}, onCancel() {} }));
+  assert.match(choices, /Unfinished workout in progress/);
+  assert.match(choices, /Full Body/);
+  assert.match(choices, /Continue workout/);
+  assert.match(choices, /Discard unfinished workout and start this session/);
+  assert.match(choices, /Cancel/);
+  const confirmation = renderToStaticMarkup(React.createElement(UnfinishedWorkoutDialog, { unfinishedName: "Full Body", requestedName: "Press + Legs", confirming: true, onContinue() {}, onRequestDiscard() {}, onDiscard() {}, onBack() {}, onCancel() {} }));
+  assert.match(confirmation, /Permanently discard/);
+  assert.match(confirmation, /Discard and start/);
+});

@@ -6,7 +6,7 @@ import { bestSet, bestSetSym, setsSummaryLines, setVolume } from "../src/lib/dom
 import { compactExerciseSummary, sessionSummary } from "../src/lib/domain/legacyWorkouts.js";
 import { normalizeLegacyRehabData } from "../src/lib/firebase/legacyRehabRepository.js";
 import { createWorkout, SIDE } from "../src/lib/domain/v2Models.js";
-import { WORKOUT_BEHAVIOR, groupSessionExercises, previousWeightForExercise, previousWeightsForExercise, resolveWorkoutExerciseSide, workoutExerciseProgressKey, workoutExerciseSideLabel, workoutItem } from "../src/lib/domain/workoutDisplay.js";
+import { WORKOUT_BEHAVIOR, groupSessionExercises, previousWeightForExercise, previousWeightsForExercise, resolveWorkoutExerciseSide, sessionWorkoutStatus, workoutExerciseProgressKey, workoutExerciseSideLabel, workoutItem } from "../src/lib/domain/workoutDisplay.js";
 import { EXERCISE_LOGGING_METHOD, EXERCISE_TYPE } from "../src/lib/domain/plans.js";
 import { completeWorkout, createDebouncedSaver, createInProgressWorkout, findInProgressWorkout, isWeightedExerciseComplete, reorderExerciseSnapshots, resumeWorkout, updateRecordedSetWeight } from "../src/lib/domain/workoutSession.js";
 import { latestCompletedWorkout, nextRehabAgeMode, persistRehabAgeMode, readRehabAgeMode, rehabAgeLabel } from "../src/lib/domain/homeDashboard.js";
@@ -32,6 +32,18 @@ test("latest completed workout ignores unfinished workouts", () => {
   assert.equal(latestCompletedWorkout(workouts.filter((workout) => workout.id !== "latest")).id, "older");
   assert.equal(latestCompletedWorkout(workouts.filter((workout) => workout.status !== "completed")), null);
   assert.equal(latestCompletedWorkout([{ status: "in_progress" }]), null);
+});
+
+test("programme session status is independent for unfinished and completed workouts", () => {
+  const workouts = [
+    { id: "draft", status: "in_progress", planId: "plan", sessionId: "full", date: "2026-07-19" },
+    { id: "press-1", status: "completed", planId: "plan", sessionId: "press", date: "2026-07-14" },
+    { id: "press-2", status: "completed", planId: "plan", sessionId: "press", date: "2026-07-18" },
+    { id: "old", status: "completed", planId: "plan", sessionId: "pull", date: "2026-07-01" },
+  ];
+  assert.deepEqual(sessionWorkoutStatus("plan", "full", workouts, "2026-07-19"), { kind: "continue", label: "Continue workout", count: 1, workout: workouts[0] });
+  assert.deepEqual(sessionWorkoutStatus("plan", "press", workouts, "2026-07-19"), { kind: "done", label: "Done 2 times this week", count: 2 });
+  assert.deepEqual(sessionWorkoutStatus("plan", "pull", workouts, "2026-07-19"), { kind: "none", label: "", count: 0 });
 });
 
 test("calculateWeekFromSurgeryDate returns 1-indexed rehab weeks", () => {

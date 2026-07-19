@@ -7,6 +7,19 @@ export function completedWorkoutHistory(workouts = []) {
   return workouts.filter((workout) => workout.status === "completed").slice().sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")) || String(b.completedAt?.seconds || b.completedAt || "").localeCompare(String(a.completedAt?.seconds || a.completedAt || "")));
 }
 
+export function sessionWorkoutStatus(programmeId, sessionId, workouts = [], today) {
+  const unfinished = workouts.find((workout) => workout.status === "in_progress" && workout.planId === programmeId && workout.sessionId === sessionId);
+  if (unfinished) return { kind: "continue", label: "Continue workout", count: 1, workout: unfinished };
+  const current = new Date(`${today}T00:00:00Z`);
+  const day = current.getUTCDay() || 7;
+  const monday = new Date(current);
+  monday.setUTCDate(current.getUTCDate() - day + 1);
+  const weekStart = monday.toISOString().slice(0, 10);
+  const count = workouts.filter((workout) => workout.status === "completed" && workout.planId === programmeId && workout.sessionId === sessionId && workout.date >= weekStart && workout.date <= today).length;
+  if (!count) return { kind: "none", label: "", count: 0 };
+  return { kind: "done", label: count === 1 ? "Done this week" : `Done ${count} times this week`, count };
+}
+
 export function durationLabel(seconds, unit) {
   const value = Number(seconds || 0);
   if (!value) return "";

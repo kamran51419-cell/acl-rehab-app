@@ -40,6 +40,9 @@ test("Home dashboard starts a chosen session and continues without a picker", as
   assert.doesNotMatch(continued, /Choose a session/);
   buttons(continueDashboard).find((button) => button.props.children === "Continue Workout").props.onClick();
   assert.equal(continuedWorkout, true);
+  const completedOnly = renderToStaticMarkup(HomeDashboard({ ...base, unfinishedWorkout: null, completedWorkout: { id: "done", status: "completed", date: "2026-07-18" }, showSessions: false }));
+  assert.match(completedOnly, /Start Workout/);
+  assert.doesNotMatch(completedOnly, /Continue Workout/);
 });
 
 test("Home dashboard renders programme, completed-workout and empty states", async (context) => {

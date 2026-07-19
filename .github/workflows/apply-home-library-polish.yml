@@ -1,0 +1,238 @@
+name: Apply home and exercise library polish
+
+on:
+  push:
+    branches:
+      - feature/home-exercise-library-polish
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/home-exercise-library-polish
+          fetch-depth: 0
+
+      - name: Apply changes
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f"Expected text not found in {path}: {old[:120]!r}")
+              p.write_text(text.replace(old, new, 1))
+
+          # Clean Home dashboard and remove Last Workout entirely.
+          Path('src/features/home/HomeScreen.jsx').write_text('''import React, { useEffect, useMemo, useState } from "react";
+          import Button from "../../components/ui/Button";
+          import { db } from "../../firebase";
+          import { nextRehabAgeMode, persistRehabAgeMode, readRehabAgeMode, rehabAgeLabel } from "../../lib/domain/homeDashboard";
+          import { todayString } from "../../lib/domain/date";
+          import { subscribePlans, subscribeWorkouts } from "../../lib/firebase/planRepository";
+
+          const defaultRepository = { subscribePlans, subscribeWorkouts };
+
+          export function HomeDashboard({ programme, unfinishedWorkout, surgeryDate, rehabAgeMode, today, showSessions, onStart, onContinue, onChooseSession, onProgramme, onCycleAge }) {
+            const sessions = (programme?.sessions || []).slice().sort((a, b) => a.sortOrder - b.sortOrder);
+            return (
+              <div className="mx-auto max-w-2xl space-y-8">
+                <div><p className="text-sm font-medium text-emerald-700">ACL Rehab</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Home</h1></div>
+                <section className="space-y-2">
+                  <p className="text-sm text-slate-500">Current programme</p>
+                  <h2 className="text-xl font-semibold">{programme?.name || "No active programme"}</h2>
+                  {!programme ? <Button variant="outline" onClick={onProgramme}>Create or activate a programme</Button> : null}
+                </section>
+                <div className="border-t border-slate-200" />
+                <section className="space-y-4">
+                  {unfinishedWorkout ? <Button className="w-full py-3 text-base" onClick={onContinue}>Continue Workout</Button> : <Button className="w-full py-3 text-base" disabled={!programme} onClick={onStart}>Start Workout</Button>}
+                  {showSessions && programme && !unfinishedWorkout ? <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><h2 className="font-semibold">Choose a session</h2><div className="mt-3 space-y-2">{sessions.map((session) => <button type="button" key={session.id} onClick={() => onChooseSession(session.id)} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-left font-medium hover:bg-slate-50">{session.name}</button>)}</div></div> : null}
+                </section>
+                {surgeryDate ? <><div className="border-t border-slate-200" /><button type="button" onClick={onCycleAge} className="text-left text-lg font-medium text-slate-700">{rehabAgeLabel(surgeryDate, rehabAgeMode, today)}</button></> : null}
+              </div>
+            );
+          }
+
+          export default function HomeScreen({ user, surgeryDate, onOpenWorkout, onOpenProgramme, repository = defaultRepository }) {
+            const [plans, setPlans] = useState([]);
+            const [workouts, setWorkouts] = useState([]);
+            const [showSessions, setShowSessions] = useState(false);
+            const preferenceKey = `rehab-age-mode:${user.uid}`;
+            const [rehabAgeMode, setRehabAgeMode] = useState(() => readRehabAgeMode(localStorage, preferenceKey));
+            useEffect(() => repository.subscribePlans(db, user.uid, setPlans, () => {}), [repository, user.uid]);
+            useEffect(() => repository.subscribeWorkouts(db, user.uid, setWorkouts, () => {}), [repository, user.uid]);
+            const programme = useMemo(() => plans.filter((plan) => plan.isActive && !plan.isArchived).sort((a, b) => String(b.updatedAtToken || b.id).localeCompare(String(a.updatedAtToken || a.id)))[0] || null, [plans]);
+            const unfinishedWorkout = useMemo(() => workouts.find((workout) => workout.status === "in_progress") || null, [workouts]);
+            function cycleAge() { const next = nextRehabAgeMode(rehabAgeMode); setRehabAgeMode(next); persistRehabAgeMode(localStorage, preferenceKey, next); }
+            return <HomeDashboard programme={programme} unfinishedWorkout={unfinishedWorkout} surgeryDate={surgeryDate} rehabAgeMode={rehabAgeMode} today={todayString()} showSessions={showSessions} onStart={() => setShowSessions(true)} onContinue={() => onOpenWorkout({ mode: "continue", workoutId: unfinishedWorkout.id })} onChooseSession={(sessionId) => onOpenWorkout({ mode: "session", sessionId })} onProgramme={onOpenProgramme} onCycleAge={cycleAge} />;
+          }
+          '''.replace('\n          ', '\n').lstrip())
+
+          # New compact, Home-owned Exercise Library.
+          Path('src/features/home/ExerciseLibraryHome.jsx').write_text('''import React, { useEffect, useMemo, useState } from "react";
+          import { Search } from "lucide-react";
+          import Button from "../../components/ui/Button";
+          import { db } from "../../firebase";
+          import {
+            EXERCISE_LOGGING_METHOD,
+            EXERCISE_TYPE,
+            EXERCISE_TYPE_OPTIONS,
+            createLibraryExercise,
+            defaultLoggingMethodForExerciseType,
+            loggingMethodsForExerciseType,
+          } from "../../lib/domain/plans";
+          import { makeId } from "../../lib/domain/legacyWorkouts";
+          import { deleteExerciseDefinition, saveExerciseDefinition, subscribeExerciseDefinitions } from "../../lib/firebase/planRepository";
+
+          const TYPE_LABELS = {
+            strength: "Strength", cardio: "Cardio", plyometric: "Plyometric", balance: "Balance",
+            mobility: "Mobility", stretch: "Stretch", other: "Other",
+          };
+          const RECORDING_LABELS = {
+            [EXERCISE_LOGGING_METHOD.REPS]: "Reps",
+            [EXERCISE_LOGGING_METHOD.REPS_WEIGHT]: "Reps + Weight",
+            [EXERCISE_LOGGING_METHOD.TIME]: "Time",
+            [EXERCISE_LOGGING_METHOD.DISTANCE]: "Distance",
+            [EXERCISE_LOGGING_METHOD.TIME_DISTANCE]: "Time + Distance",
+            [EXERCISE_LOGGING_METHOD.COMPLETED]: "Task",
+            [EXERCISE_LOGGING_METHOD.INTERVALS]: "Intervals",
+          };
+          const token = () => `token-${makeId()}`;
+          const inputClass = "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm";
+
+          function methodsFor(type) {
+            const methods = loggingMethodsForExerciseType(type);
+            if (type === EXERCISE_TYPE.PLYOMETRIC) return [EXERCISE_LOGGING_METHOD.COMPLETED];
+            return methods.length ? methods : [defaultLoggingMethodForExerciseType(type)];
+          }
+
+          export default function ExerciseLibraryHome({ user, onBackToProgramme }) {
+            const [exercises, setExercises] = useState([]);
+            const [query, setQuery] = useState("");
+            const [category, setCategory] = useState("all");
+            const [showAll, setShowAll] = useState(false);
+            const [editing, setEditing] = useState(null);
+            const [creating, setCreating] = useState(false);
+            const [form, setForm] = useState({ name: "", exerciseType: EXERCISE_TYPE.STRENGTH, loggingMethod: EXERCISE_LOGGING_METHOD.REPS_WEIGHT });
+            const [message, setMessage] = useState("");
+            const returning = sessionStorage.getItem(`programme-library-return:${user.uid}`) === "1";
+
+            useEffect(() => subscribeExerciseDefinitions(db, user.uid, setExercises, () => setMessage("We could not load your exercise library.")), [user.uid]);
+
+            const visible = useMemo(() => exercises
+              .filter((exercise) => !exercise.isArchived)
+              .filter((exercise) => category === "all" || (exercise.exerciseType || exercise.trackingType) === category)
+              .filter((exercise) => exercise.name.toLowerCase().includes(query.trim().toLowerCase())), [exercises, category, query]);
+            const displayed = showAll || query || category !== "all" ? visible : visible.slice(0, 6);
+
+            function updateType(nextType, target = form, setter = setForm) {
+              const nextMethods = methodsFor(nextType);
+              setter({ ...target, exerciseType: nextType, loggingMethod: nextMethods.includes(target.loggingMethod) ? target.loggingMethod : nextMethods[0] });
+            }
+
+            async function saveNew() {
+              if (!form.name.trim()) return;
+              const exercise = { ...createLibraryExercise({ name: form.name, exerciseType: form.exerciseType }), loggingMethod: form.loggingMethod };
+              await saveExerciseDefinition(db, user.uid, exercise, { updatedAtToken: token() });
+              setForm({ name: "", exerciseType: EXERCISE_TYPE.STRENGTH, loggingMethod: EXERCISE_LOGGING_METHOD.REPS_WEIGHT });
+              setCreating(false);
+              setMessage("Exercise added.");
+            }
+
+            async function saveEdit() {
+              if (!editing?.name.trim()) return;
+              await saveExerciseDefinition(db, user.uid, { ...editing, name: editing.name.trim(), trackingType: editing.exerciseType }, { updatedAtToken: token() });
+              setEditing(null);
+              setMessage("Exercise updated.");
+            }
+
+            async function remove(exercise) {
+              if (!window.confirm(`Delete ${exercise.name}? Existing programme and workout records will stay unchanged.`)) return;
+              await deleteExerciseDefinition(db, user.uid, exercise.id);
+              setEditing(null);
+              setMessage("Exercise deleted.");
+            }
+
+            function backToProgramme() {
+              sessionStorage.removeItem(`programme-library-return:${user.uid}`);
+              onBackToProgramme();
+            }
+
+            return (
+              <section id="exercise-library" className="mx-auto max-w-2xl space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div><h2 className="text-xl font-semibold text-slate-900">Exercise Library</h2><p className="text-sm text-slate-500">{exercises.filter((item) => !item.isArchived).length} exercises</p></div>
+                  <div className="flex gap-2">{returning ? <Button variant="outline" onClick={backToProgramme}>Back to programme</Button> : null}<Button onClick={() => setCreating((value) => !value)}>{creating ? "Cancel" : "Add exercise"}</Button></div>
+                </div>
+                {message ? <div className="rounded-xl bg-slate-50 p-3 text-sm text-slate-700">{message}</div> : null}
+                {creating ? <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-3"><label className="text-sm font-medium">Exercise name<input className={inputClass} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label><label className="text-sm font-medium">Exercise type<select className={inputClass} value={form.exerciseType} onChange={(e) => updateType(e.target.value)}>{EXERCISE_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{TYPE_LABELS[type]}</option>)}</select></label><label className="text-sm font-medium">Recording<select className={inputClass} value={form.loggingMethod} onChange={(e) => setForm({ ...form, loggingMethod: e.target.value })}>{methodsFor(form.exerciseType).map((method) => <option key={method} value={method}>{RECORDING_LABELS[method]}</option>)}</select></label><div className="md:col-span-3"><Button onClick={saveNew}>Save</Button></div></div> : null}
+                <div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input className={`${inputClass} pl-9`} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search exercises" /></div>
+                <div className="flex flex-wrap gap-2">{["all", ...EXERCISE_TYPE_OPTIONS].map((type) => <button type="button" key={type} onClick={() => setCategory(type)} className={`rounded-full border px-3 py-1.5 text-sm ${category === type ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-600"}`}>{type === "all" ? "All" : TYPE_LABELS[type]}</button>)}</div>
+                <div className="space-y-2">{displayed.map((exercise) => {
+                  const type = exercise.exerciseType || exercise.trackingType || EXERCISE_TYPE.STRENGTH;
+                  const method = exercise.loggingMethod || defaultLoggingMethodForExerciseType(type);
+                  return <div key={exercise.id} className="rounded-2xl border border-slate-200 p-3">{editing?.id === exercise.id ? <div className="grid gap-2 md:grid-cols-3"><input className={inputClass} value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} /><select className={inputClass} value={editing.exerciseType} onChange={(e) => updateType(e.target.value, editing, setEditing)}>{EXERCISE_TYPE_OPTIONS.map((option) => <option key={option} value={option}>{TYPE_LABELS[option]}</option>)}</select><select className={inputClass} value={editing.loggingMethod} onChange={(e) => setEditing({ ...editing, loggingMethod: e.target.value })}>{methodsFor(editing.exerciseType).map((option) => <option key={option} value={option}>{RECORDING_LABELS[option]}</option>)}</select><div className="flex gap-2 md:col-span-3"><Button size="sm" onClick={saveEdit}>Save</Button><Button size="sm" variant="outline" onClick={() => setEditing(null)}>Cancel</Button><Button size="sm" variant="danger" onClick={() => remove(exercise)}>Delete</Button></div></div> : <div className="flex items-center justify-between gap-3"><div className="min-w-0"><div className="truncate font-medium">{exercise.name}</div><div className="text-xs text-slate-500">{TYPE_LABELS[type]} • {RECORDING_LABELS[method] || "Task"}</div></div><Button size="sm" variant="outline" onClick={() => setEditing({ ...exercise, exerciseType: type, loggingMethod: method })}>Edit</Button></div>}</div>;
+                })}{displayed.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500">No exercises match your search.</div> : null}</div>
+                {!query && category === "all" && visible.length > 6 ? <Button variant="outline" onClick={() => setShowAll((value) => !value)}>{showAll ? "Show less" : `View all ${visible.length} exercises`}</Button> : null}
+              </section>
+            );
+          }
+          '''.replace('\n          ', '\n').lstrip())
+
+          # Wire the library into Home and remove it from More.
+          app = Path('src/App.jsx')
+          text = app.read_text()
+          text = text.replace('import HomeScreen from "./features/home/HomeScreen";', 'import HomeScreen from "./features/home/HomeScreen";\nimport ExerciseLibraryHome from "./features/home/ExerciseLibraryHome";')
+          old_home = '{activeTab === "home" && <HomeScreen user={user} surgeryDate={surgeryDate} onOpenProgramme={() => setActiveTab("programme")} onOpenWorkout={(intent) => { setWorkoutIntent({ ...intent, token: Date.now() }); setActiveTab("workout"); }} />}'
+          new_home = '{activeTab === "home" && <div className="space-y-8"><HomeScreen user={user} surgeryDate={surgeryDate} onOpenProgramme={() => setActiveTab("programme")} onOpenWorkout={(intent) => { setWorkoutIntent({ ...intent, token: Date.now() }); setActiveTab("workout"); }} /><ExerciseLibraryHome user={user} onBackToProgramme={() => setActiveTab("programme")} /></div>}'
+          if old_home not in text: raise SystemExit('Home render target not found in App.jsx')
+          text = text.replace(old_home, new_home, 1)
+          text = text.replace('{activeTab === "programme" && <PlansScreen user={user} />}', '{activeTab === "programme" && <PlansScreen user={user} onOpenExerciseLibrary={() => setActiveTab("home")} />}', 1)
+          more_pattern = re.compile(r'\{activeTab === "more" && <div className="space-y-4"><div><h1 className="text-2xl font-semibold">More</h1><p className="text-sm text-slate-500">Manage your library and app preferences\.</p></div><PlansScreen user=\{user\} view="exercises" /><CardShell title="Settings">')
+          text, count = more_pattern.subn('{activeTab === "more" && <div className="space-y-4"><div><h1 className="text-2xl font-semibold">More</h1><p className="text-sm text-slate-500">Manage app preferences.</p></div><CardShell title="Settings">', text, count=1)
+          if count != 1: raise SystemExit('More render target not found in App.jsx')
+          app.write_text(text)
+
+          # Remove in-picker creation and route to the Home library. Preserve drafts in sessionStorage.
+          plans = Path('src/features/plans/PlansScreen.jsx')
+          text = plans.read_text()
+          text = text.replace('function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, saving, saveMessage })', 'function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, onOpenExerciseLibrary, saving, saveMessage })')
+          text = text.replace('export default function PlansScreen({ user, view = "programme" })', 'export default function PlansScreen({ user, view = "programme", onOpenExerciseLibrary })')
+          text = text.replace('<PlanEditor draft={draft} setDraft={setDraft} original={original} exercises={exercises} onSave={saveDraft} onClose={closeEditor} saving={saving} saveMessage={saveMessage} />', '<PlanEditor draft={draft} setDraft={setDraft} original={original} exercises={exercises} onSave={saveDraft} onClose={closeEditor} onOpenExerciseLibrary={onOpenExerciseLibrary} saving={saving} saveMessage={saveMessage} />')
+
+          # Replace the picker creation button. The creation form remains unreachable and is removed by the regex below.
+          old_button = '<Button className="mt-3" variant="outline" onClick={() => setCreatingExercise(true)}><Plus className="mr-1 h-4 w-4" /> Create New Exercise</Button>'
+          new_button = '<div className="mt-3 rounded-xl bg-slate-50 p-3 text-sm text-slate-600"><div className="mb-2">Can\'t find your exercise?</div><Button variant="outline" onClick={() => { sessionStorage.setItem(`programme-library-return:${draft.userId}`, "1"); onOpenExerciseLibrary?.(); }}>Manage Exercise Library →</Button></div>'
+          if old_button not in text: raise SystemExit('Exercise picker create button not found')
+          text = text.replace(old_button, new_button, 1)
+
+          # Draft persistence: restore after returning from Home library, save continuously, clear only on intentional close/save.
+          marker = '  const [deleteProgrammeCandidate, setDeleteProgrammeCandidate] = useState(null);\n'
+          insert = marker + '  const draftStorageKey = user?.uid ? `programme-draft:${user.uid}` : "";\n\n  useEffect(() => {\n    if (!draftStorageKey || draft) return;\n    const saved = sessionStorage.getItem(draftStorageKey);\n    if (!saved) return;\n    try {\n      const parsed = JSON.parse(saved);\n      setDraft(parsed.draft || null);\n      setOriginal(parsed.original || null);\n      setLoadedToken(parsed.loadedToken || "");\n    } catch {\n      sessionStorage.removeItem(draftStorageKey);\n    }\n  }, [draftStorageKey]);\n\n  useEffect(() => {\n    if (!draftStorageKey || !draft) return;\n    sessionStorage.setItem(draftStorageKey, JSON.stringify({ draft, original, loadedToken }));\n  }, [draftStorageKey, draft, original, loadedToken]);\n'
+          if marker not in text: raise SystemExit('PlansScreen state marker not found')
+          text = text.replace(marker, insert, 1)
+          text = text.replace('    setSaveMessage("");\n  }\n\n  async function saveDraft()', '    setSaveMessage("");\n    if (draftStorageKey) sessionStorage.removeItem(draftStorageKey);\n  }\n\n  async function saveDraft()', 1)
+          text = text.replace('      setProgrammeNotice("Programme saved.");', '      if (draftStorageKey) sessionStorage.removeItem(draftStorageKey);\n      sessionStorage.removeItem(`programme-library-return:${user.uid}`);\n      setProgrammeNotice("Programme saved.");', 1)
+          plans.write_text(text)
+
+          # Remove the one-shot workflow from the resulting commit.
+          Path('.github/workflows/apply-home-library-polish.yml').unlink()
+          PY
+
+      - name: Commit changes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Polish Home exercise library and preserve programme drafts"
+          git push origin feature/home-exercise-library-polish

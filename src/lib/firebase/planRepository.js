@@ -193,7 +193,13 @@ export async function deleteExerciseDefinition(db, uid, exerciseId, { deleteDocu
 }
 
 export function subscribeWorkouts(db, uid, onNext, onError) {
-  return onSnapshot(collection(db, "users", uid, "workouts"), (snapshot) => onNext(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))), onError);
+  return onSnapshot(collection(db, "users", uid, "workouts"), (snapshot) => onNext(workoutsFromSnapshot(snapshot)), onError);
+}
+
+// Firestore owns document identity. Never allow a stale or malformed `id` field
+// inside the payload to replace the path id used for selection and deletion.
+export function workoutsFromSnapshot(snapshot) {
+  return snapshot.docs.map((item) => ({ ...item.data(), id: item.id }));
 }
 
 export async function createInProgressWorkoutDocument(db, uid, workout) {

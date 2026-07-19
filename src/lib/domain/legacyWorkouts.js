@@ -92,8 +92,8 @@ export function compactExerciseSummary(week, exercise) {
     return {
       type: "single",
       dates: compactDate(sessions),
-      left: left ? `${left.reps} x ${left.weight}kg` : "—",
-      right: right ? `${right.reps} x ${right.weight}kg` : "—",
+      left: left ? `${left.reps} × ${left.weight} kg` : "—",
+      right: right ? `${right.reps} × ${right.weight} kg` : "—",
       symmetry: sym,
     };
   }
@@ -101,7 +101,7 @@ export function compactExerciseSummary(week, exercise) {
   return {
     type: "bilateral",
     dates: compactDate(sessions),
-    value: best ? `${best.reps} x ${best.weight}kg` : "—",
+    value: best ? `${best.reps} × ${best.weight} kg` : "—",
   };
 }
 

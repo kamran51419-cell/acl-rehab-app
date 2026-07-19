@@ -1,9 +1,10 @@
-import { collection, doc, getDoc, onSnapshot, runTransaction, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, runTransaction, serverTimestamp, setDoc, updateDoc, writeBatch } from "firebase/firestore";
 import { duplicatePlan, nextPlanForSave } from "../domain/plans.js";
 
 function stripUndefined(value) {
   if (Array.isArray(value)) return value.map(stripUndefined);
   if (value && typeof value === "object") {
+    if (Object.getPrototypeOf(value) !== Object.prototype) return value;
     return Object.fromEntries(
       Object.entries(value)
         .filter(([, item]) => item !== undefined)
@@ -11,6 +12,20 @@ function stripUndefined(value) {
     );
   }
   return value;
+}
+
+const recentWorkoutSnapshots = new Map();
+const deletedWorkoutIds = new Set();
+
+function workoutCacheKey(uid, workoutId) {
+  return `${uid}:${workoutId}`;
+}
+
+export function mergeWorkoutSnapshots(uid, remote) {
+  const visible = remote.filter((workout) => !deletedWorkoutIds.has(workoutCacheKey(uid, workout.id))).map((workout) => recentWorkoutSnapshots.get(workoutCacheKey(uid, workout.id)) || workout);
+  const remoteIds = new Set(remote.map((workout) => workout.id));
+  const recent = [...recentWorkoutSnapshots.entries()].filter(([key]) => key.startsWith(`${uid}:`)).map(([, workout]) => workout).filter((workout) => !remoteIds.has(workout.id));
+  return visible.concat(recent);
 }
 
 function plansCollection(db, uid) {
@@ -23,6 +38,18 @@ function planRef(db, uid, planId) {
 
 function exerciseRef(db, uid, exerciseId) {
   return doc(db, "users", uid, "exercises", exerciseId);
+}
+
+function workoutRef(db, uid, workoutId) {
+  return doc(db, "users", uid, "workouts", workoutId);
+}
+
+export function exerciseCollectionPath(uid) {
+  return `users/${uid}/exercises`;
+}
+
+function logExerciseRepository(event, details) {
+  if (import.meta.env?.DEV) console.info(`[exerciseRepository] ${event}`, details);
 }
 
 export function planPaths(uid, planId = "{planId}") {
@@ -88,6 +115,18 @@ export async function duplicatePlanDocument(db, uid, sourcePlan, { newPlanId, up
 }
 
 export async function setPlanActive(db, uid, plan, isActive, { updatedAtToken }) {
+  if (isActive) {
+    const snapshot = await getDocs(plansCollection(db, uid));
+    const batch = writeBatch(db);
+    const states = exclusiveActiveProgrammeStates(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })), plan.id);
+    snapshot.docs.forEach((item) => {
+      const current = item.data();
+      const selected = states.find((state) => state.id === item.id)?.isActive;
+      if (current.isActive !== selected) batch.update(item.ref, stripUndefined({ isActive: selected, status: current.isArchived ? "archived" : selected ? "active" : "draft", activatedAt: selected ? serverTimestamp() : null, updatedAt: serverTimestamp(), updatedAtToken: selected ? updatedAtToken : `deactivated-${updatedAtToken}` }));
+    });
+    await batch.commit();
+    return;
+  }
   await updateDoc(planRef(db, uid, plan.id), stripUndefined({
     isActive,
     status: plan.isArchived ? "archived" : isActive ? "active" : "draft",
@@ -95,6 +134,10 @@ export async function setPlanActive(db, uid, plan, isActive, { updatedAtToken })
     updatedAt: serverTimestamp(),
     updatedAtToken,
   }));
+}
+
+export function exclusiveActiveProgrammeStates(plans, selectedId) {
+  return plans.map((plan) => ({ id: plan.id, isActive: plan.id === selectedId, status: plan.isArchived ? "archived" : plan.id === selectedId ? "active" : "draft" }));
 }
 
 export async function archivePlan(db, uid, plan, { updatedAtToken }) {
@@ -119,24 +162,98 @@ export async function restorePlan(db, uid, plan, { updatedAtToken }) {
   }));
 }
 
+export async function deletePlan(db, uid, planId, { deleteDocument = deleteDoc, referenceFactory = planRef } = {}) {
+  await deleteDocument(referenceFactory(db, uid, planId));
+}
+
 export async function saveExerciseDefinition(db, uid, exercise, { updatedAtToken }) {
-  await setDoc(
-    exerciseRef(db, uid, exercise.id),
-    stripUndefined({ ...exercise, userId: uid, updatedAt: serverTimestamp(), updatedAtToken }),
-    { merge: true }
-  );
+  const path = `${exerciseCollectionPath(uid)}/${exercise.id}`;
+  logExerciseRepository("save start", { uid, path });
+  try {
+    await setDoc(
+      exerciseRef(db, uid, exercise.id),
+      stripUndefined({ ...exercise, userId: uid, updatedAt: serverTimestamp(), updatedAtToken }),
+      { merge: true }
+    );
+    logExerciseRepository("save complete", { uid, path });
+  } catch (error) {
+    console.error("Exercise library Firestore save failed", { uid, path, code: error?.code, message: error?.message, error });
+    throw error;
+  }
 }
 
 export async function archiveExerciseDefinition(db, uid, exerciseId, isArchived, { updatedAtToken }) {
-  await updateDoc(exerciseRef(db, uid, exerciseId), stripUndefined({ isArchived, archivedAt: isArchived ? serverTimestamp() : null, updatedAt: serverTimestamp(), updatedAtToken }));
+  const path = `${exerciseCollectionPath(uid)}/${exerciseId}`;
+  logExerciseRepository(isArchived ? "archive start" : "restore start", { uid, path });
+  try {
+    await updateDoc(exerciseRef(db, uid, exerciseId), stripUndefined({ isArchived, archivedAt: isArchived ? serverTimestamp() : null, updatedAt: serverTimestamp(), updatedAtToken }));
+    logExerciseRepository(isArchived ? "archive complete" : "restore complete", { uid, path });
+  } catch (error) {
+    console.error("Exercise library Firestore archive/restore failed", { uid, path, code: error?.code, message: error?.message, error });
+    throw error;
+  }
+}
+
+export async function deleteExerciseDefinition(db, uid, exerciseId, { deleteDocument = deleteDoc, referenceFactory = exerciseRef } = {}) {
+  const path = `${exerciseCollectionPath(uid)}/${exerciseId}`;
+  logExerciseRepository("delete start", { uid, path });
+  try {
+    await deleteDocument(referenceFactory(db, uid, exerciseId));
+    logExerciseRepository("delete complete", { uid, path });
+  } catch (error) {
+    console.error("Exercise library Firestore delete failed", { uid, path, code: error?.code, message: error?.message, error });
+    throw error;
+  }
+}
+
+export function subscribeWorkouts(db, uid, onNext, onError) {
+  return onSnapshot(collection(db, "users", uid, "workouts"), (snapshot) => onNext(mergeWorkoutSnapshots(uid, snapshot.docs.map((item) => item.data()))), onError);
+}
+
+export async function createInProgressWorkoutDocument(db, uid, workout) {
+  const data = stripUndefined({ ...workout, userId: uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  await setDoc(workoutRef(db, uid, workout.id), data, { merge: false });
+  const saved = { ...workout, userId: uid };
+  deletedWorkoutIds.delete(workoutCacheKey(uid, workout.id));
+  recentWorkoutSnapshots.set(workoutCacheKey(uid, workout.id), saved);
+  return saved;
+}
+
+export async function updateInProgressWorkoutDocument(db, uid, workout) {
+  await setDoc(workoutRef(db, uid, workout.id), stripUndefined({ ...workout, userId: uid, updatedAt: serverTimestamp() }), { merge: true });
+  deletedWorkoutIds.delete(workoutCacheKey(uid, workout.id));
+  recentWorkoutSnapshots.set(workoutCacheKey(uid, workout.id), { ...workout, userId: uid });
+}
+
+export async function finishWorkoutDocument(db, uid, workout, { timestamp = serverTimestamp(), completedAtValue = new Date().toISOString(), setDocument = setDoc, referenceFactory = workoutRef } = {}) {
+  await setDocument(referenceFactory(db, uid, workout.id), stripUndefined({ ...workout, userId: uid, status: "completed", completedAt: timestamp, updatedAt: timestamp }), { merge: true });
+  const completed = { ...workout, userId: uid, status: "completed", completedAt: completedAtValue };
+  recentWorkoutSnapshots.set(workoutCacheKey(uid, workout.id), completed);
+  return completed;
+}
+
+export async function deleteWorkoutDocument(db, uid, workoutId, { deleteDocument = deleteDoc, referenceFactory = workoutRef } = {}) {
+  await deleteDocument(referenceFactory(db, uid, workoutId));
+  recentWorkoutSnapshots.delete(workoutCacheKey(uid, workoutId));
+  deletedWorkoutIds.add(workoutCacheKey(uid, workoutId));
 }
 
 export function subscribeExerciseDefinitions(db, uid, onNext, onError) {
+  const path = exerciseCollectionPath(uid);
+  logExerciseRepository("subscription start", { uid, path });
   return onSnapshot(
     collection(db, "users", uid, "exercises"),
-    (snapshot) => onNext(snapshot.docs.map((item) => item.data()).sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")))),
-    onError
+    (snapshot) => {
+      logExerciseRepository("subscription snapshot", { uid, path, size: snapshot.size });
+      onNext(snapshot.docs.map((item) => item.data()).sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))));
+    },
+    (error) => {
+      console.error("Exercise library Firestore subscription failed", { uid, path, code: error?.code, message: error?.message, error });
+      onError(error);
+    }
   );
 }
 
-export const __testables = { stripUndefined, preparePlanWrite, planPaths };
+function resetWorkoutCache() { recentWorkoutSnapshots.clear(); deletedWorkoutIds.clear(); }
+
+export const __testables = { stripUndefined, preparePlanWrite, planPaths, exerciseCollectionPath, resetWorkoutCache };

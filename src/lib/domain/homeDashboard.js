@@ -44,6 +44,14 @@ export function rehabAgeLabel(surgeryDate, mode, today) {
   return `${months} months post-op`;
 }
 
+export function rehabTimeline(surgeryDate, today) {
+  return {
+    days: rehabAgeLabel(surgeryDate, "days", today),
+    weeks: rehabAgeLabel(surgeryDate, "weeks", today),
+    months: rehabAgeLabel(surgeryDate, "months", today),
+  };
+}
+
 export function latestCompletedWorkout(workouts = []) {
   return workouts.filter(isCompletedWorkout).slice().sort((a, b) => String(b.date || b.workoutDate || "").localeCompare(String(a.date || a.workoutDate || "")) || String(b.completedAt?.seconds || b.completedAt || "").localeCompare(String(a.completedAt?.seconds || a.completedAt || "")))[0] || null;
 }

@@ -262,10 +262,12 @@ test("normalizeLegacyRehabData safely defaults malformed legacy snapshots", () =
     weeks: [],
     customExercises: [],
     surgeryDate: "",
+    trainingMode: "gym",
   });
 
   assert.deepEqual(
     normalizeLegacyRehabData({ weeks: [{ week: "1", sessions: [] }], customExercises: [], surgeryDate: "2026-07-18" }),
-    { weeks: [{ week: "1", sessions: [] }], customExercises: [], surgeryDate: "2026-07-18" }
+    { weeks: [{ week: "1", sessions: [] }], customExercises: [], surgeryDate: "2026-07-18", trainingMode: "rehab" }
   );
+  assert.equal(normalizeLegacyRehabData({ surgeryDate: "2026-07-18", trainingMode: "gym" }).trainingMode, "gym");
 });

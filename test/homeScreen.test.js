@@ -60,4 +60,10 @@ test("Home dashboard renders programme and empty states without the last workout
   assert.match(empty, /Start Workout/);
   assert.match(empty, /disabled=""/);
   assert.doesNotMatch(empty, /post-op/);
+  const rehab = renderToStaticMarkup(React.createElement(HomeDashboard, { ...callbacks, programme: null, surgeryDate: "2026-02-17", trainingMode: "rehab", rehabAgeMode: "months", today: "2026-07-18" }));
+  assert.match(rehab, /151 days post-op/);
+  assert.match(rehab, /21 weeks post-op/);
+  assert.match(rehab, /5 months post-op/);
+  const gym = renderToStaticMarkup(React.createElement(HomeDashboard, { ...callbacks, programme: null, surgeryDate: "2026-02-17", trainingMode: "gym", today: "2026-07-18" }));
+  assert.doesNotMatch(gym, /post-op|Rehab timeline|Surgery/);
 });

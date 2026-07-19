@@ -24,6 +24,7 @@ import PlansScreen from "./features/plans/PlansScreen";
 import WorkoutScreen from "./features/workout/WorkoutScreen";
 import WorkoutHistoryScreen from "./features/workout/WorkoutHistoryScreen";
 import HomeScreen from "./features/home/HomeScreen";
+import ProgressScreen from "./features/progress/ProgressScreen";
 import Button from "./components/ui/Button";
 import { saveLegacyRehabData, subscribeLegacyRehabData } from "./lib/firebase/legacyRehabRepository";
 import { calculateWeekFromSurgeryDate, todayString } from "./lib/domain/date";
@@ -185,6 +186,7 @@ export default function ACLTrackerApp() {
   const [progressTab, setProgressTab] = useState("all");
   const [graphsTab, setGraphsTab] = useState("combined");
   const [surgeryDate, setSurgeryDate] = useState("");
+  const [trainingMode, setTrainingMode] = useState("gym");
   const [customExercises, setCustomExercises] = useState([]);
   const [newExerciseName, setNewExerciseName] = useState("");
   const [newExerciseSingleLeg, setNewExerciseSingleLeg] = useState(true);
@@ -217,6 +219,7 @@ export default function ACLTrackerApp() {
       setWeeks([]);
       setCustomExercises([]);
       setSurgeryDate("");
+      setTrainingMode("gym");
       return;
     }
 
@@ -232,6 +235,7 @@ export default function ACLTrackerApp() {
         setWeeks(saved.weeks);
         setCustomExercises(saved.customExercises);
         setSurgeryDate(saved.surgeryDate);
+        setTrainingMode(saved.trainingMode);
       },
       (error) => {
         console.error("Failed to load rehab data from Firestore", error);
@@ -348,7 +352,7 @@ export default function ACLTrackerApp() {
     if (graphsTab === exerciseId) setGraphsTab("combined");
     if (progressTab === exerciseId || progressTab === "custom") setProgressTab("all");
   }
-async function saveAllData(nextWeeks = weeks, nextCustomExercises = customExercises, nextSurgeryDate = surgeryDate) {
+async function saveAllData(nextWeeks = weeks, nextCustomExercises = customExercises, nextSurgeryDate = surgeryDate, nextTrainingMode = trainingMode) {
   if (!user?.uid) return;
 
   try {
@@ -356,6 +360,7 @@ async function saveAllData(nextWeeks = weeks, nextCustomExercises = customExerci
       weeks: nextWeeks,
       customExercises: nextCustomExercises,
       surgeryDate: nextSurgeryDate,
+      trainingMode: nextTrainingMode,
     });
   } catch (error) {
     console.error("Failed to save rehab data to Firestore", error);
@@ -561,7 +566,7 @@ async function saveSession() {
           <TabButton active={activeTab === "more"} onClick={() => setActiveTab("more")}>More</TabButton>
         </div>
 
-        {activeTab === "home" && <HomeScreen user={user} surgeryDate={surgeryDate} fromProgramme={libraryFromProgramme} onBackToProgramme={() => { setLibraryFromProgramme(false); setActiveTab("programme"); }} onOpenProgramme={() => { setLibraryFromProgramme(false); setActiveTab("programme"); }} onOpenWorkout={(intent) => { setWorkoutIntent({ ...intent, token: Date.now() }); setActiveTab("workout"); }} />}
+        {activeTab === "home" && <HomeScreen user={user} surgeryDate={surgeryDate} trainingMode={trainingMode} fromProgramme={libraryFromProgramme} onBackToProgramme={() => { setLibraryFromProgramme(false); setActiveTab("programme"); }} onOpenProgramme={() => { setLibraryFromProgramme(false); setActiveTab("programme"); }} onOpenWorkout={(intent) => { setWorkoutIntent({ ...intent, token: Date.now() }); setActiveTab("workout"); }} />}
 
         {activeTab === "log" && (
           <div className="space-y-6">
@@ -702,9 +707,9 @@ async function saveSession() {
 
         {activeTab === "programme" && <PlansScreen user={user} onManageExerciseLibrary={() => { setLibraryFromProgramme(true); setActiveTab("home"); requestAnimationFrame(() => document.getElementById("exercise-library")?.scrollIntoView({ behavior: "smooth" })); }} />}
         {activeTab === "workout" && <WorkoutScreen user={user} intent={workoutIntent} onIntentHandled={() => setWorkoutIntent(null)} onFinished={(completed) => { setHighlightedWorkoutId(completed.id); setActiveTab("workout-history"); }} onDiscarded={() => setActiveTab("home")} />}
-        {activeTab === "progress" && <div className="space-y-4"><div><h1 className="text-2xl font-semibold">Progress</h1><p className="text-sm text-slate-500">Review your workout history and rehabilitation trends.</p></div><div className="flex gap-2"><Button onClick={() => setActiveTab("workout-history")}>Workout history</Button><Button variant="outline" onClick={() => setActiveTab("graphs")}>Progress graphs</Button></div></div>}
+        {activeTab === "progress" && <ProgressScreen user={user} trainingMode={trainingMode} onWorkoutHistory={() => setActiveTab("workout-history")} />}
         {activeTab === "workout-history" && <WorkoutHistoryScreen user={user} highlightId={highlightedWorkoutId} />}
-        {activeTab === "more" && <div className="space-y-4"><div><h1 className="text-2xl font-semibold">More</h1><p className="text-sm text-slate-500">Manage app preferences.</p></div><CardShell title="Settings"><div className="max-w-md"><Label className="text-sm font-medium text-slate-700">Surgery date (optional)</Label><Input type="date" value={surgeryDate} onChange={async (event) => { const nextDate = event.target.value; setSurgeryDate(nextDate); setWeekManuallyEdited(false); await saveAllData(weeks, customExercises, nextDate); }} /><p className="mt-2 text-sm text-slate-500">Used to calculate your rehabilitation age on Home.</p></div></CardShell></div>}
+        {activeTab === "more" && <div className="space-y-4"><div><h1 className="text-2xl font-semibold">More</h1><p className="text-sm text-slate-500">Manage app preferences.</p></div><CardShell title="Settings"><div className="max-w-md space-y-4"><div><Label>Training mode</Label><select className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm" value={trainingMode} onChange={async (event) => { const nextMode = event.target.value; setTrainingMode(nextMode); await saveAllData(weeks, customExercises, surgeryDate, nextMode); }}><option value="gym">Gym</option><option value="rehab">Rehab</option></select></div>{trainingMode === "rehab" ? <div><Label>Surgery date (optional)</Label><Input className="mt-1" type="date" value={surgeryDate} onChange={async (event) => { const nextDate = event.target.value; setSurgeryDate(nextDate); setWeekManuallyEdited(false); await saveAllData(weeks, customExercises, nextDate, trainingMode); }} />{surgeryDate ? <div className="mt-2 flex items-center justify-between gap-3"><p className="text-sm text-slate-500">{new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit", timeZone: "UTC" }).format(new Date(`${surgeryDate}T00:00:00Z`))}</p><Button size="sm" variant="outline" onClick={async () => { setSurgeryDate(""); await saveAllData(weeks, customExercises, "", trainingMode); }}>Remove</Button></div> : null}</div> : null}</div></CardShell></div>}
 
         {activeTab === "table" && (
           <div className="space-y-4">

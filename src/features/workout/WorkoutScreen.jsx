@@ -17,8 +17,6 @@ const defaultRepository = {
   deleteWorkoutDocument,
 };
 
-// Retain freshly autosaved drafts across tab unmounts until Firestore listeners catch up.
-const recentWorkoutDrafts = new Map();
 const noop = () => {};
 
 function programmeFromWorkoutSnapshot(workout) {
@@ -76,13 +74,13 @@ export default function WorkoutScreen({ user, repository = defaultRepository, in
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
   const [discarding, setDiscarding] = useState(false);
   const [discardError, setDiscardError] = useState("");
-  const localWorkouts = useRef(recentWorkoutDrafts);
+  const [loadError, setLoadError] = useState("");
   const handledIntent = useRef(null);
-  useEffect(() => user?.uid ? repository.subscribePlans(db, user.uid, setPlans, () => {}) : undefined, [repository, user?.uid]);
-  useEffect(() => user?.uid ? repository.subscribeWorkouts(db, user.uid, (remote) => { const recent = [...localWorkouts.current.values()].filter((item) => item.userId === user.uid); setWorkouts(remote.map((item) => localWorkouts.current.get(item.id) || item).concat(recent.filter((local) => !remote.some((item) => item.id === local.id)))); }, () => {}) : undefined, [repository, user?.uid]);
+  useEffect(() => user?.uid ? repository.subscribePlans(db, user.uid, setPlans, (error) => { console.error("Could not load programmes", error); setLoadError("Workout data could not be loaded. Check your connection and try again."); }) : undefined, [repository, user?.uid]);
+  useEffect(() => user?.uid ? repository.subscribeWorkouts(db, user.uid, (next) => { setWorkouts(next); setLoadError(""); }, (error) => { console.error("Could not load workouts", error); setLoadError("Workout data could not be loaded. Check your connection and try again."); }) : undefined, [repository, user?.uid]);
   const saver = useMemo(() => createDebouncedSaver((value) => repository.updateInProgressWorkoutDocument(db, user.uid, value), 500, (status) => setSaveStatus(status)), [repository, user.uid]);
   useEffect(() => () => { saver.flush().catch(() => {}); }, [saver]);
-  useEffect(() => { if (workout) { localWorkouts.current.set(workout.id, workout); saver.schedule(workout); } }, [workout, saver]);
+  useEffect(() => { if (workout) saver.schedule(workout); }, [workout, saver]);
   const activeProgrammes = useMemo(() => plans.filter((plan) => plan.isActive && !plan.isArchived).sort((a, b) => String(b.activatedAt?.seconds || b.updatedAtToken || b.id).localeCompare(String(a.activatedAt?.seconds || a.updatedAtToken || a.id))), [plans]);
   const programme = activeProgrammes[0];
   const sessions = useMemo(() => (programme?.sessions || []).slice().sort((a, b) => a.sortOrder - b.sortOrder), [programme]);
@@ -122,7 +120,6 @@ export default function WorkoutScreen({ user, repository = defaultRepository, in
     setDiscardError("");
     try {
       await repository.deleteWorkoutDocument(db, user.uid, unfinished.id);
-      recentWorkoutDrafts.delete(unfinished.id);
       setWorkouts((current) => current.filter((workout) => workout.id !== unfinished.id));
       const nextSession = requestedSession;
       setRequestedSession(null);
@@ -154,7 +151,6 @@ export default function WorkoutScreen({ user, repository = defaultRepository, in
     setLeaving(true);
     try {
       await saver.flush();
-      localWorkouts.current.set(workout.id, workout);
       setWorkouts((current) => current.some((item) => item.id === workout.id) ? current.map((item) => item.id === workout.id ? workout : item) : [...current, workout]);
       setSelectedSession(null);
       setWorkout(null);
@@ -173,7 +169,6 @@ export default function WorkoutScreen({ user, repository = defaultRepository, in
     setFinishError("");
     try {
       const completed = await completeWorkout(workout, saver, (latest) => repository.finishWorkoutDocument(db, user.uid, latest));
-      localWorkouts.current.set(workout.id, completed);
       setWorkouts((current) => current.some((item) => item.id === completed.id) ? current.map((item) => item.id === completed.id ? completed : item) : [...current, completed]);
       setWorkout(null);
       setSelectedSession(null);
@@ -188,11 +183,11 @@ export default function WorkoutScreen({ user, repository = defaultRepository, in
   }
 
   if (selectedSession && workout) {
-    return <WorkoutForm workout={workout} saveStatus={saveStatus} leaving={leaving} finishing={finishing} finishError={finishError} onBack={returnToSessions} onToggle={toggleExercise} onWeight={updateWeight} onDate={(date) => setWorkout({ ...workout, date })} onNotes={(notes) => setWorkout({ ...workout, notes })} onFinish={finishWorkout} />;
+    return <>{loadError ? <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{loadError}</div> : null}<WorkoutForm workout={workout} saveStatus={saveStatus} leaving={leaving} finishing={finishing} finishError={finishError} onBack={returnToSessions} onToggle={toggleExercise} onWeight={updateWeight} onDate={(date) => setWorkout({ ...workout, date })} onNotes={(notes) => setWorkout({ ...workout, notes })} onFinish={finishWorkout} /></>;
   }
 
   const unfinished = workouts.find((item) => item.status === "in_progress");
   const unfinishedProgramme = unfinished ? plans.find((plan) => plan.id === unfinished.planId) || programmeFromWorkoutSnapshot(unfinished) : null;
   const unfinishedSession = unfinishedProgramme?.sessions?.find((session) => session.id === unfinished.sessionId);
-  return <div className="space-y-5"><div><p className="text-sm font-medium text-emerald-700">Current Programme</p><h1 className="text-2xl font-semibold">Workout</h1><p className="text-sm text-slate-500">Choose any session from your active programme.</p></div>{activeProgrammes.length > 1 ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Multiple legacy programmes are active. Activate your preferred programme again to normalize this to one.</div> : null}{!programme ? <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center"><Dumbbell className="mx-auto mb-3 text-slate-400"/><h2 className="font-semibold">No active programme</h2><p className="text-sm text-slate-500">Activate a programme before starting a workout.</p></div> : <ProgrammeSessionList programme={programme} sessions={sessions} workouts={workouts} today={todayString()} onSelect={requestSession} />}{requestedSession && unfinished ? <UnfinishedWorkoutDialog unfinishedName={unfinished.sessionNameSnapshot || unfinishedSession?.name || "Workout"} requestedName={requestedSession.name} confirming={confirmingDiscard} discarding={discarding} error={discardError} onContinue={() => chooseSession(unfinishedProgramme, unfinishedSession)} onRequestDiscard={() => setConfirmingDiscard(true)} onDiscard={discardAndStart} onBack={() => setConfirmingDiscard(false)} onCancel={() => setRequestedSession(null)} /> : null}</div>;
+  return <div className="space-y-5">{loadError ? <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{loadError}</div> : null}<div><p className="text-sm font-medium text-emerald-700">Current Programme</p><h1 className="text-2xl font-semibold">Workout</h1><p className="text-sm text-slate-500">Choose any session from your active programme.</p></div>{activeProgrammes.length > 1 ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Multiple legacy programmes are active. Activate your preferred programme again to normalize this to one.</div> : null}{!programme ? <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center"><Dumbbell className="mx-auto mb-3 text-slate-400"/><h2 className="font-semibold">No active programme</h2><p className="text-sm text-slate-500">Activate a programme before starting a workout.</p></div> : <ProgrammeSessionList programme={programme} sessions={sessions} workouts={workouts} today={todayString()} onSelect={requestSession} />}{requestedSession && unfinished ? <UnfinishedWorkoutDialog unfinishedName={unfinished.sessionNameSnapshot || unfinishedSession?.name || "Workout"} requestedName={requestedSession.name} confirming={confirmingDiscard} discarding={discarding} error={discardError} onContinue={() => chooseSession(unfinishedProgramme, unfinishedSession)} onRequestDiscard={() => setConfirmingDiscard(true)} onDiscard={discardAndStart} onBack={() => setConfirmingDiscard(false)} onCancel={() => setRequestedSession(null)} /> : null}</div>;
 }

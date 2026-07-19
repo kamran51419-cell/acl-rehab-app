@@ -29,7 +29,7 @@ import {
   validatePlan,
 } from "../src/lib/domain/plans.js";
 import { SIDE } from "../src/lib/domain/v2Models.js";
-import { __testables as planRepoTestables, deleteExerciseDefinition, deletePlan, deleteWorkoutDocument, exclusiveActiveProgrammeStates, finishWorkoutDocument, mergeWorkoutSnapshots } from "../src/lib/firebase/planRepository.js";
+import { __testables as planRepoTestables, deleteExerciseDefinition, deletePlan, deleteWorkoutDocument, exclusiveActiveProgrammeStates, finishWorkoutDocument, updateInProgressWorkoutDocument } from "../src/lib/firebase/planRepository.js";
 
 function mixedStrengthPlan() {
   const plan = createBlankPlan({ name: "ACL Rehab Plan", isActive: true });
@@ -291,11 +291,11 @@ test("programme deletion removes only its document", async () => {
   assert.equal(deletedRef, "users/uid/plans/plan");
 });
 
-test("finishing caches a completed snapshot and stale subscriptions cannot restore it", async () => {
-  planRepoTestables.resetWorkoutCache();
+test("finishing permanently writes the completed workout snapshot", async () => {
   let written;
   const draft = { id: "workout", status: "in_progress", date: "2026-07-18", notes: "latest", exercises: [{ id: "press", completed: true, recordedSets: [{ id: "set-1", weight: 82.5 }] }] };
-  const completed = await finishWorkoutDocument({}, "uid", draft, { timestamp: "server-time", completedAtValue: "client-time", referenceFactory: () => "workout-ref", setDocument: async (ref, data) => { written = { ref, data }; } });
+  const transactionRunner = async (_db, operation) => operation({ get: async () => ({ exists: () => true, data: () => draft }), set: (ref, data) => { written = { ref, data }; } });
+  const completed = await finishWorkoutDocument({}, "uid", draft, { timestamp: "server-time", completedAtValue: "client-time", referenceFactory: () => "workout-ref", transactionRunner });
   assert.equal(written.ref, "workout-ref");
   assert.equal(written.data.status, "completed");
   assert.equal(written.data.completedAt, "server-time");
@@ -303,15 +303,20 @@ test("finishing caches a completed snapshot and stale subscriptions cannot resto
   assert.equal(written.data.exercises[0].recordedSets[0].weight, 82.5);
   assert.equal(completed.status, "completed");
   assert.equal(completed.completedAt, "client-time");
-  assert.equal(mergeWorkoutSnapshots("uid", [{ ...draft }])[0].status, "completed");
 });
 
-test("workout deletion removes only its document and suppresses stale snapshots", async () => {
-  planRepoTestables.resetWorkoutCache();
+test("delayed in-progress writes cannot overwrite a completed workout", async () => {
+  let writeCount = 0;
+  const transactionRunner = async (_db, operation) => operation({ get: async () => ({ exists: () => true, data: () => ({ status: "completed" }) }), set: () => { writeCount += 1; } });
+  const saved = await updateInProgressWorkoutDocument({}, "uid", { id: "one", status: "in_progress" }, { transactionRunner, timestamp: "now", referenceFactory: () => "workout-ref" });
+  assert.equal(saved, false);
+  assert.equal(writeCount, 0);
+});
+
+test("workout deletion removes only its Firestore document", async () => {
   let deleted;
   await deleteWorkoutDocument({}, "uid", "one", { referenceFactory: (_db, uid, id) => `users/${uid}/workouts/${id}`, deleteDocument: async (ref) => { deleted = ref; } });
   assert.equal(deleted, "users/uid/workouts/one");
-  assert.deepEqual(mergeWorkoutSnapshots("uid", [{ id: "one", status: "completed" }, { id: "two", status: "completed" }]).map((workout) => workout.id), ["two"]);
 });
 
 test("prescription summaries are human readable", () => {

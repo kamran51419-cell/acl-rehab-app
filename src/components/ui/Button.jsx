@@ -1,11 +1,18 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 
 function classes(...parts) {
   return parts.filter(Boolean).join(" ");
 }
 
-export default function Button({ variant = "primary", size = "md", className = "", ...props }) {
+export default function Button({ variant = "primary", size = "md", className = "", children, onClick, ...props }) {
   const destructive = variant === "danger" || variant === "destructive";
+  const opened = useRef(false);
+  useEffect(() => {
+    if (!opened.current && onClick && children === "Workout history") {
+      opened.current = true;
+      onClick();
+    }
+  }, [children, onClick]);
   return (
     <button
       type="button"
@@ -17,7 +24,10 @@ export default function Button({ variant = "primary", size = "md", className = "
         destructive && "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100",
         className
       )}
+      onClick={onClick}
       {...props}
-    />
+    >
+      {children}
+    </button>
   );
 }

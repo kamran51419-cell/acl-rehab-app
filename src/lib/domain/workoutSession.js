@@ -1,4 +1,4 @@
-import { EXERCISE_LOGGING_METHOD } from "./plans.js";
+import { EXERCISE_LOGGING_METHOD, EXERCISE_TYPE } from "./plans.js";
 import { SIDE, WORKOUT_STATUS } from "./v2Models";
 import { resolveWorkoutExerciseSide } from "./workoutDisplay.js";
 
@@ -104,8 +104,9 @@ export function createInProgressWorkout({
         previousWeightsByExercise[exercise.id] ||
         previousWeightsByExercise[exercise.exerciseId] ||
         {};
+      const supportsSides = [EXERCISE_TYPE.STRENGTH, EXERCISE_TYPE.BALANCE].includes(exercise.exerciseType);
 
-      if (exercise.prescription?.side !== SIDE.SEPARATE) {
+      if (!supportsSides || exercise.prescription?.side !== SIDE.SEPARATE) {
         return [createWorkoutExerciseSnapshot(exercise, previousWeights)];
       }
 
@@ -213,15 +214,15 @@ export function createDebouncedSaver(save, delay = 500, onStatus = () => {}) {
       latest = value;
       revision += 1;
       clearTimeout(timer);
-      const current = revision;
-      timer = setTimeout(() => { timer = null; persist(latest, current).catch(() => {}); }, delay);
+      const currentRevision = revision;
+      timer = setTimeout(() => { timer = null; persist(latest, currentRevision).catch(() => {}); }, delay);
     },
     async flush() {
       if (!timer) { await queue; return; }
       clearTimeout(timer);
       timer = null;
-      const current = revision;
-      await persist(latest, current);
+      const currentRevision = revision;
+      await persist(latest, currentRevision);
     },
     async cancel() { clearTimeout(timer); timer = null; await queue.catch(() => {}); },
   };

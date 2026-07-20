@@ -312,7 +312,9 @@ function pushDuplicateErrors(items, path, errors) {
 }
 
 function validateStrengthPrescription(prescription, path, errors) {
-  if (![SIDE.BOTH, SIDE.LEFT, SIDE.RIGHT].includes(prescription.side)) errors.push(`${path} has an invalid side.`);
+ if (![SIDE.BOTH, SIDE.SEPARATE, SIDE.LEFT, SIDE.RIGHT].includes(prescription.side)) {
+  errors.push(`${path} has an invalid side.`);
+}
   if (!positiveInt(prescription.targetSets)) errors.push(`${path} must have at least one target set.`);
   const reps = prescription.targetReps || {};
   if (reps.type === REP_TARGET_TYPE.FIXED) {
@@ -339,7 +341,9 @@ function validateStrength(exercise, path, errors) {
 
 function validateTimedHold(exercise, path, errors) {
   const prescription = exercise.prescription || {};
-  if (![SIDE.BOTH, SIDE.LEFT, SIDE.RIGHT].includes(prescription.side)) errors.push(`${path} has an invalid side.`);
+ if (![SIDE.BOTH, SIDE.SEPARATE, SIDE.LEFT, SIDE.RIGHT].includes(prescription.side)) {
+  errors.push(`${path} has an invalid side.`);
+}
   if (!positiveInt(prescription.targetSets)) errors.push(`${path} must have at least one set.`);
   if (!positiveInt(prescription.targetDurationSeconds)) errors.push(`${path} duration must be a positive whole number of seconds.`);
 }

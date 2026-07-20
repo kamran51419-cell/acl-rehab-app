@@ -140,7 +140,11 @@ function zeroIntervalPrescription() {
   };
 }
 
-function ExerciseSetupEditor({ exercise, onChange }) {
+function ExerciseSetupEditor({
+  exercise,
+  onChange,
+  trainingMode = "gym",
+}) {
   const updatePrescription = (prescription) => onChange({ ...exercise, prescription });
   const methods = loggingMethodsForExerciseType(exercise.exerciseType);
   const isLegacyCompleted = exercise.loggingMethod === EXERCISE_LOGGING_METHOD.COMPLETED;
@@ -177,7 +181,17 @@ function ExerciseSetupEditor({ exercise, onChange }) {
           <div key={item.id || index} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
             <div className="font-medium">Set-up {index + 1}</div>
             <div className="text-sm text-slate-600">
-              {item.side === SIDE.LEFT ? "Left only" : item.side === SIDE.RIGHT ? "Right only" : "Both legs"} · {item.targetSets} × {item.targetReps?.type === REP_TARGET_TYPE.RANGE ? `${item.targetReps.min}–${item.targetReps.max}` : item.targetReps?.value}
+              {item.side === SIDE.LEFT
+  ? "Left only"
+  : item.side === SIDE.RIGHT
+    ? "Right only"
+    : item.side === SIDE.SEPARATE
+      ? "Left & right"
+      : "Standard"}{" "}
+· {item.targetSets} ×{" "}
+{item.targetReps?.type === REP_TARGET_TYPE.RANGE
+  ? `${item.targetReps.min}–${item.targetReps.max}`
+  : item.targetReps?.value}
             </div>
           </div>
         ))}
@@ -193,7 +207,8 @@ function ExerciseSetupEditor({ exercise, onChange }) {
           prescription={exercise.prescription || {}}
           onChange={updatePrescription}
           showNotes={false}
-          bothLabel={exercise.exerciseType === EXERCISE_TYPE.BALANCE ? "Both sides" : "Both legs"}
+          bothLabel="Standard"
+          trainingMode={trainingMode}
         />
       </div>
     );
@@ -215,9 +230,15 @@ function ExerciseSetupEditor({ exercise, onChange }) {
           <div className="grid gap-3 md:grid-cols-3">
             <Field label="Side">
               <Select value={p.side || SIDE.BOTH} onChange={(event) => updatePrescription({ ...p, side: event.target.value })}>
-                <option value={SIDE.BOTH}>Both sides</option>
-                <option value={SIDE.LEFT}>Left only</option>
-                <option value={SIDE.RIGHT}>Right only</option>
+                <option value={SIDE.BOTH}>Standard</option>
+<option value={SIDE.SEPARATE}>Left & right</option>
+
+{trainingMode === "rehab" && (
+  <>
+    <option value={SIDE.LEFT}>Left only</option>
+    <option value={SIDE.RIGHT}>Right only</option>
+  </>
+)}
               </Select>
             </Field>
             <Field label="Sets"><Input inputMode="numeric" value={p.targetSets || ""} onChange={(event) => updatePrescription({ ...p, targetSets: Number(event.target.value) })} /></Field>
@@ -276,7 +297,18 @@ function ExerciseSetupEditor({ exercise, onChange }) {
   return <div className="text-sm text-slate-500">No configurable tracking option is available for this legacy exercise type.</div>;
 }
 
-function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, onManageExerciseLibrary, saving, saveMessage }) {
+function PlanEditor({
+  draft,
+  setDraft,
+  original,
+  exercises,
+  onSave,
+  onClose,
+  saving,
+  saveMessage,
+  onManageExerciseLibrary,
+  trainingMode = "gym",
+}) {
   const [exerciseQuery, setExerciseQuery] = useState("");
   const [pickerSession, setPickerSession] = useState(null);
   const [replaceTarget, setReplaceTarget] = useState(null);
@@ -410,7 +442,7 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, onM
             {editingTask ? <div className="space-y-3">
               <Field label="Task name"><Input autoFocus value={task.name} onChange={(event) => updateRoutineTask(task.id, { name: event.target.value })} placeholder="e.g. Ice knee" /></Field>
               <Field label="Notes (optional)"><Textarea value={task.notes || ""} onChange={(event) => updateRoutineTask(task.id, { notes: event.target.value })} /></Field>
-              <fieldset><legend className="mb-2 text-sm font-medium text-slate-700">Days</legend><div className="flex flex-wrap gap-2">{[...WEEKDAYS.slice(1), WEEKDAYS[0]].map((day) => <label key={day} className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-2 py-2 text-xs capitalize"><input type="checkbox" checked={task.days.includes(day)} onChange={() => updateRoutineTask(task.id, { days: task.days.includes(day) ? task.days.filter((item) => item !== day) : [...task.days, day] })} />{day.slice(0, 3)}</label>)}</div></fieldset>
+              <fieldset><legend className="mb-2 text-sm font-medium text-slate-700">Days</legend><div className="flex flex-wrap gap-2">{WEEKDAYS.map((day) => <label key={day} className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-2 py-2 text-xs capitalize"><input type="checkbox" checked={task.days.includes(day)} onChange={() => updateRoutineTask(task.id, { days: task.days.includes(day) ? task.days.filter((item) => item !== day) : [...task.days, day] })} />{day.slice(0, 3)}</label>)}</div></fieldset>
               <Field label="Time of day"><Select value={task.timeOfDay} onChange={(event) => updateRoutineTask(task.id, { timeOfDay: event.target.value })}>{Object.values(ROUTINE_TIME).map((value) => <option key={value} value={value}>{value[0].toUpperCase() + value.slice(1)}</option>)}</Select></Field>
               <div className="flex justify-end gap-2"><Button size="sm" variant="danger" onClick={() => { setRoutineTasks(routineTasks.filter((item) => item.id !== task.id).map((item, index) => ({ ...item, sortOrder: index }))); setEditingRoutineId(""); }}>Delete</Button><Button size="sm" disabled={!task.name.trim() || task.days.length === 0} onClick={() => setEditingRoutineId("")}>Done</Button></div>
             </div> : <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="font-medium">{task.name || "Unnamed task"}</div><div className="text-xs capitalize text-slate-500">{task.days.join(", ")} · {task.timeOfDay}</div>{task.notes ? <p className="truncate text-sm text-slate-500">{task.notes}</p> : null}</div><Button size="sm" variant="outline" onClick={() => setEditingRoutineId(task.id)}>Edit</Button></div>}
@@ -492,6 +524,7 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, onM
                   <ExerciseSetupEditor
                     exercise={exercise}
                     onChange={(next) => updateSession(sessionIndex, { exercises: session.exercises.map((item, index) => index === exerciseIndex ? next : item) })}
+                    trainingMode={trainingMode}
                   />
 
                   <Field label="Notes">
@@ -709,7 +742,13 @@ export function ExerciseLibrary({ user, exercises, onChanged }) {
   );
 }
 
-export default function PlansScreen({ user, view = "programme", onManageExerciseLibrary }) {
+export default function PlansScreen({
+  user,
+  view = "programme",
+  onManageExerciseLibrary,
+  trainingMode = "gym",
+}) {
+  console.log("trainingMode:", trainingMode);
   const [plans, setPlans] = useState([]);
   const [exercises, setExercises] = useState([]);
   const [plansLoading, setPlansLoading] = useState(view === "programme");
@@ -910,7 +949,21 @@ export default function PlansScreen({ user, view = "programme", onManageExercise
             </div>
           ) : null}
 
-          {draft ? <PlanEditor draft={draft} setDraft={setDraft} original={original} exercises={exercises} onSave={saveDraft} onClose={closeEditor} onManageExerciseLibrary={onManageExerciseLibrary} saving={saving} saveMessage={saveMessage} /> : null}
+      
+  {draft ? (
+  <PlanEditor
+    draft={draft}
+    setDraft={setDraft}
+    original={original}
+    exercises={exercises}
+    onSave={saveDraft}
+    onClose={closeEditor}
+    saving={saving}
+    saveMessage={saveMessage}
+    onManageExerciseLibrary={onManageExerciseLibrary}
+    trainingMode={trainingMode}
+  />
+) : null}
           {renderSection("Active", activePlans, "Activate any programme when you are ready to use it regularly.")}
           {renderSection("Inactive", inactivePlans, "Programmes you deactivate will remain here and can be activated later.")}
 

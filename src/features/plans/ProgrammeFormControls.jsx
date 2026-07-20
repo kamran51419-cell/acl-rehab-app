@@ -46,7 +46,13 @@ export function DurationInput({ seconds, durationUnit, onChange }) {
   );
 }
 
-export function DirectStrengthPrescription({ prescription, onChange, showNotes = true, bothLabel = "Both legs" }) {
+export function DirectStrengthPrescription({
+  prescription,
+  onChange,
+  showNotes = true,
+  bothLabel = "Both legs",
+  trainingMode = "gym",
+}) {
   const updateReps = (patch) => onChange({ ...prescription, targetReps: { ...prescription.targetReps, ...patch } });
 
   return (
@@ -54,9 +60,15 @@ export function DirectStrengthPrescription({ prescription, onChange, showNotes =
       <div className="grid gap-3 md:grid-cols-4">
         <Field label="Side">
           <Select value={prescription.side || SIDE.BOTH} onChange={(event) => onChange({ ...prescription, side: event.target.value })}>
-            <option value={SIDE.BOTH}>{bothLabel}</option>
-            <option value={SIDE.LEFT}>Left only</option>
-            <option value={SIDE.RIGHT}>Right only</option>
+            <option value={SIDE.BOTH}>Standard</option>
+            <option value={SIDE.SEPARATE}>Left & right</option>
+
+{trainingMode === "rehab" && (
+  <>
+    <option value={SIDE.LEFT}>Left only</option>
+    <option value={SIDE.RIGHT}>Right only</option>
+  </>
+)}
           </Select>
         </Field>
         <Field label="Sets">

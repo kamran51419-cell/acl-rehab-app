@@ -1,5 +1,5 @@
-import { EXERCISE_LOGGING_METHOD } from "./plans.js";
-import { WORKOUT_STATUS } from "./v2Models.js";
+import { EXERCISE_LOGGING_METHOD, EXERCISE_TYPE } from "./plans.js";
+import { SIDE, WORKOUT_STATUS } from "./v2Models";
 import { resolveWorkoutExerciseSide } from "./workoutDisplay.js";
 
 function ordered(items) {
@@ -13,6 +13,14 @@ export function prescribedRepsSnapshot(targetReps = {}) {
 export function createWorkoutExerciseSnapshot(exercise, previousWeights = {}) {
   const setBased = [EXERCISE_LOGGING_METHOD.REPS, EXERCISE_LOGGING_METHOD.REPS_WEIGHT, EXERCISE_LOGGING_METHOD.TIME, EXERCISE_LOGGING_METHOD.DISTANCE, EXERCISE_LOGGING_METHOD.TIME_DISTANCE].includes(exercise.loggingMethod);
   const count = setBased ? Math.max(1, Number(exercise.prescription?.targetSets || 1)) : 0;
+  const prescribedReps = prescribedRepsSnapshot(
+  exercise.prescription?.targetReps,
+);
+
+const initialReps =
+  prescribedReps.type === "range"
+    ? prescribedReps.min
+    : prescribedReps.value ?? "";
   return {
     id: exercise.id,
     exerciseId: exercise.exerciseId,
@@ -27,8 +35,34 @@ export function createWorkoutExerciseSnapshot(exercise, previousWeights = {}) {
     recordedSets: Array.from({ length: count }, (_, index) => ({
       id: `${exercise.id}-set-${index + 1}`,
       setNumber: index + 1,
-      prescribedReps: prescribedRepsSnapshot(exercise.prescription?.targetReps),
-      actualReps: "", rawReps: "", durationSeconds: "", rawDuration: "", distance: "", rawDistance: "",
+      prescribedReps: prescribedRepsSnapshot(
+  exercise.prescription?.targetReps,
+),
+actualReps:
+  prescribedRepsSnapshot(
+    exercise.prescription?.targetReps,
+  ).type === "range"
+    ? prescribedRepsSnapshot(
+        exercise.prescription?.targetReps,
+      ).min
+    : prescribedRepsSnapshot(
+        exercise.prescription?.targetReps,
+      ).value ?? "",
+rawReps: String(
+  prescribedRepsSnapshot(
+    exercise.prescription?.targetReps,
+  ).type === "range"
+    ? prescribedRepsSnapshot(
+        exercise.prescription?.targetReps,
+      ).min ?? ""
+    : prescribedRepsSnapshot(
+        exercise.prescription?.targetReps,
+      ).value ?? "",
+),
+durationSeconds: "",
+rawDuration: "",
+distance: "",
+rawDistance: "",
       weight: exercise.loggingMethod === EXERCISE_LOGGING_METHOD.REPS_WEIGHT ? previousWeights[index + 1] ?? "" : "",
       rawWeight: previousWeights[index + 1] === undefined ? "" : String(previousWeights[index + 1]),
       unit: "kg",
@@ -38,7 +72,15 @@ export function createWorkoutExerciseSnapshot(exercise, previousWeights = {}) {
   };
 }
 
-export function createInProgressWorkout({ id, userId, programme, session, date, previousWeightsByExercise = {}, createdAt = null }) {
+export function createInProgressWorkout({
+  id,
+  userId,
+  programme,
+  session,
+  date,
+  previousWeightsByExercise = {},
+  createdAt = null,
+}) {
   return {
     id,
     userId,
@@ -56,7 +98,42 @@ export function createInProgressWorkout({ id, userId, programme, session, date, 
     programmeNameSnapshot: programme.name,
     sessionId: session.id,
     sessionNameSnapshot: session.name,
-    exercises: ordered(session.exercises).map((exercise) => createWorkoutExerciseSnapshot(exercise, previousWeightsByExercise[exercise.id] || previousWeightsByExercise[exercise.exerciseId] || {})),
+
+    exercises: ordered(session.exercises).flatMap((exercise) => {
+      const previousWeights =
+        previousWeightsByExercise[exercise.id] ||
+        previousWeightsByExercise[exercise.exerciseId] ||
+        {};
+      const supportsSides = [EXERCISE_TYPE.STRENGTH, EXERCISE_TYPE.BALANCE].includes(exercise.exerciseType);
+
+      if (!supportsSides || exercise.prescription?.side !== SIDE.SEPARATE) {
+        return [createWorkoutExerciseSnapshot(exercise, previousWeights)];
+      }
+
+      const leftExercise = {
+        ...exercise,
+        id: `${exercise.id}-left`,
+        prescription: {
+          ...exercise.prescription,
+          side: SIDE.LEFT,
+        },
+      };
+
+      const rightExercise = {
+        ...exercise,
+        id: `${exercise.id}-right`,
+        prescription: {
+          ...exercise.prescription,
+          side: SIDE.RIGHT,
+        },
+      };
+
+      return [
+        createWorkoutExerciseSnapshot(leftExercise, previousWeights),
+        createWorkoutExerciseSnapshot(rightExercise, previousWeights),
+      ];
+    }),
+
     notes: "",
   };
 }
@@ -137,15 +214,15 @@ export function createDebouncedSaver(save, delay = 500, onStatus = () => {}) {
       latest = value;
       revision += 1;
       clearTimeout(timer);
-      const current = revision;
-      timer = setTimeout(() => { timer = null; persist(latest, current).catch(() => {}); }, delay);
+      const currentRevision = revision;
+      timer = setTimeout(() => { timer = null; persist(latest, currentRevision).catch(() => {}); }, delay);
     },
     async flush() {
       if (!timer) { await queue; return; }
       clearTimeout(timer);
       timer = null;
-      const current = revision;
-      await persist(latest, current);
+      const currentRevision = revision;
+      await persist(latest, currentRevision);
     },
     async cancel() { clearTimeout(timer); timer = null; await queue.catch(() => {}); },
   };

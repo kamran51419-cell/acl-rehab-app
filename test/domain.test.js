@@ -122,7 +122,13 @@ test("workout snapshots preserve side and programme guidance independently", () 
   session.exercises[1].prescription.side = SIDE.RIGHT;
   assert.equal(workout.exercises[1].programmeNoteSnapshot, "Guidance left");
   assert.equal(workout.exercises[1].sideSnapshot, SIDE.LEFT);
-  assert.equal(workoutExerciseSideLabel({ ...workout.exercises[0], exerciseType: EXERCISE_TYPE.BALANCE }), "Both sides");
+assert.equal(
+  workoutExerciseSideLabel({
+    ...workout.exercises[0],
+    exerciseType: EXERCISE_TYPE.BALANCE,
+  }),
+  "Standard",
+);
   assert.deepEqual(workout.exercises.map(workoutExerciseProgressKey), ["leg-press:both", "leg-press:left", "leg-press:right"]);
 });
 

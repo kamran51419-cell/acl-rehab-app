@@ -54,10 +54,11 @@ export function resolveWorkoutExerciseSide(exercise = {}) {
 }
 
 export function workoutExerciseSideLabel(exercise) {
+  if (![EXERCISE_TYPE.STRENGTH, EXERCISE_TYPE.BALANCE].includes(exercise?.exerciseType)) return "";
   const side = resolveWorkoutExerciseSide(exercise);
   if (side === SIDE.LEFT) return "Left only";
   if (side === SIDE.RIGHT) return "Right only";
-  if (side === SIDE.BOTH) return exercise.exerciseType === EXERCISE_TYPE.BALANCE ? "Both sides" : "Both legs";
+  if (side === SIDE.BOTH) return "Standard";
   return "";
 }
 

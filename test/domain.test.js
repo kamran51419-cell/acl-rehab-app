@@ -8,7 +8,7 @@ import { normalizeLegacyRehabData } from "../src/lib/firebase/legacyRehabReposit
 import { createWorkout, SIDE } from "../src/lib/domain/v2Models.js";
 import { WORKOUT_BEHAVIOR, groupSessionExercises, previousWeightForExercise, previousWeightsForExercise, resolveWorkoutExerciseSide, sessionWorkoutStatus, workoutExerciseProgressKey, workoutExerciseSideLabel, workoutItem } from "../src/lib/domain/workoutDisplay.js";
 import { EXERCISE_LOGGING_METHOD, EXERCISE_TYPE } from "../src/lib/domain/plans.js";
-import { completeWorkout, createDebouncedSaver, createInProgressWorkout, findInProgressWorkout, isWeightedExerciseComplete, reorderExerciseSnapshots, resumeWorkout, updateRecordedSetWeight } from "../src/lib/domain/workoutSession.js";
+import { completeWorkout, createDebouncedSaver, createInProgressWorkout, createOneOffWorkout, findInProgressWorkout, isMeaningfulWorkout, isWeightedExerciseComplete, reorderExerciseSnapshots, resumeWorkout, updateRecordedSet, updateRecordedSetWeight } from "../src/lib/domain/workoutSession.js";
 import { latestCompletedWorkout, nextRehabAgeMode, persistRehabAgeMode, readRehabAgeMode, rehabAgeLabel } from "../src/lib/domain/homeDashboard.js";
 
 test("rehabilitation age cycles and persists its display preference", () => {
@@ -199,6 +199,30 @@ test("exercise snapshot ordering preserves ids and prescriptions", () => {
   const exercises = [{ id: "a", sortOrder: 0, prescription: { value: 1 } }, { id: "b", sortOrder: 1, prescription: { value: 2 } }];
   const reordered = reorderExerciseSnapshots(exercises, 0, 1);
   assert.deepEqual(reordered.map((item) => [item.id, item.sortOrder, item.prescription.value]), [["b", 0, 2], ["a", 1, 1]]);
+});
+
+test("one-off workouts preserve library order and remain independent from programmes", () => {
+  const programme = { id: "plan", sessions: [{ id: "session", exercises: [] }] };
+  const library = [
+    { id: "run", name: "Run", exerciseType: "cardio", loggingMethod: EXERCISE_LOGGING_METHOD.TIME_DISTANCE },
+    { id: "press", name: "Press", exerciseType: "strength", loggingMethod: EXERCISE_LOGGING_METHOD.REPS_WEIGHT },
+  ];
+  const before = structuredClone(programme);
+  const workout = createOneOffWorkout({ id: "one-off", userId: "uid", exercises: library, date: "2026-07-20" });
+  assert.equal(workout.name, "One-off Workout");
+  assert.equal(workout.sourceType, "one_off");
+  assert.equal(workout.planId, undefined);
+  assert.deepEqual(workout.exercises.map((exercise) => exercise.exerciseId), ["run", "press"]);
+  assert.deepEqual(programme, before);
+});
+
+test("recording methods store only entered actual values and partial completion is meaningful", () => {
+  const workout = createOneOffWorkout({ id: "one-off", userId: "uid", date: "2026-07-20", exercises: [{ id: "reps", name: "Squat", exerciseType: "strength", loggingMethod: EXERCISE_LOGGING_METHOD.REPS }, { id: "task", name: "Walk", loggingMethod: EXERCISE_LOGGING_METHOD.COMPLETED }] });
+  assert.equal(isMeaningfulWorkout(workout), false);
+  const changed = updateRecordedSet(workout, workout.exercises[0].id, workout.exercises[0].recordedSets[0].id, "actualReps", "8");
+  assert.equal(isMeaningfulWorkout(changed), true);
+  assert.equal(changed.exercises[0].recordedSets[0].actualReps, 8);
+  assert.equal(changed.exercises[1].completed, false);
 });
 
 test("set helpers calculate best sets and symmetry from legacy set values", () => {

@@ -233,6 +233,12 @@ export function subscribeWorkouts(db, uid, onNext, onError) {
 }
 
 export async function createInProgressWorkoutDocument(db, uid, workout) {
+  const existing = await getDocs(collection(db, "users", uid, "workouts"));
+  if (existing.docs.some((item) => item.data()?.status === "in_progress" && item.id !== workout.id)) {
+    const error = new Error("An unfinished workout already exists.");
+    error.code = "workout/already-in-progress";
+    throw error;
+  }
   const data = stripUndefined({ ...workout, userId: uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
   await setDoc(workoutRef(db, uid, workout.id), data, { merge: false });
   const saved = { ...workout, userId: uid };

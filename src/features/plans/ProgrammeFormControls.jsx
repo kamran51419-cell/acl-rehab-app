@@ -73,7 +73,15 @@ export function Textarea(props) {
 }
 
 export function DurationInput({ seconds, durationUnit, onChange }) {
-  const unit = durationUnit || (Number(seconds || 0) >= 60 && Number(seconds || 0) % 60 === 0 ? "minutes" : "seconds");
+  const inferredUnit = Number(seconds || 0) === 0
+    ? "minutes"
+    : durationUnit || (Number(seconds || 0) >= 60 && Number(seconds || 0) % 60 === 0 ? "minutes" : "seconds");
+  const [unit, setUnit] = useState(inferredUnit);
+
+  useEffect(() => {
+    if (Number(seconds || 0) > 0 && durationUnit) setUnit(durationUnit);
+  }, [durationUnit, seconds]);
+
   const value = unit === "minutes" ? Number(seconds || 0) / 60 : Number(seconds || 0);
 
   return (
@@ -86,7 +94,14 @@ export function DurationInput({ seconds, durationUnit, onChange }) {
         />
       </Field>
       <Field label="Unit">
-        <Select value={unit} onChange={(event) => onChange({ seconds: Number(seconds || 0), unit: event.target.value })}>
+        <Select
+          value={unit}
+          onChange={(event) => {
+            const nextUnit = event.target.value;
+            setUnit(nextUnit);
+            onChange({ seconds: Number(seconds || 0), unit: nextUnit });
+          }}
+        >
           <option value="seconds">Seconds</option>
           <option value="minutes">Minutes</option>
         </Select>

@@ -116,6 +116,7 @@ export function createBlankPlan({ id = makeGeneratedId("plan"), userId = null, n
     isArchived: false,
     version: 1,
     sourcePlanId: null,
+    routineTasks: [],
     sessions: [],
   };
 }
@@ -277,6 +278,7 @@ export function duplicatePlan(plan, { id = makeGeneratedId("plan"), userId = pla
     isArchived: false,
     archivedAt: null,
     activatedAt: null,
+    routineTasks: asArray(plan.routineTasks).map((task, index) => ({ ...structuredClone(task), id: makeGeneratedId("routine"), sortOrder: index })),
     sessions: sortByOrder(plan.sessions).map((session, sessionIndex) => ({
       ...structuredClone(session),
       id: makeGeneratedId("session"),
@@ -408,6 +410,14 @@ export function canonicalPlanContent(plan) {
   return {
     name: normalizeName(plan?.name),
     description: String(plan?.description || ""),
+    routineTasks: sortByOrder(plan?.routineTasks).map((task) => ({
+      id: task.id,
+      name: normalizeName(task.name),
+      notes: String(task.notes || ""),
+      days: asArray(task.days),
+      timeOfDay: task.timeOfDay,
+      sortOrder: task.sortOrder,
+    })),
     sessions: sortByOrder(plan?.sessions).map((session) => ({
       id: session.id,
       name: normalizeName(session.name),

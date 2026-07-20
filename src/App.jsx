@@ -542,15 +542,6 @@ async function saveSession() {
   return (
     <div className="min-h-screen bg-slate-50 p-4 pb-24 md:p-8 md:pb-8">
       <div className="mx-auto max-w-7xl space-y-6">
-        {activeTab !== "home" ? <div className="flex items-start justify-between gap-4">
-          <div className="space-y-2">
-            <div className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm">
-              Rehab logging dashboard
-            </div>
-            <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">ACL Rehab Tracker</h1>
-          </div>
-        </div> : null}
-
         <div className="hidden md:flex flex-wrap gap-2">
           <TabButton active={activeTab === "home"} onClick={() => setActiveTab("home")}>Home</TabButton>
           <TabButton active={activeTab === "programme"} onClick={() => setActiveTab("programme")}>Programme</TabButton>

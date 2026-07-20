@@ -4,12 +4,12 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createServer } from "vite";
 
-test("Stats has a completed-workout empty state and one Progress heading", async (context) => {
+test("Stats has a completed-workout empty state without a redundant Progress heading", async (context) => {
   const vite = await createServer({ server: { middlewareMode: true }, appType: "custom", logLevel: "silent" });
   context.after(() => vite.close());
   const { ProgressLayout } = await vite.ssrLoadModule("/src/features/progress/ProgressScreen.jsx");
   const markup = renderToStaticMarkup(React.createElement(ProgressLayout, { user: { uid: "user" }, workouts: [], trainingMode: "gym" }));
-  assert.equal((markup.match(/>Progress</g) || []).length, 1);
+  assert.equal((markup.match(/>Progress</g) || []).length, 0);
   assert.match(markup, /Workout History/);
   assert.match(markup, /Stats/);
   assert.match(markup, /No completed workouts yet/);

@@ -124,28 +124,40 @@ function fieldsFor(method) {
   return {
     reps: [EXERCISE_LOGGING_METHOD.REPS, EXERCISE_LOGGING_METHOD.REPS_WEIGHT].includes(method),
     weight: method === EXERCISE_LOGGING_METHOD.REPS_WEIGHT,
+    time: method === EXERCISE_LOGGING_METHOD.TIME,
   };
 }
 
-export function ExerciseCard({ exercise, oneOff, onChange, onAddSet, onRemoveSet, onRemoveExercise, onMove, index, total }) {
+function SetTick({ checked, label, onClick }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 transition ${checked ? "border-emerald-600 bg-emerald-600 text-white" : "border-slate-300 bg-white text-transparent hover:border-emerald-500"}`}
+    >
+      <Check className="h-4 w-4" />
+    </button>
+  );
+}
+
+export function ExerciseCard({ exercise, oneOff, onChange, onAddSet, onRemoveSet, onRemoveExercise, onMove, index, total, hideExerciseName = false }) {
   const fields = fieldsFor(exercise.loggingMethod);
   const side = workoutExerciseSideLabel(exercise);
   const isProgrammeWorkout = !oneOff;
   const isWeighted = exercise.loggingMethod === EXERCISE_LOGGING_METHOD.REPS_WEIGHT;
   const isRepsOnly = exercise.loggingMethod === EXERCISE_LOGGING_METHOD.REPS;
+  const isTimedBalance = exercise.exerciseType === EXERCISE_TYPE.BALANCE && fields.time;
   const isTask = exercise.loggingMethod === EXERCISE_LOGGING_METHOD.COMPLETED;
   const stages = ordered(exercise.prescription?.stages || exercise.prescription?.intervals || []);
 
   const toggleCompleted = () => onChange(exercise.id, null, "completed", !exercise.completed);
   const prescribedRepValue = (set) => set.prescribedReps?.type === "range" ? set.prescribedReps.min : set.prescribedReps?.value ?? "";
   const currentRepValue = (set) => set.rawReps ?? set.actualReps ?? prescribedRepValue(set);
+  const prescribedDuration = durationLabel(exercise.prescription?.targetDurationSeconds, exercise.prescription?.durationUnit) || "—";
 
   function CompletionTick() {
-    return (
-      <button type="button" aria-label={exercise.completed ? `Mark ${exercise.exerciseNameSnapshot} incomplete` : `Mark ${exercise.exerciseNameSnapshot} complete`} onClick={toggleCompleted} className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 transition ${exercise.completed ? "border-emerald-600 bg-emerald-600 text-white" : "border-slate-300 bg-white text-transparent hover:border-emerald-500"}`}>
-        <Check className="h-4 w-4" />
-      </button>
-    );
+    return <SetTick checked={exercise.completed} label={exercise.completed ? `Mark ${exercise.exerciseNameSnapshot} incomplete` : `Mark ${exercise.exerciseNameSnapshot} complete`} onClick={toggleCompleted} />;
   }
 
   function CompactProgrammeContent() {
@@ -156,19 +168,28 @@ export function ExerciseCard({ exercise, oneOff, onChange, onAddSet, onRemoveSet
   }
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4">
+    <section className={`rounded-2xl border border-slate-200 bg-white p-4 ${hideExerciseName ? "shadow-none" : ""}`}>
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
-          <h2 className="font-semibold">{exercise.exerciseNameSnapshot}</h2>
-          {side || exercise.prescription?.targetReps?.type === "range" ? <p className="text-xs text-slate-500">{[side, exercise.prescription?.targetReps?.type === "range" ? `Range: ${exercise.prescription.targetReps.min}–${exercise.prescription.targetReps.max} reps` : null].filter(Boolean).join(" · ")}</p> : null}
+          {!hideExerciseName ? <h2 className="font-semibold">{exercise.exerciseNameSnapshot}</h2> : null}
+          {side || exercise.prescription?.targetReps?.type === "range" ? <p className={`${hideExerciseName ? "text-sm font-semibold text-slate-700" : "text-xs text-slate-500"}`}>{[side, exercise.prescription?.targetReps?.type === "range" ? `Range: ${exercise.prescription.targetReps.min}–${exercise.prescription.targetReps.max} reps` : null].filter(Boolean).join(" · ")}</p> : null}
           {exercise.programmeNoteSnapshot ? <p className="mt-1 text-xs text-slate-500">{exercise.programmeNoteSnapshot}</p> : null}
         </div>
-        <button type="button" aria-label={`Move ${exercise.exerciseNameSnapshot} up`} disabled={!index} onClick={() => onMove(index, -1)} className="p-2 disabled:opacity-30"><ChevronUp className="h-4 w-4" /></button>
-        <button type="button" aria-label={`Move ${exercise.exerciseNameSnapshot} down`} disabled={index === total - 1} onClick={() => onMove(index, 1)} className="p-2 disabled:opacity-30"><ChevronDown className="h-4 w-4" /></button>
+        {!hideExerciseName ? <><button type="button" aria-label={`Move ${exercise.exerciseNameSnapshot} up`} disabled={!index} onClick={() => onMove(index, -1)} className="p-2 disabled:opacity-30"><ChevronUp className="h-4 w-4" /></button><button type="button" aria-label={`Move ${exercise.exerciseNameSnapshot} down`} disabled={index === total - 1} onClick={() => onMove(index, 1)} className="p-2 disabled:opacity-30"><ChevronDown className="h-4 w-4" /></button></> : null}
         {oneOff ? <button type="button" onClick={() => onRemoveExercise(exercise.id)} className="min-h-10 px-2 text-sm font-medium text-red-600">Remove</button> : null}
       </div>
 
-      {isProgrammeWorkout && !isWeighted && !isRepsOnly ? (
+      {isTimedBalance ? (
+        <div className="mt-3 space-y-2">
+          {(exercise.recordedSets || []).map((set) => (
+            <div key={set.id} className="grid grid-cols-[3.5rem_minmax(0,1fr)_2rem] items-center gap-3 rounded-xl bg-slate-50 p-3">
+              <span className="text-sm font-medium">Set {set.setNumber}</span>
+              <span className="text-sm font-medium text-slate-700">{prescribedDuration}</span>
+              <SetTick checked={Boolean(set.completed)} label={set.completed ? `Mark set ${set.setNumber} incomplete` : `Mark set ${set.setNumber} complete`} onClick={() => onChange(exercise.id, set.id, "setCompleted", !set.completed)} />
+            </div>
+          ))}
+        </div>
+      ) : isProgrammeWorkout && !isWeighted && !isRepsOnly ? (
         <div className="mt-3 flex min-h-12 items-center gap-3 rounded-xl bg-slate-50 px-3 py-2"><CompactProgrammeContent /><CompletionTick /></div>
       ) : isTask && oneOff ? (
         <div className="mt-3 flex min-h-12 items-center gap-3 rounded-xl bg-slate-50 px-3 py-2"><CompactProgrammeContent /><CompletionTick /></div>
@@ -190,8 +211,31 @@ export function ExerciseCard({ exercise, oneOff, onChange, onAddSet, onRemoveSet
   );
 }
 
+function buildWorkoutGroups(list) {
+  const groups = [];
+  for (let index = 0; index < list.length; index += 1) {
+    const exercise = list[index];
+    const side = resolveWorkoutExerciseSide(exercise);
+    const next = list[index + 1];
+    const nextSide = resolveWorkoutExerciseSide(next);
+    const isPair = supportsSides(exercise)
+      && next
+      && exercise.exerciseId === next.exerciseId
+      && ((side === SIDE.LEFT && nextSide === SIDE.RIGHT) || (side === SIDE.RIGHT && nextSide === SIDE.LEFT));
+
+    if (isPair) {
+      groups.push({ type: "separate", exercises: side === SIDE.LEFT ? [exercise, next] : [next, exercise] });
+      index += 1;
+    } else {
+      groups.push({ type: "single", exercises: [exercise] });
+    }
+  }
+  return groups;
+}
+
 export function WorkoutForm({ workout, saveStatus, finishing, finishError, onBack, onChange, onAddSet, onRemoveSet, onRemoveExercise, onReorder, onNotes, onFinish, onDiscard }) {
   const list = ordered(workout.exercises);
+  const groups = buildWorkoutGroups(list);
   const move = (index, direction) => {
     const target = index + direction;
     if (target < 0 || target >= list.length) return;
@@ -199,7 +243,40 @@ export function WorkoutForm({ workout, saveStatus, finishing, finishError, onBac
     [next[index], next[target]] = [next[target], next[index]];
     onReorder(next.map((item, itemIndex) => ({ ...item, sortOrder: itemIndex })));
   };
-  return <div className="space-y-5"><button type="button" className="text-sm font-medium text-slate-600" onClick={onBack}>← Workout options</button><section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"><div className="flex justify-between gap-3"><div><p className="text-sm font-medium text-emerald-700">Workout in progress · {workout.sourceType === "one_off" ? "One-off Workout" : "Programme Workout"}</p><h1 className="text-2xl font-semibold">{titleFor(workout)}</h1></div><span className="text-xs text-slate-500">{saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "Saved" : saveStatus === "error" ? "Could not save" : ""}</span></div><label className="mt-4 block text-sm font-medium">Workout date<input type="date" readOnly className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3" value={workout.date || ""} /></label><div className="mt-5 space-y-3">{list.map((exercise, index) => <ExerciseCard key={exercise.id} exercise={exercise} oneOff={workout.sourceType === "one_off"} index={index} total={list.length} onChange={onChange} onAddSet={onAddSet} onRemoveSet={onRemoveSet} onRemoveExercise={onRemoveExercise} onMove={move} />)}</div><label className="mt-5 block text-sm font-medium">Workout notes<textarea className="mt-1 min-h-24 w-full rounded-xl border border-slate-200 p-3" value={workout.notes || ""} onChange={(event) => onNotes(event.target.value)} /></label>{finishError ? <p className="mt-3 text-sm font-medium text-red-600">{finishError}</p> : null}<div className="mt-6 flex flex-col gap-3 sm:flex-row"><Button disabled={finishing} onClick={onFinish}>{finishing ? "Finishing…" : "Complete Workout"}</Button><Button variant="danger" disabled={finishing} onClick={onDiscard}>Discard Workout</Button></div></section></div>;
+
+  return (
+    <div className="space-y-5">
+      <button type="button" className="text-sm font-medium text-slate-600" onClick={onBack}>← Workout options</button>
+      <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <div className="flex justify-between gap-3"><div><p className="text-sm font-medium text-emerald-700">Workout in progress · {workout.sourceType === "one_off" ? "One-off Workout" : "Programme Workout"}</p><h1 className="text-2xl font-semibold">{titleFor(workout)}</h1></div><span className="text-xs text-slate-500">{saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "Saved" : saveStatus === "error" ? "Could not save" : ""}</span></div>
+        <label className="mt-4 block text-sm font-medium">Workout date<input type="date" readOnly className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3" value={workout.date || ""} /></label>
+        <div className="mt-5 space-y-3">
+          {groups.map((group) => {
+            if (group.type === "separate") {
+              const firstIndex = list.findIndex((item) => item.id === group.exercises[0].id);
+              return (
+                <section key={`${group.exercises[0].exerciseId}-separate`} className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <h2 className="font-semibold">{group.exercises[0].exerciseNameSnapshot}</h2>
+                    <div className="flex"><button type="button" aria-label={`Move ${group.exercises[0].exerciseNameSnapshot} up`} disabled={!firstIndex} onClick={() => move(firstIndex, -1)} className="p-2 disabled:opacity-30"><ChevronUp className="h-4 w-4" /></button><button type="button" aria-label={`Move ${group.exercises[0].exerciseNameSnapshot} down`} disabled={firstIndex + 1 >= list.length - 1} onClick={() => move(firstIndex + 1, 1)} className="p-2 disabled:opacity-30"><ChevronDown className="h-4 w-4" /></button></div>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {group.exercises.map((exercise) => <ExerciseCard key={exercise.id} exercise={exercise} oneOff={false} index={firstIndex} total={list.length} onChange={onChange} onAddSet={onAddSet} onRemoveSet={onRemoveSet} onRemoveExercise={onRemoveExercise} onMove={move} hideExerciseName />)}
+                  </div>
+                </section>
+              );
+            }
+            const exercise = group.exercises[0];
+            const index = list.findIndex((item) => item.id === exercise.id);
+            return <ExerciseCard key={exercise.id} exercise={exercise} oneOff={workout.sourceType === "one_off"} index={index} total={list.length} onChange={onChange} onAddSet={onAddSet} onRemoveSet={onRemoveSet} onRemoveExercise={onRemoveExercise} onMove={move} />;
+          })}
+        </div>
+        <label className="mt-5 block text-sm font-medium">Workout notes<textarea className="mt-1 min-h-24 w-full rounded-xl border border-slate-200 p-3" value={workout.notes || ""} onChange={(event) => onNotes(event.target.value)} /></label>
+        {finishError ? <p className="mt-3 text-sm font-medium text-red-600">{finishError}</p> : null}
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row"><Button disabled={finishing} onClick={onFinish}>{finishing ? "Finishing…" : "Complete Workout"}</Button><Button variant="danger" disabled={finishing} onClick={onDiscard}>Discard Workout</Button></div>
+      </section>
+    </div>
+  );
 }
 
 export function DiscardWorkoutDialog({ discarding, error, onCancel, onConfirm }) {
@@ -282,7 +359,23 @@ export default function WorkoutScreen({ user, repository = defaultRepository, in
     }
   }, [intent, unfinished, programme]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const change = (exerciseId, setId, field, value) => setWorkout((current) => field === "completed" ? { ...current, exercises: current.exercises.map((exercise) => exercise.id === exerciseId ? { ...exercise, completed: value } : exercise) } : updateRecordedSet(current, exerciseId, setId, field, value));
+  const change = (exerciseId, setId, field, value) => setWorkout((current) => {
+    if (field === "completed") {
+      return { ...current, exercises: current.exercises.map((exercise) => exercise.id === exerciseId ? { ...exercise, completed: value } : exercise) };
+    }
+    if (field === "setCompleted") {
+      return {
+        ...current,
+        exercises: current.exercises.map((exercise) => {
+          if (exercise.id !== exerciseId) return exercise;
+          const recordedSets = (exercise.recordedSets || []).map((set) => set.id === setId ? { ...set, completed: value } : set);
+          return { ...exercise, recordedSets, completed: recordedSets.some((set) => set.completed) };
+        }),
+      };
+    }
+    return updateRecordedSet(current, exerciseId, setId, field, value);
+  });
+
   const finish = async () => {
     if (!isMeaningfulWorkout(workout)) {
       setFinishError("Record at least one completed entry before completing this workout.");
@@ -302,6 +395,7 @@ export default function WorkoutScreen({ user, repository = defaultRepository, in
       setFinishing(false);
     }
   };
+
   const discard = async () => {
     setDiscarding(true);
     try {

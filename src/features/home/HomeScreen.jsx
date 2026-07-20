@@ -10,15 +10,145 @@ import PlansScreen from "../plans/PlansScreen";
 const defaultRepository = { subscribePlans, subscribeWorkouts, subscribeRoutineOccurrences, setRoutineOccurrenceStatus };
 const VISIBLE_TASKS = 3;
 
-export function TodayRoutine({ tasks = [], expanded = false, onToggle, onStatus }) {
-  const visible = expanded ? tasks : tasks.slice(0, VISIBLE_TASKS);
-  return <section aria-labelledby="today-routine-title" className="space-y-2">
-    <div className="flex items-center justify-between"><h2 id="today-routine-title" className="text-base font-semibold">Today’s Routine</h2>{tasks.length > VISIBLE_TASKS ? <button type="button" className="text-sm font-medium text-slate-600" onClick={onToggle}>{expanded ? "Show Less" : "Show All"}</button> : null}</div>
-    {tasks.length === 0 ? <p className="text-sm text-slate-500">No routine tasks scheduled today.</p> : <div className="space-y-1.5">{visible.map((task) => <article key={task.id} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
-      <div className="min-w-0 flex-1"><div className={task.status === ROUTINE_STATUS.COMPLETED ? "font-medium text-slate-500 line-through" : "font-medium"}>{task.name}</div><div className="flex min-w-0 gap-2 text-xs capitalize text-slate-500"><span>{task.timeOfDay}</span>{task.notes ? <span className="truncate">· {task.notes}</span> : null}<span>· {task.status}</span></div></div>
-      {task.status === ROUTINE_STATUS.PENDING ? <div className="flex shrink-0 gap-1"><Button size="sm" onClick={() => onStatus(task, ROUTINE_STATUS.COMPLETED)}>Complete</Button><Button size="sm" variant="outline" onClick={() => onStatus(task, ROUTINE_STATUS.SKIPPED)}>Skip</Button></div> : <span className={task.status === ROUTINE_STATUS.COMPLETED ? "text-xs font-medium text-emerald-700" : "text-xs font-medium text-slate-500"}>{task.status === ROUTINE_STATUS.COMPLETED ? "Completed" : "Skipped"}</span>}
-    </article>)}</div>}
-  </section>;
+export function TodayRoutine({
+  tasks = [],
+  expanded = false,
+  onToggle,
+  onStatus,
+}) {
+  const pendingTasks = tasks.filter(
+    (task) => task.status !== ROUTINE_STATUS.COMPLETED,
+  );
+
+  const completedTasks = tasks.filter(
+    (task) => task.status === ROUTINE_STATUS.COMPLETED,
+  );
+
+  const visiblePendingTasks = expanded
+    ? pendingTasks
+    : pendingTasks.slice(0, VISIBLE_TASKS);
+
+  const allCompleted = tasks.length > 0 && pendingTasks.length === 0;
+
+  return (
+    <section
+      aria-labelledby="today-routine-title"
+      className="space-y-3"
+    >
+      <div className="flex items-center justify-between">
+        <h2
+          id="today-routine-title"
+          className="text-base font-semibold"
+        >
+          Today’s Routine
+        </h2>
+
+        {pendingTasks.length > VISIBLE_TASKS ? (
+          <button
+            type="button"
+            className="text-sm font-medium text-slate-600"
+            onClick={onToggle}
+          >
+            {expanded ? "Show Less" : "Show All"}
+          </button>
+        ) : null}
+      </div>
+
+      {tasks.length === 0 ? (
+        <p className="text-sm text-slate-500">
+          No routine tasks scheduled today.
+        </p>
+      ) : null}
+
+      {allCompleted ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+          <p className="font-medium text-emerald-800">
+            ✓ Today’s routine complete
+          </p>
+
+          <p className="mt-1 text-sm text-emerald-700">
+            {completedTasks.length} of {tasks.length} tasks completed
+          </p>
+        </div>
+      ) : null}
+
+      {visiblePendingTasks.length > 0 ? (
+        <div className="space-y-1.5">
+          {visiblePendingTasks.map((task) => (
+  <article
+  key={task.id}
+  className="flex min-h-14 items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2"
+>
+            
+              <button
+                type="button"
+                aria-label={`Complete ${task.name}`}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-slate-300 text-sm font-bold text-transparent hover:border-emerald-600 hover:text-emerald-600"
+                onClick={() =>
+                  onStatus(task, ROUTINE_STATUS.COMPLETED)
+                }
+              >
+                ✓
+              </button>
+
+              <div className="min-w-0 flex-1">
+                <div className="font-medium">
+                  {task.name}
+                </div>
+
+                <div className="flex min-w-0 gap-2 text-xs capitalize text-slate-500">
+                  <span>{task.timeOfDay}</span>
+
+                  {task.notes ? (
+                    <span className="truncate">
+                      · {task.notes}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : null}
+
+      {completedTasks.length > 0 && !allCompleted ? (
+        <div className="border-t border-slate-200 pt-3">
+          <h3 className="mb-2 text-sm font-semibold text-emerald-700">
+            Completed
+          </h3>
+
+          <div className="space-y-1.5">
+            {completedTasks.map((task) => (
+              <article
+                key={task.id}
+                className="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2"
+              >
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 font-bold text-emerald-700">
+                  ✓
+                </span>
+
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium text-slate-500 line-through">
+                    {task.name}
+                  </div>
+
+                  <div className="flex min-w-0 gap-2 text-xs capitalize text-slate-400">
+                    <span>{task.timeOfDay}</span>
+
+                    {task.notes ? (
+                      <span className="truncate">
+                        · {task.notes}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
 }
 
 export function HomeDashboard({ programme, unfinishedWorkout, surgeryDate, trainingMode = "gym", today, showSessions, onStart, onContinue, onChooseSession, onOneOff, routineTasks = [], routineExpanded = false, onToggleRoutine, onRoutineStatus }) {

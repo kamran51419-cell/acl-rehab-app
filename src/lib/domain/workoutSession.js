@@ -11,8 +11,8 @@ export function prescribedRepsSnapshot(targetReps = {}) {
 }
 
 export function createWorkoutExerciseSnapshot(exercise, previousWeights = {}) {
-  const weighted = exercise.loggingMethod === EXERCISE_LOGGING_METHOD.REPS_WEIGHT;
-  const count = weighted ? Number(exercise.prescription?.targetSets || 0) : 0;
+  const setBased = [EXERCISE_LOGGING_METHOD.REPS, EXERCISE_LOGGING_METHOD.REPS_WEIGHT, EXERCISE_LOGGING_METHOD.TIME, EXERCISE_LOGGING_METHOD.DISTANCE, EXERCISE_LOGGING_METHOD.TIME_DISTANCE].includes(exercise.loggingMethod);
+  const count = setBased ? Math.max(1, Number(exercise.prescription?.targetSets || 1)) : 0;
   return {
     id: exercise.id,
     exerciseId: exercise.exerciseId,
@@ -28,7 +28,8 @@ export function createWorkoutExerciseSnapshot(exercise, previousWeights = {}) {
       id: `${exercise.id}-set-${index + 1}`,
       setNumber: index + 1,
       prescribedReps: prescribedRepsSnapshot(exercise.prescription?.targetReps),
-      weight: previousWeights[index + 1] ?? "",
+      actualReps: "", rawReps: "", durationSeconds: "", rawDuration: "", distance: "", rawDistance: "",
+      weight: exercise.loggingMethod === EXERCISE_LOGGING_METHOD.REPS_WEIGHT ? previousWeights[index + 1] ?? "" : "",
       rawWeight: previousWeights[index + 1] === undefined ? "" : String(previousWeights[index + 1]),
       unit: "kg",
     })),
@@ -46,7 +47,11 @@ export function createInProgressWorkout({ id, userId, programme, session, date, 
     updatedAt: null,
     completedAt: null,
     status: WORKOUT_STATUS.IN_PROGRESS,
+    sourceType: "programme",
+    name: session.name,
+    startedAt: createdAt || new Date().toISOString(),
     planId: programme.id,
+    programmeId: programme.id,
     planVersion: programme.version || 1,
     programmeNameSnapshot: programme.name,
     sessionId: session.id,
@@ -55,6 +60,23 @@ export function createInProgressWorkout({ id, userId, programme, session, date, 
     notes: "",
   };
 }
+
+export function createOneOffWorkout({ id, userId, name = "", exercises = [], date, startedAt = new Date().toISOString() }) {
+  return { id, userId, date, createdAt: null, updatedAt: null, completedAt: null, startedAt, status: WORKOUT_STATUS.IN_PROGRESS, sourceType: "one_off", name: name.trim() || "One-off Workout", sessionNameSnapshot: name.trim() || "One-off Workout", exercises: exercises.map((definition, index) => createWorkoutExerciseSnapshot({ id: `${definition.id}-${index + 1}`, exerciseId: definition.id, exerciseNameSnapshot: definition.name, exerciseType: definition.exerciseType || "other", loggingMethod: definition.loggingMethod || EXERCISE_LOGGING_METHOD.REPS, sortOrder: index, prescription: {}, sideSnapshot: definition.defaultSideConfig }, {})), notes: "" };
+}
+
+export function isMeaningfulWorkout(workout) {
+  return (workout?.exercises || []).some((exercise) => exercise.completed || (exercise.recordedSets || []).some((set) => [set.actualReps, set.weight, set.durationSeconds, set.distance].some((value) => value !== "" && value !== undefined && value !== null)));
+}
+
+export function updateRecordedSet(workout, exerciseId, setId, field, rawValue) {
+  const rawField = { actualReps: "rawReps", weight: "rawWeight", durationSeconds: "rawDuration", distance: "rawDistance" }[field];
+  const value = rawValue === "" || !Number.isFinite(Number(rawValue)) ? "" : Number(rawValue);
+  return { ...workout, exercises: workout.exercises.map((exercise) => exercise.id !== exerciseId ? exercise : { ...exercise, recordedSets: exercise.recordedSets.map((set) => set.id !== setId ? set : { ...set, [field]: value, [rawField]: rawValue }) }) };
+}
+
+export function addRecordedSet(workout, exerciseId) { return { ...workout, exercises: workout.exercises.map((exercise) => { if (exercise.id !== exerciseId) return exercise; const setNumber = exercise.recordedSets.length + 1; return { ...exercise, recordedSets: [...exercise.recordedSets, { id: `${exercise.id}-set-${Date.now()}-${setNumber}`, setNumber, actualReps: "", rawReps: "", weight: "", rawWeight: "", durationSeconds: "", rawDuration: "", distance: "", rawDistance: "", unit: "kg" }] }; }) }; }
+export function removeRecordedSet(workout, exerciseId, setId) { return { ...workout, exercises: workout.exercises.map((exercise) => exercise.id !== exerciseId ? exercise : { ...exercise, recordedSets: exercise.recordedSets.filter((set) => set.id !== setId).map((set, index) => ({ ...set, setNumber: index + 1 })) }) }; }
 
 export function findInProgressWorkout(workouts, planId, sessionId, date) {
   return (workouts || []).find((workout) => workout.status === WORKOUT_STATUS.IN_PROGRESS && workout.planId === planId && workout.sessionId === sessionId && workout.date === date) || null;

@@ -127,6 +127,10 @@ export function createWorkout({
   sessionNameSnapshot = "Legacy log",
   exercises = [],
   notes = "",
+  sourceType = undefined,
+  name = undefined,
+  programmeNameSnapshot = undefined,
+  durationSeconds = undefined,
   legacy = undefined,
 }) {
   return {
@@ -143,6 +147,10 @@ export function createWorkout({
     sessionNameSnapshot,
     exercises,
     notes,
+    sourceType: sourceType || (planId || sessionId ? "programme" : undefined),
+    name,
+    programmeNameSnapshot,
+    durationSeconds,
     legacy,
   };
 }

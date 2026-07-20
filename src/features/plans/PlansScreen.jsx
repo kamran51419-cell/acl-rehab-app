@@ -634,7 +634,6 @@ export function ExerciseLibrary({ user, exercises, onChanged }) {
             <div className="mt-4 space-y-4">
               <Field label="Exercise name"><Input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="Leg extension" /></Field>
               <Field label="Exercise type"><Select value={exerciseType} onChange={(event) => setExerciseType(event.target.value)}>{LIBRARY_EXERCISE_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}</Select></Field>
-              <Field label="Recording method"><Input value={loggingMethodLabel(defaultLoggingMethodForExerciseType(exerciseType))} disabled /></Field>
             </div>
             <div className="mt-6 flex justify-end gap-2">
               <Button variant="outline" disabled={saving} onClick={() => { setAddingExercise(false); setName(""); setExerciseType(EXERCISE_TYPE.STRENGTH); }}>Cancel</Button>
@@ -651,7 +650,6 @@ export function ExerciseLibrary({ user, exercises, onChanged }) {
             <div className="mt-4 space-y-4">
               <Field label="Exercise name"><Input autoFocus value={editingExercise.name} onChange={(event) => setEditingExercise({ ...editingExercise, name: event.target.value })} /></Field>
               <Field label="Exercise type"><Select value={editingExercise.exerciseType || editingExercise.trackingType} onChange={(event) => setEditingExercise({ ...editingExercise, exerciseType: event.target.value })}>{!LIBRARY_EXERCISE_TYPE_OPTIONS.includes(editingExercise.exerciseType) ? <option value={editingExercise.exerciseType}>{exerciseTypeLabel(editingExercise.exerciseType)} (existing)</option> : null}{LIBRARY_EXERCISE_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}</Select></Field>
-              <Field label="Recording method"><Input value={loggingMethodLabel(defaultLoggingMethodForExerciseType(editingExercise.exerciseType || editingExercise.trackingType))} disabled /></Field>
             </div>
             <div className="mt-6 flex flex-wrap justify-end gap-2">
               <Button variant="danger" onClick={() => setDeleteCandidate(editingExercise)}>Delete</Button>

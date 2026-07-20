@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ClipboardList, Home, Table2, Dumbbell, Menu, Plus, Trash2, X } from "lucide-react";
+import { ClipboardList, Home, Table2, Dumbbell, Settings, Plus, Trash2, X } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -542,29 +542,24 @@ async function saveSession() {
   return (
     <div className="min-h-screen bg-slate-50 p-4 pb-24 md:p-8 md:pb-8">
       <div className="mx-auto max-w-7xl space-y-6">
-        <div className="flex items-start justify-between gap-4">
+        {activeTab !== "home" ? <div className="flex items-start justify-between gap-4">
           <div className="space-y-2">
             <div className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm">
               Rehab logging dashboard
             </div>
             <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">ACL Rehab Tracker</h1>
-            <div className="text-sm text-slate-500">{user.email}</div>
           </div>
-
-          <Button variant="outline" onClick={handleLogout}>
-            Log out
-          </Button>
-        </div>
+        </div> : null}
 
         <div className="hidden md:flex flex-wrap gap-2">
           <TabButton active={activeTab === "home"} onClick={() => setActiveTab("home")}>Home</TabButton>
           <TabButton active={activeTab === "programme"} onClick={() => setActiveTab("programme")}>Programme</TabButton>
           <TabButton active={activeTab === "workout"} onClick={() => setActiveTab("workout")}>Workout</TabButton>
           <TabButton active={["progress", "workout-history", "table", "graphs"].includes(activeTab)} onClick={() => setActiveTab("progress")}>Progress</TabButton>
-          <TabButton active={activeTab === "more"} onClick={() => setActiveTab("more")}>More</TabButton>
+          <TabButton active={activeTab === "more"} onClick={() => setActiveTab("more")}>Settings</TabButton>
         </div>
 
-        {activeTab === "home" && <HomeScreen user={user} surgeryDate={surgeryDate} trainingMode={trainingMode} fromProgramme={libraryFromProgramme} onBackToProgramme={() => { setLibraryFromProgramme(false); setActiveTab("programme"); }} onOpenProgramme={() => { setLibraryFromProgramme(false); setActiveTab("programme"); }} onOpenWorkout={(intent) => { setWorkoutIntent({ ...intent, token: Date.now() }); setActiveTab("workout"); }} />}
+        {activeTab === "home" && <HomeScreen user={user} surgeryDate={surgeryDate} trainingMode={trainingMode} fromProgramme={libraryFromProgramme} onBackToProgramme={() => { setLibraryFromProgramme(false); setActiveTab("programme"); }} onOpenWorkout={(intent) => { setWorkoutIntent({ ...intent, token: Date.now() }); setActiveTab("workout"); }} />}
 
         {activeTab === "log" && (
           <div className="space-y-6">
@@ -706,7 +701,7 @@ async function saveSession() {
         {activeTab === "programme" && <PlansScreen user={user} onManageExerciseLibrary={() => { setLibraryFromProgramme(true); setActiveTab("home"); requestAnimationFrame(() => document.getElementById("exercise-library")?.scrollIntoView({ behavior: "smooth" })); }} />}
         {activeTab === "workout" && <WorkoutScreen user={user} intent={workoutIntent} onIntentHandled={() => setWorkoutIntent(null)} onFinished={() => setActiveTab("workout-history")} onDiscarded={() => setActiveTab("home")} />}
         {["progress", "workout-history"].includes(activeTab) && <ProgressScreen key={activeTab} user={user} trainingMode={trainingMode} initialTab={activeTab === "workout-history" ? "history" : "stats"} />}
-        {activeTab === "more" && <div className="space-y-4"><div><h1 className="text-2xl font-semibold">More</h1><p className="text-sm text-slate-500">Manage app preferences.</p></div><CardShell title="Settings"><div className="max-w-md space-y-4"><div><Label>Training mode</Label><select className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm" value={trainingMode} onChange={async (event) => { const nextMode = event.target.value; setTrainingMode(nextMode); await saveAllData(weeks, customExercises, surgeryDate, nextMode); }}><option value="gym">Gym</option><option value="rehab">Rehab</option></select></div>{trainingMode === "rehab" ? <div><Label>Surgery date (optional)</Label><Input className="mt-1" type="date" value={surgeryDate} onChange={async (event) => { const nextDate = event.target.value; setSurgeryDate(nextDate); setWeekManuallyEdited(false); await saveAllData(weeks, customExercises, nextDate, trainingMode); }} />{surgeryDate ? <div className="mt-2 flex items-center justify-between gap-3"><p className="text-sm text-slate-500">{new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit", timeZone: "UTC" }).format(new Date(`${surgeryDate}T00:00:00Z`))}</p><Button size="sm" variant="outline" onClick={async () => { setSurgeryDate(""); await saveAllData(weeks, customExercises, "", trainingMode); }}>Remove</Button></div> : null}</div> : null}</div></CardShell></div>}
+        {activeTab === "more" && <div className="space-y-4"><div><h1 className="text-2xl font-semibold">Settings</h1><p className="text-sm text-slate-500">Manage app preferences and your account.</p></div><CardShell title="Settings"><div className="max-w-md space-y-4"><div><Label>Training mode</Label><select className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm" value={trainingMode} onChange={async (event) => { const nextMode = event.target.value; setTrainingMode(nextMode); await saveAllData(weeks, customExercises, surgeryDate, nextMode); }}><option value="gym">Gym</option><option value="rehab">Rehab</option></select></div>{trainingMode === "rehab" ? <div><Label>Surgery date (optional)</Label><Input className="mt-1" type="date" value={surgeryDate} onChange={async (event) => { const nextDate = event.target.value; setSurgeryDate(nextDate); setWeekManuallyEdited(false); await saveAllData(weeks, customExercises, nextDate, trainingMode); }} />{surgeryDate ? <div className="mt-2 flex items-center justify-between gap-3"><p className="text-sm text-slate-500">{new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit", timeZone: "UTC" }).format(new Date(`${surgeryDate}T00:00:00Z`))}</p><Button size="sm" variant="outline" onClick={async () => { setSurgeryDate(""); await saveAllData(weeks, customExercises, "", trainingMode); }}>Remove</Button></div> : null}</div> : null}</div></CardShell><CardShell title="Account"><div className="max-w-md space-y-4"><div><Label>Email</Label><p className="mt-1 text-sm text-slate-600">{user.email}</p></div><Button variant="outline" onClick={handleLogout}>Log out</Button></div></CardShell></div>}
 
         {activeTab === "table" && (
           <div className="space-y-4">
@@ -1029,8 +1024,8 @@ async function saveSession() {
             onClick={() => setActiveTab("more")}
             className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "more" ? "bg-slate-100 font-medium" : "text-slate-500")}
           >
-            <Menu className="h-4 w-4" />
-            More
+            <Settings className="h-4 w-4" />
+            Settings
           </button>
         </div>
       </div>

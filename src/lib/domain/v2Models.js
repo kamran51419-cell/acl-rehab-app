@@ -2,6 +2,7 @@ export const V2_SCHEMA_VERSION = 2;
 
 export const SIDE = Object.freeze({
   BOTH: "both",
+  SEPARATE: "separate",
   LEFT: "left",
   RIGHT: "right",
 });
@@ -81,76 +82,5 @@ export function createPrescriptionBlock({
     restSeconds,
     notes,
     sortOrder,
-  };
-}
-
-export function createWorkoutSet({
-  id,
-  setNumber,
-  side,
-  setType = SET_TYPE.WORKING,
-  targetReps = unknownTargetReps(),
-  actualReps = undefined,
-  weight = undefined,
-  completed = false,
-  rawReps = "",
-  rawWeight = "",
-  previous = undefined,
-}) {
-  return {
-    id,
-    setNumber,
-    side,
-    setType,
-    targetReps,
-    actualReps,
-    weight,
-    unit: "kg",
-    completed,
-    rawReps,
-    rawWeight,
-    previous,
-  };
-}
-
-export function createWorkout({
-  id,
-  userId = null,
-  date = "",
-  createdAt = null,
-  startedAt = null,
-  completedAt = null,
-  status = WORKOUT_STATUS.COMPLETED,
-  planId = null,
-  planVersion = null,
-  sessionId = null,
-  sessionNameSnapshot = "Legacy log",
-  exercises = [],
-  notes = "",
-  sourceType = undefined,
-  name = undefined,
-  programmeNameSnapshot = undefined,
-  durationSeconds = undefined,
-  legacy = undefined,
-}) {
-  return {
-    id,
-    userId,
-    date,
-    createdAt,
-    startedAt,
-    completedAt,
-    status,
-    planId,
-    planVersion,
-    sessionId,
-    sessionNameSnapshot,
-    exercises,
-    notes,
-    sourceType: sourceType || (planId || sessionId ? "programme" : undefined),
-    name,
-    programmeNameSnapshot,
-    durationSeconds,
-    legacy,
   };
 }

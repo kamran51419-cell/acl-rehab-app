@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../../firebase";
 import { REP_TARGET_TYPE, fixedReps, repRange } from "../../lib/domain/plans";
 import { SIDE } from "../../lib/domain/v2Models";
@@ -21,15 +22,29 @@ function useSavedTrainingMode() {
   const [trainingMode, setTrainingMode] = useState("gym");
 
   useEffect(() => {
-    const user = auth.currentUser;
-    if (!user?.uid) return undefined;
+    let unsubscribeRehabData;
 
-    return subscribeLegacyRehabData(
-      db,
-      user.uid,
-      (saved) => setTrainingMode(saved.trainingMode || "gym"),
-      () => setTrainingMode("gym"),
-    );
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      unsubscribeRehabData?.();
+      unsubscribeRehabData = undefined;
+
+      if (!user?.uid) {
+        setTrainingMode("gym");
+        return;
+      }
+
+      unsubscribeRehabData = subscribeLegacyRehabData(
+        db,
+        user.uid,
+        (saved) => setTrainingMode(saved.trainingMode || "gym"),
+        () => setTrainingMode("gym"),
+      );
+    });
+
+    return () => {
+      unsubscribeAuth();
+      unsubscribeRehabData?.();
+    };
   }, []);
 
   return trainingMode;

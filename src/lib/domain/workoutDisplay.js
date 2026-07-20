@@ -54,6 +54,7 @@ export function resolveWorkoutExerciseSide(exercise = {}) {
 }
 
 export function workoutExerciseSideLabel(exercise) {
+  if (![EXERCISE_TYPE.STRENGTH, EXERCISE_TYPE.BALANCE].includes(exercise?.exerciseType)) return "";
   const side = resolveWorkoutExerciseSide(exercise);
   if (side === SIDE.LEFT) return "Left only";
   if (side === SIDE.RIGHT) return "Right only";

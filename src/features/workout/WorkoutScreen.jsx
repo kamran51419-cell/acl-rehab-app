@@ -3,8 +3,17 @@ import { Check, ChevronDown, ChevronRight, ChevronUp, Dumbbell, Search, Trash2 }
 import { db } from "../../firebase";
 import Button from "../../components/ui/Button";
 import { todayString } from "../../lib/domain/date";
-import { EXERCISE_LOGGING_METHOD, filterExerciseLibrary } from "../../lib/domain/plans";
-import { previousWeightsForExercise, sessionWorkoutStatus, workoutExerciseSideLabel } from "../../lib/domain/workoutDisplay";
+import {
+  EXERCISE_LOGGING_METHOD,
+  filterExerciseLibrary,
+  planPrescriptionSummary,
+} from "../../lib/domain/plans";
+import {
+  durationLabel,
+  previousWeightsForExercise,
+  sessionWorkoutStatus,
+  workoutExerciseSideLabel,
+} from "../../lib/domain/workoutDisplay";
 import { addRecordedSet, completeWorkout, createDebouncedSaver, createInProgressWorkout, createOneOffWorkout, isMeaningfulWorkout, removeRecordedSet, updateRecordedSet } from "../../lib/domain/workoutSession";
 import { createInProgressWorkoutDocument, deleteWorkoutDocument, finishWorkoutDocument, subscribeExerciseDefinitions, subscribePlans, subscribeWorkouts, updateInProgressWorkoutDocument } from "../../lib/firebase/planRepository";
 import { makeId } from "../../lib/domain/legacyWorkouts";
@@ -22,11 +31,340 @@ export function OneOffWorkoutBuilder({ exercises, onCancel, onStart }) {
 }
 
 function fieldsFor(method) { return { reps: ["reps", "reps_weight"].includes(method), weight: method === "reps_weight", duration: ["time", "time_distance"].includes(method), distance: ["distance", "time_distance"].includes(method) }; }
-export function ExerciseCard({ exercise, oneOff, onChange, onAddSet, onRemoveSet, onRemoveExercise, onMove, index, total }) {
-  const fields = fieldsFor(exercise.loggingMethod); const task = exercise.loggingMethod === EXERCISE_LOGGING_METHOD.COMPLETED; const side = workoutExerciseSideLabel(exercise);
-  return <section className="rounded-2xl border border-slate-200 bg-white p-4"><div className="flex items-start gap-2"><div className="min-w-0 flex-1"><h2 className="font-semibold">{exercise.exerciseNameSnapshot}</h2>{side ? <p className="text-xs text-slate-500">{side}</p> : null}{exercise.programmeNoteSnapshot ? <p className="text-xs text-slate-500">{exercise.programmeNoteSnapshot}</p> : null}</div><button type="button" aria-label={`Move ${exercise.exerciseNameSnapshot} up`} disabled={!index} onClick={() => onMove(index, -1)} className="p-2 disabled:opacity-30"><ChevronUp className="h-4 w-4"/></button><button type="button" aria-label={`Move ${exercise.exerciseNameSnapshot} down`} disabled={index === total - 1} onClick={() => onMove(index, 1)} className="p-2 disabled:opacity-30"><ChevronDown className="h-4 w-4"/></button>{oneOff ? <button type="button" onClick={() => onRemoveExercise(exercise.id)} className="min-h-10 px-2 text-sm font-medium text-red-600">Remove</button> : null}</div>{task ? <label className="mt-3 flex min-h-11 items-center gap-3"><input type="checkbox" checked={Boolean(exercise.completed)} onChange={(e) => onChange(exercise.id, null, "completed", e.target.checked)}/><span>Task completed</span>{exercise.completed ? <Check className="h-5 w-5 text-emerald-600"/> : null}</label> : <div className="mt-3 space-y-2">{(exercise.recordedSets || []).map((set) => <div key={set.id} className="rounded-xl bg-slate-50 p-3"><div className="mb-2 flex items-center justify-between text-sm font-medium"><span>Set {set.setNumber}</span>{oneOff && exercise.recordedSets.length > 1 ? <button type="button" className="text-red-600" onClick={() => onRemoveSet(exercise.id, set.id)}>Remove set</button> : null}</div><div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{fields.reps ? <label className="text-xs font-medium">Reps<input aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} reps`} inputMode="numeric" className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-2" onFocus={(e) => e.currentTarget.select()} value={set.rawReps ?? set.actualReps ?? ""} onChange={(e) => onChange(exercise.id, set.id, "actualReps", e.target.value)}/></label> : null}{fields.weight ? <label className="text-xs font-medium">Weight (kg)<input aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} weight`} inputMode="decimal" className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-2" onFocus={(e) => e.currentTarget.select()} value={set.rawWeight ?? set.weight ?? ""} onChange={(e) => onChange(exercise.id, set.id, "weight", e.target.value)}/></label> : null}{fields.duration ? <label className="text-xs font-medium">Duration (seconds)<input inputMode="numeric" className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-2" onFocus={(e) => e.currentTarget.select()} value={set.rawDuration ?? set.durationSeconds ?? ""} onChange={(e) => onChange(exercise.id, set.id, "durationSeconds", e.target.value)}/></label> : null}{fields.distance ? <label className="text-xs font-medium">Distance (km)<input inputMode="decimal" className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-2" onFocus={(e) => e.currentTarget.select()} value={set.rawDistance ?? set.distance ?? ""} onChange={(e) => onChange(exercise.id, set.id, "distance", e.target.value)}/></label> : null}</div></div>)}{oneOff ? <button type="button" className="min-h-11 text-sm font-medium text-emerald-700" onClick={() => onAddSet(exercise.id)}>+ Add set</button> : null}</div>}</section>;
+export function ExerciseCard({
+  exercise,
+  oneOff,
+  onChange,
+  onAddSet,
+  onRemoveSet,
+  onRemoveExercise,
+  onMove,
+  index,
+  total,
+}) {
+  const fields = fieldsFor(exercise.loggingMethod);
+  const side = workoutExerciseSideLabel(exercise);
+
+  const isProgrammeWorkout = !oneOff;
+  const isWeighted = exercise.loggingMethod === "reps_weight";
+  const isRepsOnly = exercise.loggingMethod === "reps";
+  const isTask = exercise.loggingMethod === "completed";
+  const isInterval =
+  exercise.loggingMethod ===
+  EXERCISE_LOGGING_METHOD.INTERVAL;
+
+ const stages = ordered(
+  exercise.prescription?.stages ||
+    exercise.prescription?.intervals ||
+    [],
+);
+
+  function toggleCompleted() {
+    onChange(
+      exercise.id,
+      null,
+      "completed",
+      !exercise.completed,
+    );
+  }
+
+  function prescribedRepValue(set) {
+    if (set.prescribedReps?.type === "fixed") {
+      return set.prescribedReps.value;
+    }
+
+    if (set.prescribedReps?.type === "range") {
+      return set.prescribedReps.min;
+    }
+
+    return "";
+  }
+
+  function currentRepValue(set) {
+    return (
+      set.rawReps ??
+      set.actualReps ??
+      prescribedRepValue(set)
+    );
+  }
+
+  function CompletionTick() {
+    return (
+      <button
+        type="button"
+        aria-label={
+          exercise.completed
+            ? `Mark ${exercise.exerciseNameSnapshot} incomplete`
+            : `Mark ${exercise.exerciseNameSnapshot} complete`
+        }
+        onClick={toggleCompleted}
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 transition ${
+          exercise.completed
+            ? "border-emerald-600 bg-emerald-600 text-white"
+            : "border-slate-300 bg-white text-transparent hover:border-emerald-500"
+        }`}
+      >
+        <Check className="h-4 w-4" />
+      </button>
+    );
+  }
+
+  function intervalStageLabel(stage) {
+    const phase =
+      stage.phase === "rest" ? "Rest" : "Work";
+
+    const duration =
+      durationLabel(
+        stage.durationSeconds,
+        stage.durationUnit,
+      ) || "—";
+
+    return `${duration} ${phase.toLowerCase()}`;
+  }
+
+  function CompactProgrammeContent() {
+  if (stages.length > 0) {
+    return (
+      <div className="min-w-0 flex-1 space-y-1">
+        {stages.map((stage, stageIndex) => (
+          <div
+            key={stage.id || stageIndex}
+            className="text-sm font-medium text-slate-700"
+          >
+            {intervalStageLabel(stage)}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <span className="min-w-0 flex-1 text-sm font-medium text-slate-700">
+      {planPrescriptionSummary(exercise) ||
+        (isTask ? "Complete task" : "Complete exercise")}
+    </span>
+  );
 }
 
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <h2 className="font-semibold">
+            {exercise.exerciseNameSnapshot}
+          </h2>
+
+          {side || exercise.prescription?.targetReps?.type === "range" ? (
+  <p className="text-xs text-slate-500">
+    {[
+      side,
+      exercise.prescription?.targetReps?.type === "range"
+        ? `Range: ${exercise.prescription.targetReps.min}–${exercise.prescription.targetReps.max} reps`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(" · ")}
+  </p>
+) : null}
+
+          {exercise.programmeNoteSnapshot ? (
+            <p className="mt-1 text-xs text-slate-500">
+              {exercise.programmeNoteSnapshot}
+            </p>
+          ) : null}
+        </div>
+
+        <button
+          type="button"
+          aria-label={`Move ${exercise.exerciseNameSnapshot} up`}
+          disabled={!index}
+          onClick={() => onMove(index, -1)}
+          className="p-2 disabled:opacity-30"
+        >
+          <ChevronUp className="h-4 w-4" />
+        </button>
+
+        <button
+          type="button"
+          aria-label={`Move ${exercise.exerciseNameSnapshot} down`}
+          disabled={index === total - 1}
+          onClick={() => onMove(index, 1)}
+          className="p-2 disabled:opacity-30"
+        >
+          <ChevronDown className="h-4 w-4" />
+        </button>
+
+        {oneOff ? (
+          <button
+            type="button"
+            onClick={() =>
+              onRemoveExercise(exercise.id)
+            }
+            className="min-h-10 px-2 text-sm font-medium text-red-600"
+          >
+            Remove
+          </button>
+        ) : null}
+      </div>
+
+      {isProgrammeWorkout &&
+      !isWeighted &&
+      !isRepsOnly ? (
+        <div className="mt-3 flex min-h-12 items-center gap-3 rounded-xl bg-slate-50 px-3 py-2">
+          <CompactProgrammeContent />
+
+          <CompletionTick />
+        </div>
+      ) : isTask && oneOff ? (
+        <div className="mt-3 flex min-h-12 items-center gap-3 rounded-xl bg-slate-50 px-3 py-2">
+          <CompactProgrammeContent />
+
+          <CompletionTick />
+        </div>
+      ) : (
+        <div className="mt-3 space-y-2">
+          {(exercise.recordedSets || []).map(
+            (set) => (
+              <div
+                key={set.id}
+                className={`grid items-end gap-2 rounded-xl bg-slate-50 p-3 ${
+                  isWeighted
+                    ? "grid-cols-[3.25rem_minmax(0,1fr)_minmax(0,1fr)]"
+                    : "grid-cols-[3.25rem_minmax(0,1fr)]"
+                }`}
+              >
+                <span className="pb-2 text-sm font-medium">
+                  Set {set.setNumber}
+                </span>
+
+                {fields.reps ? (
+                  <label className="min-w-0 text-xs font-medium">
+                    Reps
+
+                    {set.prescribedReps?.type === "range" ? (
+  <select
+    aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} reps`}
+    className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-slate-900"
+    value={currentRepValue(set)}
+    onChange={(event) =>
+      onChange(
+        exercise.id,
+        set.id,
+        "actualReps",
+        event.target.value,
+      )
+    }
+  >
+  <option value="" disabled hidden>
+  {set.prescribedReps.min}–{set.prescribedReps.max}
+</option>
+
+    {Array.from(
+      {
+        length:
+          Number(set.prescribedReps.max) -
+          Number(set.prescribedReps.min) +
+          1,
+      },
+      (_, index) =>
+        Number(set.prescribedReps.min) + index,
+    ).map((rep) => (
+      <option key={rep} value={rep}>
+        {rep}
+      </option>
+    ))}
+  </select>
+) : (
+  <input
+    aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} reps`}
+    inputMode="numeric"
+    className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-slate-900"
+    value={currentRepValue(set)}
+    onFocus={(event) =>
+      event.currentTarget.select()
+    }
+    onChange={(event) =>
+      onChange(
+        exercise.id,
+        set.id,
+        "actualReps",
+        event.target.value,
+      )
+    }
+  />
+)}
+                  </label>
+                ) : null}
+
+                {isWeighted ? (
+                  <label className="min-w-0 text-xs font-medium">
+                    Weight (kg)
+
+                    <input
+                      aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} weight`}
+                      inputMode="decimal"
+                      className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-slate-900"
+                      value={
+                        set.rawWeight ??
+                        set.weight ??
+                        ""
+                      }
+                      onFocus={(event) =>
+                        event.currentTarget.select()
+                      }
+                      onChange={(event) =>
+                        onChange(
+                          exercise.id,
+                          set.id,
+                          "weight",
+                          event.target.value,
+                        )
+                      }
+                    />
+                  </label>
+                ) : null}
+
+                {oneOff &&
+                exercise.recordedSets.length > 1 ? (
+                  <button
+                    type="button"
+                    className="col-start-2 min-h-10 justify-self-start text-sm text-red-600"
+                    onClick={() =>
+                      onRemoveSet(
+                        exercise.id,
+                        set.id,
+                      )
+                    }
+                  >
+                    Remove
+                  </button>
+                ) : null}
+              </div>
+            ),
+          )}
+
+          {isProgrammeWorkout && isRepsOnly ? (
+            <div className="flex min-h-10 items-center justify-end pr-1">
+              <CompletionTick />
+            </div>
+          ) : null}
+
+          {oneOff ? (
+            <button
+              type="button"
+              className="min-h-11 text-sm font-medium text-emerald-700"
+              onClick={() =>
+                onAddSet(exercise.id)
+              }
+            >
+              + Add set
+            </button>
+          ) : null}
+        </div>
+      )}
+    </section>
+  );
+}
 export function WorkoutForm({ workout, saveStatus, finishing, finishError, onBack, onChange, onAddSet, onRemoveSet, onRemoveExercise, onReorder, onNotes, onFinish, onDiscard }) { const list = ordered(workout.exercises); const move = (index, direction) => { const target = index + direction; if (target < 0 || target >= list.length) return; const next = list.slice(); [next[index], next[target]] = [next[target], next[index]]; onReorder(next.map((item, i) => ({ ...item, sortOrder: i }))); }; return <div className="space-y-5"><button type="button" className="text-sm font-medium text-slate-600" onClick={onBack}>← Workout options</button><section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"><div className="flex justify-between gap-3"><div><p className="text-sm font-medium text-emerald-700">Workout in progress · {workout.sourceType === "one_off" ? "One-off Workout" : "Programme Workout"}</p><h1 className="text-2xl font-semibold">{titleFor(workout)}</h1></div><span className="text-xs text-slate-500">{saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "Saved" : saveStatus === "error" ? "Could not save" : ""}</span></div><label className="mt-4 block text-sm font-medium">Workout date<input type="date" readOnly className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3" value={workout.date || ""}/></label><div className="mt-5 space-y-3">{list.map((exercise, index) => <ExerciseCard key={exercise.id} exercise={exercise} oneOff={workout.sourceType === "one_off"} index={index} total={list.length} onChange={onChange} onAddSet={onAddSet} onRemoveSet={onRemoveSet} onRemoveExercise={onRemoveExercise} onMove={move}/>)}</div><label className="mt-5 block text-sm font-medium">Workout notes<textarea className="mt-1 min-h-24 w-full rounded-xl border border-slate-200 p-3" value={workout.notes || ""} onChange={(e) => onNotes(e.target.value)}/></label>{finishError ? <p className="mt-3 text-sm font-medium text-red-600">{finishError}</p> : null}<div className="mt-6 flex flex-col gap-3 sm:flex-row"><Button disabled={finishing} onClick={onFinish}>{finishing ? "Finishing…" : "Complete Workout"}</Button><Button variant="danger" disabled={finishing} onClick={onDiscard}>Discard Workout</Button></div></section></div>; }
 export function DiscardWorkoutDialog({ discarding, error, onCancel, onConfirm }) { return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"><div role="dialog" aria-modal="true" aria-labelledby="discard-title" className="w-full max-w-md rounded-2xl bg-white p-5"><h2 id="discard-title" className="text-lg font-semibold">Discard Workout?</h2><p className="mt-2 text-sm text-slate-600">This permanently deletes this unfinished workout. Completed workouts will not be affected, and it will not appear in Workout History.</p>{error ? <p className="mt-2 text-red-600">{error}</p> : null}<div className="mt-5 flex justify-end gap-2"><Button variant="outline" onClick={onCancel}>Cancel</Button><Button variant="danger" disabled={discarding} onClick={onConfirm}>{discarding ? "Discarding…" : "Discard Workout"}</Button></div></div></div>; }
 export function WeightCard({ exercise, onToggle = noop, onWeight = noop, index = 0, total = 1, onNudge = noop }) { return ExerciseCard({ exercise, index, total, oneOff: false, onChange: (exerciseId, setId, field, value) => field === "completed" ? onToggle(exerciseId) : field === "weight" ? onWeight(exerciseId, setId, value) : noop(), onAddSet: noop, onRemoveSet: noop, onRemoveExercise: noop, onMove: (position, direction) => onNudge(position, direction) }); }

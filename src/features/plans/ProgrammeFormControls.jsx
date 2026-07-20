@@ -1,6 +1,9 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth, db } from "../../firebase";
 import { REP_TARGET_TYPE, fixedReps, repRange } from "../../lib/domain/plans";
 import { SIDE } from "../../lib/domain/v2Models";
+import { subscribeLegacyRehabData } from "../../lib/firebase/legacyRehabRepository";
 
 export function Field({ label, children }) {
   return (
@@ -15,8 +18,43 @@ export function Input(props) {
   return <input className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" {...props} />;
 }
 
-export function Select(props) {
-  return <select className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" {...props} />;
+export function Select({ children, ...props }) {
+  const [trainingMode, setTrainingMode] = useState("gym");
+  const options = useMemo(() => React.Children.toArray(children), [children]);
+  const isSideSelect = options.some((option) => option?.props?.value === SIDE.LEFT || option?.props?.value === SIDE.RIGHT);
+
+  useEffect(() => {
+    if (!isSideSelect) return undefined;
+
+    let unsubscribeData = () => {};
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      unsubscribeData();
+      unsubscribeData = () => {};
+
+      if (!user?.uid) {
+        setTrainingMode("gym");
+        return;
+      }
+
+      unsubscribeData = subscribeLegacyRehabData(
+        db,
+        user.uid,
+        (saved) => setTrainingMode(saved.trainingMode === "rehab" ? "rehab" : "gym"),
+        () => setTrainingMode("gym")
+      );
+    });
+
+    return () => {
+      unsubscribeAuth();
+      unsubscribeData();
+    };
+  }, [isSideSelect]);
+
+  const visibleOptions = isSideSelect && trainingMode !== "rehab"
+    ? options.filter((option) => ![SIDE.LEFT, SIDE.RIGHT].includes(option?.props?.value))
+    : options;
+
+  return <select className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" {...props}>{visibleOptions}</select>;
 }
 
 export function Textarea(props) {

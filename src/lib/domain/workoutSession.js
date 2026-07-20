@@ -7,20 +7,23 @@ function ordered(items) {
 }
 
 export function prescribedRepsSnapshot(targetReps = {}) {
-  return targetReps.type === "range" ? { type: "range", min: targetReps.min, max: targetReps.max } : { type: "fixed", value: targetReps.value };
+  return targetReps.type === "range"
+    ? { type: "range", min: targetReps.min, max: targetReps.max }
+    : { type: "fixed", value: targetReps.value };
 }
 
 export function createWorkoutExerciseSnapshot(exercise, previousWeights = {}) {
-  const setBased = [EXERCISE_LOGGING_METHOD.REPS, EXERCISE_LOGGING_METHOD.REPS_WEIGHT, EXERCISE_LOGGING_METHOD.TIME, EXERCISE_LOGGING_METHOD.DISTANCE, EXERCISE_LOGGING_METHOD.TIME_DISTANCE].includes(exercise.loggingMethod);
+  const setBased = [
+    EXERCISE_LOGGING_METHOD.REPS,
+    EXERCISE_LOGGING_METHOD.REPS_WEIGHT,
+    EXERCISE_LOGGING_METHOD.TIME,
+    EXERCISE_LOGGING_METHOD.DISTANCE,
+    EXERCISE_LOGGING_METHOD.TIME_DISTANCE,
+  ].includes(exercise.loggingMethod);
   const count = setBased ? Math.max(1, Number(exercise.prescription?.targetSets || 1)) : 0;
-  const prescribedReps = prescribedRepsSnapshot(
-  exercise.prescription?.targetReps,
-);
+  const prescribedReps = prescribedRepsSnapshot(exercise.prescription?.targetReps);
+  const initialReps = prescribedReps.type === "range" ? prescribedReps.min : prescribedReps.value ?? "";
 
-const initialReps =
-  prescribedReps.type === "range"
-    ? prescribedReps.min
-    : prescribedReps.value ?? "";
   return {
     id: exercise.id,
     exerciseId: exercise.exerciseId,
@@ -35,36 +38,16 @@ const initialReps =
     recordedSets: Array.from({ length: count }, (_, index) => ({
       id: `${exercise.id}-set-${index + 1}`,
       setNumber: index + 1,
-      prescribedReps: prescribedRepsSnapshot(
-  exercise.prescription?.targetReps,
-),
-actualReps:
-  prescribedRepsSnapshot(
-    exercise.prescription?.targetReps,
-  ).type === "range"
-    ? prescribedRepsSnapshot(
-        exercise.prescription?.targetReps,
-      ).min
-    : prescribedRepsSnapshot(
-        exercise.prescription?.targetReps,
-      ).value ?? "",
-rawReps: String(
-  prescribedRepsSnapshot(
-    exercise.prescription?.targetReps,
-  ).type === "range"
-    ? prescribedRepsSnapshot(
-        exercise.prescription?.targetReps,
-      ).min ?? ""
-    : prescribedRepsSnapshot(
-        exercise.prescription?.targetReps,
-      ).value ?? "",
-),
-durationSeconds: "",
-rawDuration: "",
-distance: "",
-rawDistance: "",
+      prescribedReps,
+      actualReps: initialReps,
+      rawReps: String(initialReps ?? ""),
+      durationSeconds: "",
+      rawDuration: "",
+      distance: "",
+      rawDistance: "",
       weight: exercise.loggingMethod === EXERCISE_LOGGING_METHOD.REPS_WEIGHT ? previousWeights[index + 1] ?? "" : "",
       rawWeight: previousWeights[index + 1] === undefined ? "" : String(previousWeights[index + 1]),
+      completed: false,
       unit: "kg",
     })),
     intervalProgress: null,
@@ -72,15 +55,7 @@ rawDistance: "",
   };
 }
 
-export function createInProgressWorkout({
-  id,
-  userId,
-  programme,
-  session,
-  date,
-  previousWeightsByExercise = {},
-  createdAt = null,
-}) {
+export function createInProgressWorkout({ id, userId, programme, session, date, previousWeightsByExercise = {}, createdAt = null }) {
   return {
     id,
     userId,
@@ -98,62 +73,104 @@ export function createInProgressWorkout({
     programmeNameSnapshot: programme.name,
     sessionId: session.id,
     sessionNameSnapshot: session.name,
-
     exercises: ordered(session.exercises).flatMap((exercise) => {
-      const previousWeights =
-        previousWeightsByExercise[exercise.id] ||
-        previousWeightsByExercise[exercise.exerciseId] ||
-        {};
+      const previousWeights = previousWeightsByExercise[exercise.id] || previousWeightsByExercise[exercise.exerciseId] || {};
       const supportsSides = [EXERCISE_TYPE.STRENGTH, EXERCISE_TYPE.BALANCE].includes(exercise.exerciseType);
-
       if (!supportsSides || exercise.prescription?.side !== SIDE.SEPARATE) {
         return [createWorkoutExerciseSnapshot(exercise, previousWeights)];
       }
-
-      const leftExercise = {
-        ...exercise,
-        id: `${exercise.id}-left`,
-        prescription: {
-          ...exercise.prescription,
-          side: SIDE.LEFT,
-        },
-      };
-
-      const rightExercise = {
-        ...exercise,
-        id: `${exercise.id}-right`,
-        prescription: {
-          ...exercise.prescription,
-          side: SIDE.RIGHT,
-        },
-      };
-
-      return [
-        createWorkoutExerciseSnapshot(leftExercise, previousWeights),
-        createWorkoutExerciseSnapshot(rightExercise, previousWeights),
-      ];
+      const left = { ...exercise, id: `${exercise.id}-left`, prescription: { ...exercise.prescription, side: SIDE.LEFT } };
+      const right = { ...exercise, id: `${exercise.id}-right`, prescription: { ...exercise.prescription, side: SIDE.RIGHT } };
+      return [createWorkoutExerciseSnapshot(left, previousWeights), createWorkoutExerciseSnapshot(right, previousWeights)];
     }),
-
     notes: "",
   };
 }
 
 export function createOneOffWorkout({ id, userId, name = "", exercises = [], date, startedAt = new Date().toISOString() }) {
-  return { id, userId, date, createdAt: null, updatedAt: null, completedAt: null, startedAt, status: WORKOUT_STATUS.IN_PROGRESS, sourceType: "one_off", name: name.trim() || "One-off Workout", sessionNameSnapshot: name.trim() || "One-off Workout", exercises: exercises.map((definition, index) => createWorkoutExerciseSnapshot({ id: `${definition.id}-${index + 1}`, exerciseId: definition.id, exerciseNameSnapshot: definition.name, exerciseType: definition.exerciseType || "other", loggingMethod: definition.loggingMethod || EXERCISE_LOGGING_METHOD.REPS, sortOrder: index, prescription: {}, sideSnapshot: definition.defaultSideConfig }, {})), notes: "" };
+  const title = name.trim() || "One-off Workout";
+  return {
+    id,
+    userId,
+    date,
+    createdAt: null,
+    updatedAt: null,
+    completedAt: null,
+    startedAt,
+    status: WORKOUT_STATUS.IN_PROGRESS,
+    sourceType: "one_off",
+    name: title,
+    sessionNameSnapshot: title,
+    exercises: exercises.map((definition, index) => createWorkoutExerciseSnapshot({
+      id: `${definition.id}-${index + 1}`,
+      exerciseId: definition.id,
+      exerciseNameSnapshot: definition.name,
+      exerciseType: definition.exerciseType || "other",
+      loggingMethod: definition.loggingMethod || EXERCISE_LOGGING_METHOD.REPS,
+      sortOrder: index,
+      prescription: {},
+      sideSnapshot: definition.defaultSideConfig,
+    }, {})),
+    notes: "",
+  };
 }
 
 export function isMeaningfulWorkout(workout) {
-  return (workout?.exercises || []).some((exercise) => exercise.completed || (exercise.recordedSets || []).some((set) => [set.actualReps, set.weight, set.durationSeconds, set.distance].some((value) => value !== "" && value !== undefined && value !== null)));
+  return (workout?.exercises || []).some((exercise) =>
+    exercise.completed || (exercise.recordedSets || []).some((set) =>
+      set.completed || [set.actualReps, set.weight, set.durationSeconds, set.distance].some((value) => value !== "" && value !== undefined && value !== null),
+    ),
+  );
 }
 
 export function updateRecordedSet(workout, exerciseId, setId, field, rawValue) {
   const rawField = { actualReps: "rawReps", weight: "rawWeight", durationSeconds: "rawDuration", distance: "rawDistance" }[field];
   const value = rawValue === "" || !Number.isFinite(Number(rawValue)) ? "" : Number(rawValue);
-  return { ...workout, exercises: workout.exercises.map((exercise) => exercise.id !== exerciseId ? exercise : { ...exercise, recordedSets: exercise.recordedSets.map((set) => set.id !== setId ? set : { ...set, [field]: value, [rawField]: rawValue }) }) };
+  return {
+    ...workout,
+    exercises: workout.exercises.map((exercise) => exercise.id !== exerciseId ? exercise : {
+      ...exercise,
+      recordedSets: exercise.recordedSets.map((set) => set.id !== setId ? set : { ...set, [field]: value, [rawField]: rawValue }),
+    }),
+  };
 }
 
-export function addRecordedSet(workout, exerciseId) { return { ...workout, exercises: workout.exercises.map((exercise) => { if (exercise.id !== exerciseId) return exercise; const setNumber = exercise.recordedSets.length + 1; return { ...exercise, recordedSets: [...exercise.recordedSets, { id: `${exercise.id}-set-${Date.now()}-${setNumber}`, setNumber, actualReps: "", rawReps: "", weight: "", rawWeight: "", durationSeconds: "", rawDuration: "", distance: "", rawDistance: "", unit: "kg" }] }; }) }; }
-export function removeRecordedSet(workout, exerciseId, setId) { return { ...workout, exercises: workout.exercises.map((exercise) => exercise.id !== exerciseId ? exercise : { ...exercise, recordedSets: exercise.recordedSets.filter((set) => set.id !== setId).map((set, index) => ({ ...set, setNumber: index + 1 })) }) }; }
+export function addRecordedSet(workout, exerciseId) {
+  return {
+    ...workout,
+    exercises: workout.exercises.map((exercise) => {
+      if (exercise.id !== exerciseId) return exercise;
+      const setNumber = exercise.recordedSets.length + 1;
+      return {
+        ...exercise,
+        recordedSets: [...exercise.recordedSets, {
+          id: `${exercise.id}-set-${Date.now()}-${setNumber}`,
+          setNumber,
+          actualReps: "",
+          rawReps: "",
+          weight: "",
+          rawWeight: "",
+          durationSeconds: "",
+          rawDuration: "",
+          distance: "",
+          rawDistance: "",
+          completed: false,
+          unit: "kg",
+        }],
+      };
+    }),
+  };
+}
+
+export function removeRecordedSet(workout, exerciseId, setId) {
+  return {
+    ...workout,
+    exercises: workout.exercises.map((exercise) => exercise.id !== exerciseId ? exercise : {
+      ...exercise,
+      recordedSets: exercise.recordedSets.filter((set) => set.id !== setId).map((set, index) => ({ ...set, setNumber: index + 1 })),
+    }),
+  };
+}
 
 export function findInProgressWorkout(workouts, planId, sessionId, date) {
   return (workouts || []).find((workout) => workout.status === WORKOUT_STATUS.IN_PROGRESS && workout.planId === planId && workout.sessionId === sessionId && workout.date === date) || null;
@@ -162,8 +179,14 @@ export function findInProgressWorkout(workouts, planId, sessionId, date) {
 export function resumeWorkout(existing, template) {
   if (!existing) return template;
   return {
-    ...template,
     ...existing,
+    ...template,
+    id: existing.id,
+    date: existing.date || template.date,
+    startedAt: existing.startedAt || template.startedAt,
+    createdAt: existing.createdAt || template.createdAt,
+    notes: existing.notes || "",
+    status: existing.status || template.status,
     exercises: template.exercises.map((fresh) => {
       const savedById = (existing.exercises || []).find((exercise) => exercise.id === fresh.id);
       const sameDefinition = (existing.exercises || []).filter((exercise) => exercise.exerciseId === fresh.exerciseId);
@@ -171,7 +194,25 @@ export function resumeWorkout(existing, template) {
       if (!saved) return fresh;
       const legacySets = (saved.prescriptionBlocks || []).flatMap((block) => block.actualSets || []);
       const savedSets = saved.recordedSets?.length ? saved.recordedSets : legacySets.length ? legacySets : saved.weight !== undefined ? [{ setNumber: 1, weight: saved.weight }] : [];
-      return { ...fresh, ...saved, recordedSets: fresh.recordedSets.map((set) => { const previous = savedSets.find((savedSet) => savedSet.id === set.id || Number(savedSet.setNumber) === set.setNumber); if (!previous) return set; const weight = previous.weight ?? set.weight; return { ...set, ...previous, weight, rawWeight: previous.rawWeight !== undefined && previous.rawWeight !== "" ? previous.rawWeight : (weight !== undefined && weight !== "" ? String(weight) : set.rawWeight) }; }) };
+      return {
+        ...fresh,
+        completed: Boolean(saved.completed),
+        notes: saved.notes || "",
+        recordedSets: fresh.recordedSets.map((set) => {
+          const previous = savedSets.find((savedSet) => savedSet.id === set.id || Number(savedSet.setNumber) === set.setNumber);
+          if (!previous) return set;
+          const weight = previous.weight ?? set.weight;
+          return {
+            ...set,
+            ...previous,
+            id: set.id,
+            setNumber: set.setNumber,
+            prescribedReps: set.prescribedReps,
+            weight,
+            rawWeight: previous.rawWeight !== undefined && previous.rawWeight !== "" ? previous.rawWeight : (weight !== undefined && weight !== "" ? String(weight) : set.rawWeight),
+          };
+        }),
+      };
     }),
   };
 }
@@ -182,7 +223,13 @@ export function isWeightedExerciseComplete(exercise) {
 
 export function updateRecordedSetWeight(workout, exerciseId, setId, weight) {
   const numericWeight = weight === "" || !Number.isFinite(Number(weight)) ? "" : Number(weight);
-  return { ...workout, exercises: workout.exercises.map((exercise) => exercise.id === exerciseId ? { ...exercise, recordedSets: exercise.recordedSets.map((set) => set.id === setId ? { ...set, weight: numericWeight, rawWeight: weight } : set) } : exercise) };
+  return {
+    ...workout,
+    exercises: workout.exercises.map((exercise) => exercise.id === exerciseId ? {
+      ...exercise,
+      recordedSets: exercise.recordedSets.map((set) => set.id === setId ? { ...set, weight: numericWeight, rawWeight: weight } : set),
+    } : exercise),
+  };
 }
 
 export function reorderExerciseSnapshots(exercises, fromIndex, toIndex) {

@@ -47,6 +47,10 @@ function workoutRef(db, uid, workoutId) {
   return doc(db, "users", uid, "workouts", workoutId);
 }
 
+function routineOccurrenceRef(db, uid, occurrenceId) {
+  return doc(db, "users", uid, "routineTaskOccurrences", occurrenceId);
+}
+
 export function exerciseCollectionPath(uid) {
   return `users/${uid}/exercises`;
 }
@@ -60,7 +64,21 @@ export function planPaths(uid, planId = "{planId}") {
     plans: `users/${uid}/plans/{planId}`,
     plan: `users/${uid}/plans/${planId}`,
     exercises: `users/${uid}/exercises/{exerciseId}`,
+    routineTaskOccurrences: `users/${uid}/routineTaskOccurrences/{occurrenceId}`,
   };
+}
+
+export function subscribeRoutineOccurrences(db, uid, programmeId, scheduledDate, onNext, onError) {
+  return onSnapshot(collection(db, "users", uid, "routineTaskOccurrences"), (snapshot) => {
+    onNext(snapshot.docs.map((item) => item.data()).filter((item) => item.programmeId === programmeId && item.scheduledDate === scheduledDate));
+  }, onError);
+}
+
+export async function setRoutineOccurrenceStatus(db, uid, { id, programmeId, taskId, scheduledDate, status }) {
+  const actionAt = new Date().toISOString();
+  const data = { id, userId: uid, programmeId, taskId, scheduledDate, status, actionAt, updatedAt: serverTimestamp() };
+  await setDoc(routineOccurrenceRef(db, uid, id), data, { merge: true });
+  return { ...data, updatedAt: actionAt };
 }
 
 export function preparePlanWrite(plan, { created = false, timestamp = serverTimestamp(), updatedAtToken } = {}) {

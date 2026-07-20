@@ -27,6 +27,7 @@ import {
 } from "../../lib/domain/plans";
 import { SIDE } from "../../lib/domain/v2Models";
 import { makeId } from "../../lib/domain/legacyWorkouts";
+import { ROUTINE_TIME, WEEKDAYS, createRoutineTask, routineTasksForPlan } from "../../lib/domain/routineTasks";
 import { DirectStrengthPrescription, DurationInput, Field, Input, Select, Textarea } from "./ProgrammeFormControls";
 import {
   createPlan,
@@ -283,12 +284,23 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, onM
   const [draggingExercise, setDraggingExercise] = useState(null);
   const [draggingSession, setDraggingSession] = useState(null);
   const [removeSessionIndex, setRemoveSessionIndex] = useState(null);
+  const [editingRoutineId, setEditingRoutineId] = useState("");
 
   const validation = validatePlan(draft);
+  const routineValid = routineTasksForPlan(draft).every((task) => task.name?.trim() && task.days?.length);
   const validationMessages = friendlyPlanValidationMessages(validation.errors);
   const filteredExercises = filterExerciseLibrary(exercises, { query: exerciseQuery });
 
   const setSessions = (sessions) => setDraft({ ...draft, sessions });
+  const routineTasks = routineTasksForPlan(draft);
+  const setRoutineTasks = (routineTasks) => setDraft({ ...draft, routineTasks });
+  const addRoutineTask = () => {
+    const now = new Date().toISOString();
+    const task = createRoutineTask({ id: `routine-${makeId()}`, name: "", days: [], sortOrder: routineTasks.length, createdAt: now, updatedAt: now });
+    setRoutineTasks([...routineTasks, task]);
+    setEditingRoutineId(task.id);
+  };
+  const updateRoutineTask = (taskId, patch) => setRoutineTasks(routineTasks.map((task) => task.id === taskId ? { ...task, ...patch, updatedAt: new Date().toISOString() } : task));
   const updateSession = (sessionIndex, patch) => setSessions(draft.sessions.map((session, index) => index === sessionIndex ? { ...session, ...patch } : session));
 
   const moveSession = (fromIndex, toIndex) => {
@@ -369,12 +381,13 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, onM
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={onClose}>Close</Button>
-          <Button onClick={onSave} disabled={saving || !validation.valid}>{saving ? "Saving…" : "Save programme"}</Button>
+          <Button onClick={onSave} disabled={saving || !validation.valid || !routineValid}>{saving ? "Saving…" : "Save programme"}</Button>
         </div>
       </div>
 
       {saveMessage ? <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{saveMessage}</div> : null}
       {!validation.valid ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">{validationMessages.slice(0, 4).join(" ")}</div> : null}
+      {!routineValid ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Give every routine task a name and select at least one day.</div> : null}
 
       <div className="grid gap-3 md:grid-cols-2">
         <Field label="Programme name"><Input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="My programme" /></Field>
@@ -384,6 +397,26 @@ function PlanEditor({ draft, setDraft, original, exercises, onSave, onClose, onM
           Active programme
         </label>
       </div>
+
+      <section className="space-y-3 border-t border-slate-100 pt-5">
+        <div className="flex items-center justify-between gap-3">
+          <div><h3 className="text-lg font-semibold">Routine Tasks</h3><p className="text-sm text-slate-500">Small tasks scheduled independently of workouts.</p></div>
+          <Button variant="outline" onClick={addRoutineTask}><Plus className="mr-1 h-4 w-4" /> Add task</Button>
+        </div>
+        {routineTasks.length === 0 ? <p className="rounded-xl border border-dashed border-slate-300 p-3 text-sm text-slate-500">No routine tasks.</p> : null}
+        {routineTasks.map((task) => {
+          const editingTask = editingRoutineId === task.id;
+          return <article key={task.id} className="rounded-2xl border border-slate-200 p-3">
+            {editingTask ? <div className="space-y-3">
+              <Field label="Task name"><Input autoFocus value={task.name} onChange={(event) => updateRoutineTask(task.id, { name: event.target.value })} placeholder="e.g. Ice knee" /></Field>
+              <Field label="Notes (optional)"><Textarea value={task.notes || ""} onChange={(event) => updateRoutineTask(task.id, { notes: event.target.value })} /></Field>
+              <fieldset><legend className="mb-2 text-sm font-medium text-slate-700">Days</legend><div className="flex flex-wrap gap-2">{WEEKDAYS.map((day) => <label key={day} className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-2 py-2 text-xs capitalize"><input type="checkbox" checked={task.days.includes(day)} onChange={() => updateRoutineTask(task.id, { days: task.days.includes(day) ? task.days.filter((item) => item !== day) : [...task.days, day] })} />{day.slice(0, 3)}</label>)}</div></fieldset>
+              <Field label="Time of day"><Select value={task.timeOfDay} onChange={(event) => updateRoutineTask(task.id, { timeOfDay: event.target.value })}>{Object.values(ROUTINE_TIME).map((value) => <option key={value} value={value}>{value[0].toUpperCase() + value.slice(1)}</option>)}</Select></Field>
+              <div className="flex justify-end gap-2"><Button size="sm" variant="danger" onClick={() => { setRoutineTasks(routineTasks.filter((item) => item.id !== task.id).map((item, index) => ({ ...item, sortOrder: index }))); setEditingRoutineId(""); }}>Delete</Button><Button size="sm" disabled={!task.name.trim() || task.days.length === 0} onClick={() => setEditingRoutineId("")}>Done</Button></div>
+            </div> : <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="font-medium">{task.name || "Unnamed task"}</div><div className="text-xs capitalize text-slate-500">{task.days.join(", ")} · {task.timeOfDay}</div>{task.notes ? <p className="truncate text-sm text-slate-500">{task.notes}</p> : null}</div><Button size="sm" variant="outline" onClick={() => setEditingRoutineId(task.id)}>Edit</Button></div>}
+          </article>;
+        })}
+      </section>
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">

@@ -25,6 +25,7 @@ import {
   createOneOffWorkout,
   isMeaningfulWorkout,
   removeRecordedSet,
+  resumeWorkout,
   updateRecordedSet,
 } from "../../lib/domain/workoutSession";
 import {
@@ -68,7 +69,6 @@ export function normalizeWorkoutForDisplay(saved) {
   if (!saved?.exercises?.length) return saved;
   const seen = new Set();
   const exercises = [];
-
   ordered(saved.exercises).forEach((original) => {
     const exercise = cleanUnsupportedSideExercise(original);
     const key = supportsSides(exercise)
@@ -78,7 +78,6 @@ export function normalizeWorkoutForDisplay(saved) {
     seen.add(key);
     exercises.push({ ...exercise, sortOrder: exercises.length });
   });
-
   return { ...saved, exercises };
 }
 
@@ -147,7 +146,7 @@ export function ExerciseCard({ exercise, oneOff, onChange, onAddSet, onRemoveSet
   const isProgrammeWorkout = !oneOff;
   const isWeighted = exercise.loggingMethod === EXERCISE_LOGGING_METHOD.REPS_WEIGHT;
   const isRepsOnly = exercise.loggingMethod === EXERCISE_LOGGING_METHOD.REPS;
-  const isTimedBalance = exercise.exerciseType === EXERCISE_TYPE.BALANCE && fields.time;
+  const isSetTickExercise = isProgrammeWorkout && !isWeighted && (isRepsOnly || fields.time) && (exercise.recordedSets || []).length > 0;
   const isTask = exercise.loggingMethod === EXERCISE_LOGGING_METHOD.COMPLETED;
   const stages = ordered(exercise.prescription?.stages || exercise.prescription?.intervals || []);
 
@@ -179,15 +178,18 @@ export function ExerciseCard({ exercise, oneOff, onChange, onAddSet, onRemoveSet
         {oneOff ? <button type="button" onClick={() => onRemoveExercise(exercise.id)} className="min-h-10 px-2 text-sm font-medium text-red-600">Remove</button> : null}
       </div>
 
-      {isTimedBalance ? (
+      {isSetTickExercise ? (
         <div className="mt-3 space-y-2">
-          {(exercise.recordedSets || []).map((set) => (
-            <div key={set.id} className="grid grid-cols-[3.5rem_minmax(0,1fr)_2rem] items-center gap-3 rounded-xl bg-slate-50 p-3">
-              <span className="text-sm font-medium">Set {set.setNumber}</span>
-              <span className="text-sm font-medium text-slate-700">{prescribedDuration}</span>
-              <SetTick checked={Boolean(set.completed)} label={set.completed ? `Mark set ${set.setNumber} incomplete` : `Mark set ${set.setNumber} complete`} onClick={() => onChange(exercise.id, set.id, "setCompleted", !set.completed)} />
-            </div>
-          ))}
+          {(exercise.recordedSets || []).map((set) => {
+            const target = isRepsOnly ? `${currentRepValue(set)} reps` : prescribedDuration;
+            return (
+              <div key={set.id} className="grid grid-cols-[3.5rem_minmax(0,1fr)_2rem] items-center gap-3 rounded-xl bg-slate-50 p-3">
+                <span className="text-sm font-medium">Set {set.setNumber}</span>
+                <span className="text-sm font-medium text-slate-700">{target}</span>
+                <SetTick checked={Boolean(set.completed)} label={set.completed ? `Mark set ${set.setNumber} incomplete` : `Mark set ${set.setNumber} complete`} onClick={() => onChange(exercise.id, set.id, "setCompleted", !set.completed)} />
+              </div>
+            );
+          })}
         </div>
       ) : isProgrammeWorkout && !isWeighted && !isRepsOnly ? (
         <div className="mt-3 flex min-h-12 items-center gap-3 rounded-xl bg-slate-50 px-3 py-2"><CompactProgrammeContent /><CompletionTick /></div>
@@ -203,7 +205,6 @@ export function ExerciseCard({ exercise, oneOff, onChange, onAddSet, onRemoveSet
               {oneOff && exercise.recordedSets.length > 1 ? <button type="button" className="col-start-2 min-h-10 justify-self-start text-sm text-red-600" onClick={() => onRemoveSet(exercise.id, set.id)}>Remove</button> : null}
             </div>
           ))}
-          {isProgrammeWorkout && isRepsOnly ? <div className="flex min-h-10 items-center justify-end pr-1"><CompletionTick /></div> : null}
           {oneOff ? <button type="button" className="min-h-11 text-sm font-medium text-emerald-700" onClick={() => onAddSet(exercise.id)}>+ Add set</button> : null}
         </div>
       )}
@@ -222,7 +223,6 @@ function buildWorkoutGroups(list) {
       && next
       && exercise.exerciseId === next.exerciseId
       && ((side === SIDE.LEFT && nextSide === SIDE.RIGHT) || (side === SIDE.RIGHT && nextSide === SIDE.LEFT));
-
     if (isPair) {
       groups.push({ type: "separate", exercises: side === SIDE.LEFT ? [exercise, next] : [next, exercise] });
       index += 1;
@@ -319,11 +319,28 @@ export default function WorkoutScreen({ user, repository = defaultRepository, in
   const programme = useMemo(() => plans.filter((plan) => plan.isActive && !plan.isArchived)[0], [plans]);
   const unfinished = workouts.find((item) => item.status === "in_progress");
 
+  const syncSavedWithProgramme = useCallback((saved) => {
+    if (!saved || saved.sourceType !== "programme" || !programme || saved.planId !== programme.id) return saved;
+    const session = programme.sessions?.find((item) => item.id === saved.sessionId);
+    if (!session) return saved;
+    const previous = Object.fromEntries((session.exercises || []).map((exercise) => [exercise.id, previousWeightsForExercise(workouts.filter((item) => item.status === "completed"), exercise)]));
+    const template = createInProgressWorkout({
+      id: saved.id,
+      userId: user.uid,
+      programme,
+      session,
+      date: saved.date || todayString(),
+      previousWeightsByExercise: previous,
+      createdAt: saved.createdAt || saved.startedAt || new Date().toISOString(),
+    });
+    return resumeWorkout(saved, template);
+  }, [programme, user.uid, workouts]);
+
   const openSaved = useCallback((saved) => {
-    setWorkout(normalizeWorkoutForDisplay(saved));
+    setWorkout(normalizeWorkoutForDisplay(syncSavedWithProgramme(saved)));
     setBuilder(false);
     onIntentHandled();
-  }, [onIntentHandled]);
+  }, [onIntentHandled, syncSavedWithProgramme]);
 
   const startProgramme = async (session) => {
     if (unfinished) return openSaved(unfinished);

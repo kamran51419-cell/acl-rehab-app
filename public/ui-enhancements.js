@@ -12,6 +12,14 @@ function normalisedText(element) {
   return element?.textContent?.replace(/\s+/g, " ").trim().toLowerCase() || "";
 }
 
+function normalisedName(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[‐‑‒–—−-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function findProgrammeEditor() {
   const heading = [...document.querySelectorAll("h2")].find((item) => {
     const text = item.textContent?.trim();
@@ -117,10 +125,65 @@ function allowRepeatedProgrammeExercises(editor) {
 }
 
 function hideSingleLegBalance(root = document) {
-  [...root.querySelectorAll("div")].forEach((row) => {
-    const name = [...row.children].find((child) => child.children.length === 0 && normalisedText(child) === "single-leg balance");
-    if (name && row.querySelector("button")) row.style.display = "none";
+  const candidates = [...root.querySelectorAll("div, article, li")].filter((element) => {
+    const ownText = [...element.childNodes]
+      .filter((node) => node.nodeType === Node.TEXT_NODE)
+      .map((node) => node.textContent)
+      .join(" ");
+    const directText = normalisedName(ownText || element.firstElementChild?.textContent);
+    return directText === "single leg balance";
   });
+
+  candidates.forEach((nameElement) => {
+    let row = nameElement;
+    for (let depth = 0; depth < 5 && row; depth += 1, row = row.parentElement) {
+      const action = [...row.querySelectorAll("button")].find((button) => ["Edit", "Add", "Selected", "Use"].includes(buttonText(button)));
+      if (action) {
+        row.style.display = "none";
+        row.setAttribute("aria-hidden", "true");
+        break;
+      }
+    }
+  });
+}
+
+function removeStandardBothLabels(root = document) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  nodes.forEach((node) => {
+    const parent = node.parentElement;
+    if (!parent || ["SCRIPT", "STYLE", "OPTION"].includes(parent.tagName)) return;
+    const text = node.textContent || "";
+    if (/^\s*\d+\s*[×x]\s*[^·]+\s+both\s*$/i.test(text)) {
+      node.textContent = text.replace(/\s+both\s*$/i, "");
+    }
+  });
+}
+
+function preventPageZoom() {
+  document.addEventListener("wheel", (event) => {
+    if (event.ctrlKey) event.preventDefault();
+  }, { passive: false });
+
+  document.addEventListener("keydown", (event) => {
+    if ((event.ctrlKey || event.metaKey) && ["+", "=", "-", "0"].includes(event.key)) {
+      event.preventDefault();
+    }
+  });
+
+  ["gesturestart", "gesturechange", "gestureend"].forEach((type) => {
+    document.addEventListener(type, (event) => event.preventDefault(), { passive: false });
+  });
+
+  const style = document.createElement("style");
+  style.textContent = `
+    @media (max-width: 639px) {
+      input, select, textarea { font-size: 16px !important; }
+    }
+    html, body { touch-action: pan-x pan-y; }
+  `;
+  document.head.appendChild(style);
 }
 
 function updateProgrammeEditorOverlay() {
@@ -142,12 +205,14 @@ function updateProgrammeEditorOverlay() {
     tidyProgrammeExerciseCards(editor);
     allowRepeatedProgrammeExercises(editor);
     hideSingleLegBalance(editor);
+    removeStandardBothLabels(editor);
     raiseNativeDialogs();
   } else if (programmeEditor) {
     document.body.style.overflow = previousBodyOverflow;
     programmeEditor = null;
   }
   hideSingleLegBalance();
+  removeStandardBothLabels();
   enhanceWorkoutDragging();
 }
 
@@ -177,7 +242,13 @@ function showDiscardConfirmation(discardButton) {
   confirm.addEventListener("click", () => {
     closeConfirmation();
     bypassDiscardConfirmation = true;
+    const originalConfirm = window.confirm;
+    window.confirm = () => true;
     discardButton.click();
+    window.setTimeout(() => {
+      window.confirm = originalConfirm;
+      bypassDiscardConfirmation = false;
+    }, 0);
   });
   document.body.appendChild(overlay);
   cancel.focus();
@@ -262,10 +333,7 @@ document.addEventListener("click", (event) => {
   if (!button || buttonText(button) !== "Discard Workout") return;
   const overviewCard = button.closest("section.border-emerald-200");
   if (!overviewCard) return;
-  if (bypassDiscardConfirmation) {
-    bypassDiscardConfirmation = false;
-    return;
-  }
+  if (bypassDiscardConfirmation) return;
   if (document.getElementById(modalRootId)) return;
   event.preventDefault();
   event.stopPropagation();
@@ -286,4 +354,5 @@ new MutationObserver(updateProgrammeEditorOverlay).observe(document.documentElem
   subtree: true,
 });
 
+preventPageZoom();
 updateProgrammeEditorOverlay();

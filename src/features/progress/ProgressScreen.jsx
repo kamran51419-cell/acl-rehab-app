@@ -84,7 +84,7 @@ export function StatsView({ workouts, trainingMode }) {
 
 export function ProgressLayout({ user, workouts, trainingMode, initialTab = "stats" }) {
   const [tab, setTab] = useState(initialTab);
-  return <div className="space-y-5"><div className="flex gap-2 border-b border-slate-200 pb-3"><Button variant={tab === "history" ? "primary" : "outline"} onClick={() => setTab("history")}>Workout History</Button><Button variant={tab === "stats" ? "primary" : "outline"} onClick={() => setTab("stats")}>Stats</Button></div>{tab === "history" ? <WorkoutHistoryScreen user={user} showNavigation={false}/> : <StatsView workouts={workouts} trainingMode={trainingMode}/>}</div>;
+  return <div className="space-y-5"><div className="flex gap-2 border-b border-slate-200 pb-3"><Button variant={tab === "stats" ? "primary" : "outline"} onClick={() => setTab("stats")}>Stats</Button><Button variant={tab === "history" ? "primary" : "outline"} onClick={() => setTab("history")}>Workout History</Button></div>{tab === "history" ? <WorkoutHistoryScreen user={user} showNavigation={false}/> : <StatsView workouts={workouts} trainingMode={trainingMode}/>}</div>;
 }
 
 export default function ProgressScreen({ user, trainingMode, initialTab = "stats", repository = defaultRepository }) {

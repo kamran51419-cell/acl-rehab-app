@@ -12,24 +12,70 @@ function findProgrammeEditor() {
     return text === "Edit programme" || text === "Create programme";
   });
   if (!heading) return null;
-  return heading.closest("div.space-y-5.rounded-3xl") || heading.parentElement?.parentElement || null;
+  return heading.closest("div.rounded-3xl") || heading.parentElement?.parentElement || null;
 }
 
 function sizeProgrammeEditor(editor) {
-  const mobile = window.innerWidth < 640;
+  const mobile = window.matchMedia("(max-width: 639px)").matches;
   Object.assign(editor.style, {
     position: "fixed",
-    top: mobile ? "0" : "16px",
-    right: mobile ? "0" : "16px",
-    bottom: mobile ? "0" : "16px",
-    left: mobile ? "0" : "16px",
-    zIndex: "60",
-    maxWidth: mobile ? "none" : "1120px",
+    inset: mobile ? "0" : "16px",
+    zIndex: "80",
+    width: mobile ? "100vw" : "auto",
+    maxWidth: mobile ? "100vw" : "1120px",
+    maxHeight: mobile ? "100dvh" : "calc(100vh - 32px)",
     margin: "0 auto",
+    paddingBottom: mobile ? "max(20px, env(safe-area-inset-bottom))" : "",
+    overflowX: "hidden",
     overflowY: "auto",
     borderRadius: mobile ? "0" : "24px",
     boxShadow: "0 0 0 100vmax rgba(15, 23, 42, 0.55), 0 24px 60px rgba(15, 23, 42, 0.25)",
+    overscrollBehavior: "contain",
+    WebkitOverflowScrolling: "touch",
   });
+}
+
+function raiseNativeDialogs() {
+  document.querySelectorAll('div.fixed.inset-0 [role="dialog"]').forEach((dialog) => {
+    const overlay = dialog.parentElement;
+    if (overlay && !overlay.contains(programmeEditor)) overlay.style.zIndex = "120";
+  });
+}
+
+function setExerciseCollapsed(card, collapsed) {
+  const children = [...card.children];
+  children.slice(1).forEach((child) => {
+    child.hidden = collapsed;
+  });
+  card.dataset.exerciseCollapsed = collapsed ? "true" : "false";
+  const button = card.querySelector("[data-collapse-exercise]");
+  if (button) {
+    button.textContent = collapsed ? "Expand" : "Collapse";
+    button.setAttribute("aria-expanded", collapsed ? "false" : "true");
+  }
+}
+
+function addExerciseCollapseButtons(editor) {
+  [...editor.querySelectorAll("button")]
+    .filter((button) => buttonText(button) === "Change exercise")
+    .forEach((changeButton) => {
+      const card = changeButton.closest("div.rounded-xl.border.bg-white");
+      if (!card || card.dataset.collapseReady === "true") return;
+      const actions = changeButton.parentElement;
+      if (!actions) return;
+
+      const collapseButton = document.createElement("button");
+      collapseButton.type = "button";
+      collapseButton.dataset.collapseExercise = "true";
+      collapseButton.className = changeButton.className;
+      collapseButton.textContent = "Collapse";
+      collapseButton.setAttribute("aria-expanded", "true");
+      collapseButton.addEventListener("click", () => {
+        setExerciseCollapsed(card, card.dataset.exerciseCollapsed !== "true");
+      });
+      actions.insertBefore(collapseButton, changeButton);
+      card.dataset.collapseReady = "true";
+    });
 }
 
 function updateProgrammeEditorOverlay() {
@@ -48,6 +94,8 @@ function updateProgrammeEditorOverlay() {
       }
     }
     sizeProgrammeEditor(editor);
+    addExerciseCollapseButtons(editor);
+    raiseNativeDialogs();
   } else if (programmeEditor) {
     document.body.style.overflow = previousBodyOverflow;
     programmeEditor = null;
@@ -63,7 +111,7 @@ function showDiscardConfirmation(discardButton) {
 
   const overlay = document.createElement("div");
   overlay.id = modalRootId;
-  overlay.style.cssText = "position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.55);padding:16px";
+  overlay.style.cssText = "position:fixed;inset:0;z-index:140;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.55);padding:16px";
   overlay.innerHTML = `
     <div role="dialog" aria-modal="true" aria-labelledby="discard-overview-title" style="width:100%;max-width:440px;border-radius:16px;background:white;padding:20px;box-shadow:0 24px 60px rgba(15,23,42,.3)">
       <h2 id="discard-overview-title" style="margin:0;font-size:1.125rem;font-weight:600;color:#0f172a">Discard workout?</h2>

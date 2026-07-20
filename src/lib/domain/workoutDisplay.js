@@ -58,7 +58,6 @@ export function workoutExerciseSideLabel(exercise) {
   const side = resolveWorkoutExerciseSide(exercise);
   if (side === SIDE.LEFT) return "Left only";
   if (side === SIDE.RIGHT) return "Right only";
-  if (side === SIDE.BOTH) return "Standard";
   return "";
 }
 

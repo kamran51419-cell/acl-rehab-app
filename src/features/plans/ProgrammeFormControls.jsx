@@ -1,6 +1,8 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { auth, db } from "../../firebase";
 import { REP_TARGET_TYPE, fixedReps, repRange } from "../../lib/domain/plans";
 import { SIDE } from "../../lib/domain/v2Models";
+import { subscribeLegacyRehabData } from "../../lib/firebase/legacyRehabRepository";
 
 export function Field({ label, children }) {
   return (
@@ -15,8 +17,40 @@ export function Input(props) {
   return <input className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" {...props} />;
 }
 
-export function Select(props) {
-  return <select className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" {...props} />;
+function useSavedTrainingMode() {
+  const [trainingMode, setTrainingMode] = useState("gym");
+
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user?.uid) return undefined;
+
+    return subscribeLegacyRehabData(
+      db,
+      user.uid,
+      (saved) => setTrainingMode(saved.trainingMode || "gym"),
+      () => setTrainingMode("gym"),
+    );
+  }, []);
+
+  return trainingMode;
+}
+
+export function Select({ children, ...props }) {
+  const trainingMode = useSavedTrainingMode();
+  const optionValues = useMemo(
+    () => React.Children.toArray(children).map((child) => child?.props?.value).filter(Boolean),
+    [children],
+  );
+  const isSideSelect = optionValues.includes(SIDE.BOTH) && optionValues.includes(SIDE.SEPARATE);
+  const showRehabOnlySides = isSideSelect && trainingMode === "rehab";
+
+  return (
+    <select className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" {...props}>
+      {children}
+      {showRehabOnlySides && !optionValues.includes(SIDE.LEFT) ? <option value={SIDE.LEFT}>Left only</option> : null}
+      {showRehabOnlySides && !optionValues.includes(SIDE.RIGHT) ? <option value={SIDE.RIGHT}>Right only</option> : null}
+    </select>
+  );
 }
 
 export function Textarea(props) {
@@ -51,7 +85,6 @@ export function DirectStrengthPrescription({
   onChange,
   showNotes = true,
   bothLabel = "Both legs",
-  trainingMode = "gym",
 }) {
   const updateReps = (patch) => onChange({ ...prescription, targetReps: { ...prescription.targetReps, ...patch } });
 
@@ -62,13 +95,6 @@ export function DirectStrengthPrescription({
           <Select value={prescription.side || SIDE.BOTH} onChange={(event) => onChange({ ...prescription, side: event.target.value })}>
             <option value={SIDE.BOTH}>Standard</option>
             <option value={SIDE.SEPARATE}>Left & right</option>
-
-{trainingMode === "rehab" && (
-  <>
-    <option value={SIDE.LEFT}>Left only</option>
-    <option value={SIDE.RIGHT}>Right only</option>
-  </>
-)}
           </Select>
         </Field>
         <Field label="Sets">

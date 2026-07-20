@@ -13,3 +13,8 @@
 .space-y-6 > .flex.flex-wrap.items-start.justify-between.gap-3 {
   justify-content: flex-end;
 }
+
+/* The date is already shown inside the date input, so do not repeat it below. */
+input[type="date"] + .mt-2 > p.text-slate-500 {
+  display: none;
+}

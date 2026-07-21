@@ -4,6 +4,7 @@ import { registerSW } from 'virtual:pwa-register'
 import './index.css'
 import App from './App.jsx'
 import { installUiRuntimeFixes } from './uiRuntimeFixes'
+import { installProgrammeButtonLabels } from './programmeButtonLabels'
 
 const updateSW = registerSW({
   immediate: true,
@@ -13,6 +14,7 @@ const updateSW = registerSW({
 })
 
 installUiRuntimeFixes()
+installProgrammeButtonLabels()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

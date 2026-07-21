@@ -2,38 +2,46 @@ function textOf(element) {
   return (element?.textContent || "").trim();
 }
 
-function reactClickHandler(button) {
-  const propsKey = Object.keys(button).find((key) => key.startsWith("__reactProps$"));
-  return propsKey ? button[propsKey]?.onClick : null;
-}
-
 function pickerFor(button) {
-  const picker = button.closest("div.rounded-xl.border-dashed") || button.closest("[data-exercise-picker]");
-  if (!picker) return null;
-  const heading = [...picker.querySelectorAll("strong, h1, h2, h3")].find((item) =>
-    /^(Exercise picker|Change exercise)$/i.test(textOf(item)),
-  );
-  return heading ? picker : null;
+  const picker = button.closest("div.rounded-xl.border-dashed");
+  const heading = picker?.querySelector("strong");
+  return picker && /^(Exercise picker|Change exercise)$/i.test(textOf(heading)) ? picker : null;
 }
 
-function isRepeatAddButton(button) {
-  if (!pickerFor(button)) return false;
-  const label = textOf(button);
-  return label === "Selected" || label === "Added" || button.dataset.repeatExerciseAdd === "true";
+function selectedExerciseName(button) {
+  const row = button.closest("div.flex.items-center.justify-between");
+  return textOf(row?.querySelector(".font-medium"));
+}
+
+function sessionForPicker(picker) {
+  return picker.closest("div.space-y-4.rounded-2xl");
+}
+
+function duplicateMatchingExercise(picker, exerciseName) {
+  const session = sessionForPicker(picker);
+  if (!session || !exerciseName) return false;
+
+  const cards = [...session.querySelectorAll("div.space-y-3.rounded-xl.border.bg-white.p-3")];
+  const matchingCard = cards.find((card) => textOf(card.querySelector(".font-semibold")) === exerciseName);
+  if (!matchingCard) return false;
+
+  const duplicateButton = [...matchingCard.querySelectorAll("button")].find((button) => textOf(button) === "Duplicate");
+  if (!duplicateButton) return false;
+
+  duplicateButton.click();
+  return true;
 }
 
 function enableRepeatExerciseAdds() {
   document.querySelectorAll("button").forEach((button) => {
-    if (!isRepeatAddButton(button)) return;
+    if (textOf(button) !== "Selected") return;
+    if (!pickerFor(button)) return;
 
     button.dataset.repeatExerciseAdd = "true";
     button.disabled = false;
     button.removeAttribute("disabled");
-    button.setAttribute("aria-disabled", "false");
     button.textContent = "Add";
     button.classList.remove("opacity-50", "cursor-not-allowed");
-    button.style.pointerEvents = "auto";
-    button.style.opacity = "1";
   });
 }
 
@@ -117,23 +125,23 @@ export function installDuplicateAndPairedExerciseFix() {
   if (typeof document === "undefined" || typeof MutationObserver === "undefined") return () => {};
 
   const forceRepeatAdd = (event) => {
-    const button = event.target.closest?.("button");
-    if (!button || !isRepeatAddButton(button)) return;
-    const handler = reactClickHandler(button);
-    if (typeof handler !== "function") return;
+    const button = event.target.closest?.("button[data-repeat-exercise-add='true']");
+    if (!button) return;
 
+    const picker = pickerFor(button);
+    if (!picker) return;
+
+    const exerciseName = selectedExerciseName(button);
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
 
-    button.disabled = false;
-    button.removeAttribute("disabled");
-    button.textContent = "Add";
-    handler({ currentTarget: button, target: button, preventDefault() {}, stopPropagation() {} });
+    if (!duplicateMatchingExercise(picker, exerciseName)) return;
+
+    const closeButton = [...picker.querySelectorAll("button")].find((candidate) => textOf(candidate) === "Close");
+    closeButton?.click();
   };
 
-  document.addEventListener("pointerdown", forceRepeatAdd, true);
-  document.addEventListener("touchstart", forceRepeatAdd, true);
   document.addEventListener("click", forceRepeatAdd, true);
 
   let queued = false;
@@ -151,8 +159,6 @@ export function installDuplicateAndPairedExerciseFix() {
   observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["disabled"] });
   return () => {
     observer.disconnect();
-    document.removeEventListener("pointerdown", forceRepeatAdd, true);
-    document.removeEventListener("touchstart", forceRepeatAdd, true);
     document.removeEventListener("click", forceRepeatAdd, true);
   };
 }

@@ -110,7 +110,7 @@ function markTimelineCards() {
   [...document.querySelectorAll("div, p, span")]
     .filter((element) => /(?:days|weeks|months) post-op$/i.test(textOf(element)))
     .forEach((label) => {
-      const card = closestCard(label) || label.parentElement;
+      const card = closestCard(label);
       if (card) card.dataset.appSurfaceCard = "metric";
     });
 }
@@ -144,20 +144,13 @@ function clearTabOverrides() {
   document.querySelectorAll("[data-app-tab-surface]").forEach((element) => element.removeAttribute("data-app-tab-surface"));
 }
 
-function markBroadSuitableCards() {
-  const roots = [...document.querySelectorAll("main, #root > div > div")];
-  roots.forEach((root) => {
-    root.querySelectorAll("section[class*='rounded-'], article[class*='rounded-']").forEach((card) => {
-      if (!card.dataset.appSurfaceCard && !card.dataset.workoutStateCard) card.dataset.appSurfaceCard = "soft";
-    });
+function markExerciseCards() {
+  [...document.querySelectorAll("h2, h3")].forEach((heading) => {
+    const card = closestCard(heading);
+    if (!card || card.dataset.appSurfaceCard || card.dataset.workoutStateCard) return;
+    const hasExerciseContent = card.querySelector("input, select, [class*='set'], [class*='exercise']") || heading.closest("[data-quick-workout-builder='true']");
+    if (hasExerciseContent) card.dataset.appSurfaceCard = "exercise";
   });
-
-  [...document.querySelectorAll("h2, h3")]
-    .filter((heading) => heading.closest("[data-quick-workout-builder='true']") || heading.closest("section[class*='rounded-'], article[class*='rounded-']"))
-    .forEach((heading) => {
-      const card = closestCard(heading);
-      if (card && !card.dataset.appSurfaceCard) card.dataset.appSurfaceCard = "exercise";
-    });
 }
 
 function markConsistentSurfaceCards() {
@@ -177,7 +170,7 @@ function markConsistentSurfaceCards() {
 
   markTimelineCards();
   markProgrammeActiveCard();
-  markBroadSuitableCards();
+  markExerciseCards();
 }
 
 function markPageAndDialogSurfaces() {

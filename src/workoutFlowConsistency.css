@@ -3,59 +3,59 @@ html[data-app-blue-tinge="true"] body,
 html[data-app-blue-tinge="true"] #root,
 html[data-app-blue-tinge="true"] .min-h-screen {
   background:
-    radial-gradient(circle at top left, rgb(219 234 254 / 0.38), transparent 34rem),
-    linear-gradient(180deg, rgb(248 250 252), rgb(241 245 249 / 0.94) 58%, rgb(239 246 255 / 0.48)) !important;
+    radial-gradient(circle at top left, rgb(219 234 254 / 0.22), transparent 32rem),
+    linear-gradient(180deg, rgb(248 250 252), rgb(245 247 250 / 0.98) 60%, rgb(239 246 255 / 0.28)) !important;
 }
 
 [data-quick-workout-builder="true"] {
   margin-inline: auto;
   max-width: 64rem;
   border-radius: 1.5rem;
-  background: linear-gradient(100deg, rgb(239 246 255 / 0.72) 0%, rgb(248 250 252 / 0.96) 32%, rgb(255 255 255) 72%) !important;
+  background: linear-gradient(100deg, rgb(239 246 255 / 0.42) 0%, rgb(248 250 252 / 0.96) 36%, rgb(255 255 255) 76%) !important;
 }
 
 [data-workout-state-card="progress"],
 [data-app-surface-card] {
   overflow: hidden;
-  border-color: rgb(219 234 254 / 0.88) !important;
-  background: linear-gradient(100deg, rgb(239 246 255 / 0.62) 0%, rgb(248 250 252 / 0.98) 30%, rgb(255 255 255) 72%) !important;
-  box-shadow: 0 12px 30px rgb(15 23 42 / 0.07), 0 2px 8px rgb(15 23 42 / 0.04) !important;
+  border-color: rgb(219 234 254 / 0.72) !important;
+  background: linear-gradient(100deg, rgb(239 246 255 / 0.38) 0%, rgb(248 250 252 / 0.98) 34%, rgb(255 255 255) 76%) !important;
+  box-shadow: 0 10px 24px rgb(15 23 42 / 0.055), 0 2px 6px rgb(15 23 42 / 0.035) !important;
 }
 
 [data-app-surface-card="section"] {
-  background: linear-gradient(100deg, rgb(239 246 255 / 0.54) 0%, rgb(248 250 252 / 0.98) 34%, rgb(255 255 255) 76%) !important;
+  background: linear-gradient(100deg, rgb(239 246 255 / 0.32) 0%, rgb(248 250 252 / 0.98) 38%, rgb(255 255 255) 78%) !important;
 }
 
 [data-app-surface-card="metric"] {
-  background: linear-gradient(100deg, rgb(219 234 254 / 0.62) 0%, rgb(239 246 255 / 0.52) 24%, rgb(255 255 255) 70%) !important;
+  background: linear-gradient(100deg, rgb(219 234 254 / 0.38) 0%, rgb(239 246 255 / 0.3) 28%, rgb(255 255 255) 74%) !important;
 }
 
 [data-app-surface-card="exercise"] {
-  background: linear-gradient(100deg, rgb(239 246 255 / 0.46) 0%, rgb(248 250 252 / 0.98) 28%, rgb(255 255 255) 72%) !important;
+  background: linear-gradient(100deg, rgb(239 246 255 / 0.26) 0%, rgb(248 250 252 / 0.98) 34%, rgb(255 255 255) 78%) !important;
 }
 
 [data-app-surface-card="active"] {
-  border-color: rgb(147 197 253 / 0.92) !important;
-  background: linear-gradient(100deg, rgb(191 219 254 / 0.68) 0%, rgb(219 234 254 / 0.52) 26%, rgb(255 255 255) 72%) !important;
-  box-shadow: 0 14px 34px rgb(29 78 216 / 0.1), 0 2px 8px rgb(15 23 42 / 0.05) !important;
+  border-color: rgb(147 197 253 / 0.72) !important;
+  background: linear-gradient(100deg, rgb(191 219 254 / 0.48) 0%, rgb(219 234 254 / 0.38) 30%, rgb(255 255 255) 76%) !important;
+  box-shadow: 0 12px 28px rgb(29 78 216 / 0.075), 0 2px 7px rgb(15 23 42 / 0.04) !important;
 }
 
 [data-app-dialog-panel="true"] {
-  border: 1px solid rgb(191 219 254 / 0.86) !important;
-  background: linear-gradient(100deg, rgb(239 246 255 / 0.66) 0%, rgb(248 250 252 / 0.98) 32%, rgb(255 255 255) 74%) !important;
-  box-shadow: 0 24px 70px rgb(15 23 42 / 0.2), 0 3px 12px rgb(29 78 216 / 0.08) !important;
+  border: 1px solid rgb(191 219 254 / 0.68) !important;
+  background: linear-gradient(100deg, rgb(239 246 255 / 0.38) 0%, rgb(248 250 252 / 0.98) 36%, rgb(255 255 255) 78%) !important;
+  box-shadow: 0 22px 60px rgb(15 23 42 / 0.18), 0 3px 10px rgb(29 78 216 / 0.06) !important;
 }
 
 /* Quick Workout is a soft action surface rather than another heavy primary button. */
 [data-quick-workout-action="true"] {
   border-color: transparent !important;
-  background: linear-gradient(100deg, rgb(219 234 254 / 0.9) 0%, rgb(239 246 255 / 0.94) 42%, rgb(248 250 252) 100%) !important;
+  background: linear-gradient(100deg, rgb(219 234 254 / 0.64) 0%, rgb(239 246 255 / 0.8) 44%, rgb(248 250 252) 100%) !important;
   color: rgb(30 64 175) !important;
-  box-shadow: 0 8px 20px rgb(29 78 216 / 0.09), inset 0 0 0 1px rgb(191 219 254 / 0.42) !important;
+  box-shadow: 0 7px 17px rgb(29 78 216 / 0.07), inset 0 0 0 1px rgb(191 219 254 / 0.26) !important;
 }
 
 [data-quick-workout-action="true"]:hover {
-  background: linear-gradient(100deg, rgb(191 219 254 / 0.88) 0%, rgb(219 234 254 / 0.9) 42%, rgb(239 246 255) 100%) !important;
+  background: linear-gradient(100deg, rgb(191 219 254 / 0.64) 0%, rgb(219 234 254 / 0.72) 44%, rgb(239 246 255) 100%) !important;
 }
 
 /* Tabs and filter chips deliberately keep their original solid selected/unselected styling. */
@@ -105,7 +105,7 @@ html[data-app-blue-tinge="true"] .min-h-screen {
   html[data-app-blue-tinge="true"] #root,
   html[data-app-blue-tinge="true"] .min-h-screen {
     background:
-      radial-gradient(circle at top left, rgb(219 234 254 / 0.32), transparent 22rem),
-      linear-gradient(180deg, rgb(248 250 252), rgb(241 245 249 / 0.96) 62%, rgb(239 246 255 / 0.42)) !important;
+      radial-gradient(circle at top left, rgb(219 234 254 / 0.18), transparent 20rem),
+      linear-gradient(180deg, rgb(248 250 252), rgb(245 247 250 / 0.98) 64%, rgb(239 246 255 / 0.24)) !important;
   }
 }

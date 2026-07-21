@@ -5,6 +5,7 @@ import './index.css'
 import './uiPolish.css'
 import './finalUxPolish.css'
 import './workoutFlowConsistency.css'
+import './finalTargetedUiFix.css'
 import App from './App.jsx'
 import { installUiRuntimeFixes } from './uiRuntimeFixes'
 import { installProgrammeButtonLabels } from './programmeButtonLabels'
@@ -17,6 +18,7 @@ import { installHomeSummaryAndSettingsFix } from './homeSummaryAndSettingsFix'
 import { installTaskAndVariationLabels } from './taskAndVariationLabels'
 import { installQuickWorkoutCancelCleanup } from './quickWorkoutCancelCleanup'
 import { installWorkoutFlowConsistencyFix } from './workoutFlowConsistencyFix'
+import { installFinalTargetedUiFixes } from './finalTargetedUiFix'
 
 const updateSW = registerSW({
   immediate: true,
@@ -36,6 +38,7 @@ installHomeSummaryAndSettingsFix()
 installTaskAndVariationLabels()
 installQuickWorkoutCancelCleanup()
 installWorkoutFlowConsistencyFix()
+installFinalTargetedUiFixes()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

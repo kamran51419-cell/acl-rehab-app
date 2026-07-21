@@ -33,6 +33,7 @@
 
 [data-final-stats-card="true"] {
   background-color: transparent !important;
+  box-shadow: none !important;
 }
 
 /* The Stats list wrapper must stay invisible so only the exercise card is visible. */

@@ -9,12 +9,25 @@ function programmeEditor() {
   return heading?.closest('[data-final-programme-editor="true"]') || heading?.closest("[class*='rounded-3xl']") || null
 }
 
+function exercisePicker(editor) {
+  const heading = [...editor.querySelectorAll('strong, h1, h2, h3, div')].find((element) =>
+    /^(Exercise picker|Change exercise)$/i.test(textOf(element)),
+  )
+  return heading?.closest("[class*='rounded-xl']") || null
+}
+
 function enableRepeatedExerciseAdds(editor) {
-  editor.querySelectorAll('button').forEach((button) => {
-    if (textOf(button) !== 'Selected') return
+  const picker = exercisePicker(editor)
+  if (!picker) return
+
+  picker.querySelectorAll('button').forEach((button) => {
+    if (!['Selected', 'Add'].includes(textOf(button))) return
     button.disabled = false
     button.removeAttribute('disabled')
+    button.setAttribute('aria-disabled', 'false')
     button.textContent = 'Add'
+    button.style.pointerEvents = 'auto'
+    button.style.opacity = '1'
   })
 }
 
@@ -60,8 +73,32 @@ export function installProgrammeCreatorInputFixes() {
     requestAnimationFrame(() => input.select())
   }
 
+  const unlockPickerButton = (event) => {
+    const button = event.target?.closest?.('button')
+    if (!button || !['Selected', 'Add'].includes(textOf(button))) return
+    const editor = programmeEditor()
+    if (!editor || !exercisePicker(editor)?.contains(button)) return
+    button.disabled = false
+    button.removeAttribute('disabled')
+    button.setAttribute('aria-disabled', 'false')
+  }
+
+  const ensureCloseIsClickable = (event) => {
+    const button = event.target?.closest?.('button')
+    if (!button || textOf(button) !== 'Close') return
+    const editor = programmeEditor()
+    if (!editor || !editor.contains(button)) return
+    button.disabled = false
+    button.removeAttribute('disabled')
+    button.style.pointerEvents = 'auto'
+  }
+
   document.addEventListener('focusin', selectNumericInput)
   document.addEventListener('pointerup', selectNumericInput)
+  document.addEventListener('pointerdown', unlockPickerButton, true)
+  document.addEventListener('touchstart', unlockPickerButton, true)
+  document.addEventListener('pointerdown', ensureCloseIsClickable, true)
+  document.addEventListener('touchstart', ensureCloseIsClickable, true)
 
   let queued = false
   const schedule = () => {
@@ -75,11 +112,15 @@ export function installProgrammeCreatorInputFixes() {
 
   applyProgrammeCreatorFixes()
   const observer = new MutationObserver(schedule)
-  observer.observe(document.body, { childList: true, subtree: true, characterData: true })
+  observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['disabled'] })
 
   return () => {
     observer.disconnect()
     document.removeEventListener('focusin', selectNumericInput)
     document.removeEventListener('pointerup', selectNumericInput)
+    document.removeEventListener('pointerdown', unlockPickerButton, true)
+    document.removeEventListener('touchstart', unlockPickerButton, true)
+    document.removeEventListener('pointerdown', ensureCloseIsClickable, true)
+    document.removeEventListener('touchstart', ensureCloseIsClickable, true)
   }
 }

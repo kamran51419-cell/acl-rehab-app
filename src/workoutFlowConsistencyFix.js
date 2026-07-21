@@ -6,6 +6,11 @@ function headingWithText(text) {
   return [...document.querySelectorAll("h1, h2, h3")].find((heading) => textOf(heading) === text);
 }
 
+function headingContainingText(text) {
+  const normalized = text.toLowerCase();
+  return [...document.querySelectorAll("h1, h2, h3")].find((heading) => textOf(heading).toLowerCase().includes(normalized));
+}
+
 function closestCard(element) {
   if (!element) return null;
   const rounded = element.closest("[class*='rounded-xl'], [class*='rounded-2xl'], [class*='rounded-3xl']");
@@ -14,16 +19,19 @@ function closestCard(element) {
 }
 
 function removeLeakedProgrammeCards() {
-  const quickWorkoutOpen = Boolean(headingWithText("Quick Workout"));
+  const quickWorkoutOpen = Boolean(headingContainingText("Quick Workout"));
   const workoutInProgress = Boolean(headingWithText("Workout in progress"));
   if (!quickWorkoutOpen && !workoutInProgress) return;
 
   document.querySelectorAll("[data-home-summary-cards]").forEach((element) => element.remove());
-  [...document.querySelectorAll("h1, h2, h3, p, span, div")]
+  [...document.querySelectorAll("h1, h2, h3, h4, p, span, div")]
     .filter((element) => ["active programme", "last workout"].includes(textOf(element).toLowerCase()))
     .forEach((label) => {
       const card = closestCard(label);
-      if (card && !card.querySelector("h1, h2, h3")?.textContent?.includes("Workout in progress")) card.remove();
+      if (!card) return;
+      const isWorkoutProgressCard = Boolean(card.querySelector("h1, h2, h3")?.textContent?.includes("Workout in progress"));
+      const isBuilderCard = Boolean(card.querySelector("h1, h2, h3")?.textContent?.includes("Quick Workout"));
+      if (!isWorkoutProgressCard && !isBuilderCard) card.remove();
     });
 }
 
@@ -95,7 +103,7 @@ function markFollowingCard(label, variant = "section") {
 
 function markQuickWorkoutBuilder() {
   document.querySelectorAll("[data-quick-workout-builder]").forEach((element) => element.removeAttribute("data-quick-workout-builder"));
-  const heading = headingWithText("Quick Workout");
+  const heading = headingContainingText("Quick Workout");
   if (!heading) return;
   const screen = heading.closest(".space-y-5, .space-y-6") || heading.parentElement;
   if (screen) screen.dataset.quickWorkoutBuilder = "true";
@@ -137,6 +145,9 @@ function markProgrammeActiveCard() {
     element.removeAttribute("data-programme-active-heading");
     element.removeAttribute("data-programme-active-card");
   });
+
+  if (headingContainingText("Edit programme") || headingContainingText("Create programme")) return;
+
   const heading = headingWithText("Active");
   if (!heading) return;
   heading.dataset.programmeActiveHeading = "true";
@@ -172,17 +183,20 @@ function markStatsExerciseCards() {
     element.removeAttribute("data-app-list-wrapper");
   });
 
-  [...document.querySelectorAll("button, article, section")].forEach((element) => {
+  [...document.querySelectorAll("button, article, section, div")].forEach((element) => {
     const text = textOf(element);
     if (!/View stats/i.test(text) || text.length > 400) return;
+    if ([...element.children].some((child) => /View stats/i.test(textOf(child)) && textOf(child).length < text.length)) return;
+
     const card = element.matches("[class*='rounded-']") ? element : closestCard(element);
     if (!card || card.dataset.standardTab) return;
     card.dataset.appSurfaceCard = "secondary-card";
     card.dataset.appListCard = "true";
 
-    const wrapper = card.parentElement;
-    if (wrapper && wrapper.children.length <= 3 && !wrapper.matches("main, section[class*='rounded-'], article[class*='rounded-']")) {
-      wrapper.dataset.appListWrapper = "true";
+    let wrapper = card.parentElement;
+    for (let depth = 0; wrapper && depth < 2; depth += 1, wrapper = wrapper.parentElement) {
+      if (wrapper.matches("main, #root, body")) break;
+      if (!wrapper.matches("section[class*='rounded-'], article[class*='rounded-']")) wrapper.dataset.appListWrapper = "true";
     }
   });
 }

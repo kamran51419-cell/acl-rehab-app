@@ -3,6 +3,13 @@
   --app-card-radius: 1.25rem;
   --app-card-shadow: 0 8px 24px rgb(15 23 42 / 0.06), 0 1px 3px rgb(15 23 42 / 0.08);
   --app-card-shadow-hover: 0 12px 30px rgb(15 23 42 / 0.09), 0 2px 5px rgb(15 23 42 / 0.08);
+  --app-accent-50: #f0fdfa;
+  --app-accent-100: #ccfbf1;
+  --app-accent-200: #99f6e4;
+  --app-accent-500: #14b8a6;
+  --app-accent-600: #0d9488;
+  --app-accent-700: #0f766e;
+  --app-accent-800: #115e59;
 }
 
 /* Premium but restrained card treatment */
@@ -27,6 +34,57 @@
 [data-home-summary-cards] > button:hover {
   transform: translateY(-1px);
   box-shadow: var(--app-card-shadow-hover) !important;
+  border-color: var(--app-accent-200) !important;
+}
+
+/* Restrained teal identity: primary actions, selected controls and focus states */
+button.bg-slate-900 {
+  background-color: var(--app-accent-700) !important;
+  box-shadow: 0 4px 12px rgb(13 148 136 / 0.18);
+}
+
+button.bg-slate-900:hover {
+  background-color: var(--app-accent-800) !important;
+}
+
+button.bg-slate-900:focus-visible,
+button.border-slate-200:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--app-accent-500) !important;
+  outline-offset: 2px;
+}
+
+button.border-slate-200.bg-white:hover {
+  border-color: var(--app-accent-200) !important;
+  background-color: var(--app-accent-50) !important;
+  color: var(--app-accent-800) !important;
+}
+
+button.bg-slate-100,
+button.bg-slate-200 {
+  border-color: var(--app-accent-200) !important;
+  background-color: var(--app-accent-50) !important;
+  color: var(--app-accent-800) !important;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--app-accent-500) !important;
+  box-shadow: 0 0 0 3px rgb(20 184 166 / 0.12);
+}
+
+/* Add subtle colour without turning whole cards into coloured panels */
+[data-home-summary-cards] > button:first-child {
+  background-image: linear-gradient(135deg, rgb(240 253 250 / 0.85), rgb(255 255 255 / 0) 52%);
+}
+
+.rounded-3xl.border.border-slate-200.bg-white > h2,
+.rounded-3xl.border.border-slate-200.bg-white h3,
+.rounded-2xl.border.border-slate-200.bg-white.shadow-sm h2 {
+  text-decoration-color: var(--app-accent-500);
 }
 
 /* Keep spacing comfortable without wasting phone space */
@@ -61,8 +119,8 @@
 }
 
 .recharts-cartesian-grid line {
-  stroke: #e2e8f0;
-  stroke-opacity: 0.7;
+  stroke: #dbe7e5;
+  stroke-opacity: 0.75;
 }
 
 .recharts-cartesian-axis-tick-value {
@@ -76,8 +134,12 @@
   stroke-linejoin: round;
 }
 
+.recharts-line:nth-of-type(1) .recharts-line-curve {
+  stroke: var(--app-accent-600);
+}
+
 .recharts-default-tooltip {
-  border: 1px solid #e2e8f0 !important;
+  border: 1px solid var(--app-accent-100) !important;
   border-radius: 0.875rem !important;
   box-shadow: 0 10px 25px rgb(15 23 42 / 0.12) !important;
   padding: 0.65rem 0.8rem !important;
@@ -116,15 +178,16 @@
 }
 
 .fixed.bottom-0.left-0.right-0.z-20.border-t button.bg-slate-100 {
-  background: #eef2ff !important;
-  border-color: #c7d2fe;
-  color: #3730a3 !important;
+  background: var(--app-accent-50) !important;
+  border-color: var(--app-accent-200) !important;
+  color: var(--app-accent-800) !important;
   font-weight: 600;
 }
 
 .fixed.bottom-0.left-0.right-0.z-20.border-t button.bg-slate-100 svg {
   transform: scale(1.12);
   stroke-width: 2.25;
+  color: var(--app-accent-700);
 }
 
 .fixed.bottom-0.left-0.right-0.z-20.border-t button:active {
@@ -135,6 +198,13 @@
 .hidden.md\:flex.flex-wrap.gap-2 > button {
   min-height: 2.5rem;
   box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+}
+
+.hidden.md\:flex.flex-wrap.gap-2 > button.bg-slate-100,
+.hidden.md\:flex.flex-wrap.gap-2 > button.bg-slate-900 {
+  border-color: var(--app-accent-200) !important;
+  background-color: var(--app-accent-50) !important;
+  color: var(--app-accent-800) !important;
 }
 
 /* Avoid accidental horizontal overflow introduced by richer cards/charts */

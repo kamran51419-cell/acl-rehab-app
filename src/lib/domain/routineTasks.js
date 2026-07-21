@@ -38,6 +38,7 @@ export function routineTimesForTask(task) {
     try {
       const parsed = JSON.parse(stored.slice(6));
       if (Array.isArray(parsed) && parsed.length) return parsed;
+      if (parsed && typeof parsed === "object" && Array.isArray(parsed.selected) && parsed.selected.length) return parsed.selected;
     } catch {
       return [ROUTINE_TIME.ANYTIME];
     }

@@ -7,7 +7,12 @@ function headingWithText(text) {
 }
 
 function closestCard(element) {
-  return element?.closest("section, article, [class*='rounded-2xl'], [class*='rounded-3xl']") || null;
+  if (!element) return null;
+  return (
+    element.closest("[class*='rounded-3xl'], [class*='rounded-2xl'], article") ||
+    element.closest("section") ||
+    null
+  );
 }
 
 function removeLeakedProgrammeCards() {
@@ -17,7 +22,7 @@ function removeLeakedProgrammeCards() {
 
   document.querySelectorAll("[data-home-summary-cards]").forEach((element) => element.remove());
 
-  [...document.querySelectorAll("h1, h2, h3, p, span, div")]
+  [...document.querySelectorAll("h1, h2, h3, p, span")]
     .filter((element) => {
       const text = textOf(element).toLowerCase();
       return text === "active programme" || text === "last workout";
@@ -76,7 +81,7 @@ function markWorkoutStateCard() {
 }
 
 function markCardByExactText(label, variant = "soft") {
-  const match = [...document.querySelectorAll("h1, h2, h3, h4, p, span, div")]
+  const match = [...document.querySelectorAll("h1, h2, h3, h4, p, span")]
     .find((element) => textOf(element) === label);
   const card = closestCard(match);
   if (card) card.dataset.appSurfaceCard = variant;
@@ -90,7 +95,6 @@ function markConsistentSurfaceCards() {
     "Exercise Library",
     "Stats",
     "Workout History",
-    "Weight progress",
     "Training mode",
     "Surgery date",
     "Account",
@@ -103,7 +107,6 @@ function markConsistentSurfaceCards() {
     "Active Programme",
     "Last Workout",
     "Rehab timeline",
-    "Active",
   ].forEach((label) => markCardByExactText(label, "summary"));
 }
 

@@ -71,14 +71,26 @@ function markCardByExactText(label, variant = "soft") {
 function markConsistentSurfaceCards() {
   document.querySelectorAll("[data-app-surface-card]").forEach((element) => element.removeAttribute("data-app-surface-card"));
 
-  ["Inactive programmes", "Exercise Library", "Stats", "Workout History"].forEach((label) => {
-    const heading = headingWithText(label);
-    const card = closestCard(heading);
-    if (card) card.dataset.appSurfaceCard = "soft";
-  });
+  [
+    "Inactive programmes",
+    "Exercise Library",
+    "Stats",
+    "Workout History",
+    "Weight progress",
+    "Training mode",
+    "Surgery date",
+    "Account",
+  ].forEach((label) => markCardByExactText(label, "section"));
 
   ["Improvement", "Latest performance", "Best set"].forEach((label) => markCardByExactText(label, "metric"));
-  ["Today's Tasks", "Active Programme", "Last Workout", "Rehab timeline"].forEach((label) => markCardByExactText(label, "summary"));
+
+  [
+    "Today's Tasks",
+    "Active Programme",
+    "Last Workout",
+    "Rehab timeline",
+    "Active",
+  ].forEach((label) => markCardByExactText(label, "summary"));
 }
 
 function apply() {

@@ -19,6 +19,7 @@ import { installTaskAndVariationLabels } from './taskAndVariationLabels'
 import { installQuickWorkoutCancelCleanup } from './quickWorkoutCancelCleanup'
 import { installWorkoutFlowConsistencyFix } from './workoutFlowConsistencyFix'
 import { installFinalTargetedUiFixes } from './finalTargetedUiFix'
+import { installTodayTaskOrderFix } from './todayTaskOrderFix'
 
 const updateSW = registerSW({
   immediate: true,
@@ -39,6 +40,7 @@ installTaskAndVariationLabels()
 installQuickWorkoutCancelCleanup()
 installWorkoutFlowConsistencyFix()
 installFinalTargetedUiFixes()
+installTodayTaskOrderFix()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

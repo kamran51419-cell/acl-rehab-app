@@ -39,6 +39,13 @@ function labelFor(value) {
   return `${value[0].toUpperCase()}${value.slice(1)}`;
 }
 
+function controlledSelectValue(select) {
+  if (select.value) return select.value;
+  const reactPropsKey = Object.keys(select).find((key) => key.startsWith("__reactProps$"));
+  const reactValue = reactPropsKey ? select[reactPropsKey]?.value : null;
+  return typeof reactValue === "string" && reactValue ? reactValue : "anytime";
+}
+
 function commit(select, selected, customTimes) {
   const value = encodeState(selected, customTimes);
   if (![...select.options].some((option) => option.value === value)) {
@@ -80,7 +87,7 @@ function customTimeBox(time, selected, onToggle, onDelete) {
 }
 
 function renderEditor(select, host) {
-  const { selected, customTimes } = parseState(select.value);
+  const { selected, customTimes } = parseState(controlledSelectValue(select));
   host.replaceChildren();
 
   const options = document.createElement("div");

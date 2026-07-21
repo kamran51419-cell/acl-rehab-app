@@ -1,194 +1,107 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, ChevronRight, ChevronUp, Dumbbell } from "lucide-react";
+import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import Button from "../../components/ui/Button";
 import { todayString } from "../../lib/domain/date";
-import {
-  EXERCISE_LOGGING_METHOD,
-  EXERCISE_TYPE,
-  planPrescriptionSummary,
-} from "../../lib/domain/plans";
+import { EXERCISE_LOGGING_METHOD, EXERCISE_TYPE, planPrescriptionSummary } from "../../lib/domain/plans";
 import { SIDE } from "../../lib/domain/v2Models";
-import {
-  durationLabel,
-  previousWeightsForExercise,
-  resolveWorkoutExerciseSide,
-  sessionWorkoutStatus,
-  workoutExerciseSideLabel,
-} from "../../lib/domain/workoutDisplay";
-import {
-  addRecordedSet,
-  completeWorkout,
-  createDebouncedSaver,
-  createInProgressWorkout,
-  isMeaningfulWorkout,
-  removeRecordedSet,
-  resumeWorkout,
-  updateRecordedSet,
-} from "../../lib/domain/workoutSession";
-import {
-  createInProgressWorkoutDocument,
-  deleteWorkoutDocument,
-  finishWorkoutDocument,
-  subscribeExerciseDefinitions,
-  subscribePlans,
-  subscribeWorkouts,
-  updateInProgressWorkoutDocument,
-} from "../../lib/firebase/planRepository";
+import { durationLabel, previousWeightsForExercise, resolveWorkoutExerciseSide, sessionWorkoutStatus, workoutExerciseSideLabel } from "../../lib/domain/workoutDisplay";
+import { addRecordedSet, completeWorkout, createDebouncedSaver, createInProgressWorkout, isMeaningfulWorkout, removeRecordedSet, resumeWorkout, updateRecordedSet } from "../../lib/domain/workoutSession";
+import { createInProgressWorkoutDocument, deleteWorkoutDocument, finishWorkoutDocument, subscribeExerciseDefinitions, subscribePlans, subscribeWorkouts, updateInProgressWorkoutDocument } from "../../lib/firebase/planRepository";
 import { subscribeLegacyRehabData } from "../../lib/firebase/legacyRehabRepository";
 import { makeId } from "../../lib/domain/legacyWorkouts";
 import QuickWorkoutBuilder, { buildQuickWorkout } from "./QuickWorkoutBuilder";
 
 const noop = () => {};
-const defaultRepository = {
-  subscribePlans,
-  subscribeWorkouts,
-  subscribeExerciseDefinitions,
-  createInProgressWorkoutDocument,
-  updateInProgressWorkoutDocument,
-  finishWorkoutDocument,
-  deleteWorkoutDocument,
-};
+const defaultRepository = { subscribePlans, subscribeWorkouts, subscribeExerciseDefinitions, createInProgressWorkoutDocument, updateInProgressWorkoutDocument, finishWorkoutDocument, deleteWorkoutDocument };
 const ordered = (items = []) => items.slice().sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
 const titleFor = (workout) => workout.name || workout.sessionNameSnapshot || "Workout";
 const supportsSides = (exercise) => [EXERCISE_TYPE.STRENGTH, EXERCISE_TYPE.BALANCE].includes(exercise?.exerciseType);
 
+function hasWeight(set) { const value = set?.weight ?? set?.rawWeight; return value !== "" && value !== undefined && value !== null && Number.isFinite(Number(value)); }
+function exerciseAttempted(exercise) { if (exercise?.completed) return true; const sets = exercise?.recordedSets || []; if (exercise?.loggingMethod === EXERCISE_LOGGING_METHOD.REPS_WEIGHT) return sets.some(hasWeight); if (sets.length) return sets.some((set) => Boolean(set.completed)); return Boolean(exercise?.intervalProgress?.completed || exercise?.intervalProgress?.completedBlocks?.length); }
+
 function cleanUnsupportedSideExercise(exercise) {
   if (supportsSides(exercise)) return exercise;
-  const prescription = { ...(exercise.prescription || {}) };
-  delete prescription.side;
+  const prescription = { ...(exercise.prescription || {}) }; delete prescription.side;
   return { ...exercise, id: String(exercise.id || "").replace(/-(left|right)$/, ""), sideSnapshot: undefined, prescription };
 }
 
 export function normalizeWorkoutForDisplay(saved) {
   if (!saved?.exercises?.length) return saved;
-  const seen = new Set();
-  const exercises = [];
-  ordered(saved.exercises).forEach((original) => {
-    const exercise = cleanUnsupportedSideExercise(original);
-    const key = supportsSides(exercise) ? exercise.id : `${exercise.exerciseId || exercise.exerciseNameSnapshot}:${exercise.id}`;
-    if (seen.has(key)) return;
-    seen.add(key);
-    exercises.push({ ...exercise, sortOrder: exercises.length });
-  });
+  const seen = new Set(); const exercises = [];
+  ordered(saved.exercises).forEach((original) => { const exercise = cleanUnsupportedSideExercise(original); const key = supportsSides(exercise) ? exercise.id : `${exercise.exerciseId || exercise.exerciseNameSnapshot}:${exercise.id}`; if (seen.has(key)) return; seen.add(key); exercises.push({ ...exercise, sortOrder: exercises.length }); });
   return { ...saved, exercises };
 }
 
-function programmeSummary(exercise) {
-  const summary = planPrescriptionSummary(exercise);
-  const standardSide = resolveWorkoutExerciseSide(exercise) === SIDE.BOTH;
-  return standardSide && supportsSides(exercise) ? summary.replace(/\s+both$/i, "") : summary;
-}
-
-function fieldsFor(method) {
-  return {
-    reps: [EXERCISE_LOGGING_METHOD.REPS, EXERCISE_LOGGING_METHOD.REPS_WEIGHT].includes(method),
-    weight: method === EXERCISE_LOGGING_METHOD.REPS_WEIGHT,
-    time: [EXERCISE_LOGGING_METHOD.TIME, EXERCISE_LOGGING_METHOD.TIME_DISTANCE].includes(method),
-    distance: [EXERCISE_LOGGING_METHOD.DISTANCE, EXERCISE_LOGGING_METHOD.TIME_DISTANCE].includes(method),
-  };
-}
-
-function SetTick({ checked, label, onClick }) {
-  return <button type="button" aria-label={label} onClick={onClick} className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 transition ${checked ? "border-emerald-600 bg-emerald-600 text-white" : "border-slate-300 bg-white text-transparent hover:border-emerald-500"}`}><Check className="h-4 w-4" /></button>;
-}
+function programmeSummary(exercise) { const summary = planPrescriptionSummary(exercise); return resolveWorkoutExerciseSide(exercise) === SIDE.BOTH && supportsSides(exercise) ? summary.replace(/\s+both$/i, "") : summary; }
+function fieldsFor(method) { return { reps: [EXERCISE_LOGGING_METHOD.REPS, EXERCISE_LOGGING_METHOD.REPS_WEIGHT].includes(method), weight: method === EXERCISE_LOGGING_METHOD.REPS_WEIGHT, time: [EXERCISE_LOGGING_METHOD.TIME, EXERCISE_LOGGING_METHOD.TIME_DISTANCE].includes(method), distance: [EXERCISE_LOGGING_METHOD.DISTANCE, EXERCISE_LOGGING_METHOD.TIME_DISTANCE].includes(method) }; }
+function SetTick({ checked, label, onClick }) { return <button type="button" aria-label={label} onClick={onClick} className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 transition ${checked ? "border-emerald-600 bg-emerald-600 text-white" : "border-slate-300 bg-white text-transparent hover:border-emerald-500"}`}><Check className="h-4 w-4" /></button>; }
 
 function RepsInput({ exercise, set, onChange }) {
-  const prescribed = set.prescribedReps || {};
-  const prescribedValue = prescribed.type === "range" ? prescribed.min : prescribed.value ?? "";
-  const value = set.rawReps ?? set.actualReps ?? prescribedValue;
-  if (prescribed.type === "range") {
-    return <select aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} reps`} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-slate-900" value={value} onChange={(event) => onChange(exercise.id, set.id, "actualReps", event.target.value)}>{Array.from({ length: Number(prescribed.max) - Number(prescribed.min) + 1 }, (_, index) => Number(prescribed.min) + index).map((rep) => <option key={rep} value={rep}>{rep}</option>)}</select>;
-  }
-  return <input aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} reps`} inputMode="numeric" className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-slate-900" value={value} onFocus={(event) => event.currentTarget.select()} onChange={(event) => onChange(exercise.id, set.id, "actualReps", event.target.value)} />;
+  const prescribed = set.prescribedReps || {}; const fallback = prescribed.type === "range" ? prescribed.min : prescribed.value ?? ""; const value = set.rawReps ?? set.actualReps ?? fallback;
+  if (prescribed.type === "range") return <select aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} reps`} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3" value={value} onChange={(event) => onChange(exercise.id, set.id, "actualReps", event.target.value)}>{Array.from({ length: Number(prescribed.max) - Number(prescribed.min) + 1 }, (_, index) => Number(prescribed.min) + index).map((rep) => <option key={rep} value={rep}>{rep}</option>)}</select>;
+  return <input aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} reps`} inputMode="numeric" className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3" value={value} onFocus={(event) => event.currentTarget.select()} onChange={(event) => onChange(exercise.id, set.id, "actualReps", event.target.value)} />;
 }
 
-function displaySideLabel(exercise, hideExerciseName) {
-  const label = workoutExerciseSideLabel(exercise);
-  if (!hideExerciseName) return label;
-  if (resolveWorkoutExerciseSide(exercise) === SIDE.LEFT) return "Left";
-  if (resolveWorkoutExerciseSide(exercise) === SIDE.RIGHT) return "Right";
-  return label;
-}
+function displaySideLabel(exercise, hideExerciseName) { const label = workoutExerciseSideLabel(exercise); if (!hideExerciseName) return label; if (resolveWorkoutExerciseSide(exercise) === SIDE.LEFT) return "Left"; if (resolveWorkoutExerciseSide(exercise) === SIDE.RIGHT) return "Right"; return label; }
 
 export function ExerciseCard({ exercise, oneOff, onChange, onAddSet, onRemoveSet, onRemoveExercise, onMove, index, total, hideExerciseName = false }) {
-  const fields = fieldsFor(exercise.loggingMethod);
-  const side = displaySideLabel(exercise, hideExerciseName);
-  const isWeighted = exercise.loggingMethod === EXERCISE_LOGGING_METHOD.REPS_WEIGHT;
-  const isRepsOnly = exercise.loggingMethod === EXERCISE_LOGGING_METHOD.REPS;
-  const isTask = exercise.loggingMethod === EXERCISE_LOGGING_METHOD.COMPLETED;
-  const isIntervals = exercise.loggingMethod === EXERCISE_LOGGING_METHOD.INTERVALS;
-  const stages = ordered(exercise.prescription?.stages || exercise.prescription?.intervals || []);
-  const prescribedDuration = durationLabel(exercise.prescription?.targetDurationSeconds, exercise.prescription?.durationUnit) || "—";
-  const prescribedDistance = exercise.prescription?.targetDistance ?? exercise.prescription?.distance;
-  const isSetTickExercise = !isWeighted && (isRepsOnly || fields.time || fields.distance) && (exercise.recordedSets || []).length > 0;
-  const toggleCompleted = () => onChange(exercise.id, null, "completed", !exercise.completed);
-
-  function CompactContent() {
-    if (stages.length) return <div className="min-w-0 flex-1 space-y-1">{stages.map((stage, stageIndex) => <div key={stage.id || stageIndex} className="text-sm font-medium text-slate-700">{`${durationLabel(stage.durationSeconds, stage.durationUnit) || "—"} ${stage.phase === "rest" ? "rest" : "work"}`}</div>)}</div>;
-    return <span className="min-w-0 flex-1 text-sm font-medium text-slate-700">{programmeSummary(exercise) || (isTask ? "Complete task" : "Complete exercise")}</span>;
-  }
-
-  return (
-    <section className={`rounded-2xl border border-slate-200 bg-white p-4 ${hideExerciseName ? "shadow-none" : ""}`}>
-      <div className="flex items-start gap-2">
-        <div className="min-w-0 flex-1">
-          {!hideExerciseName ? <h2 className="font-semibold">{exercise.exerciseNameSnapshot}</h2> : null}
-          {side || exercise.prescription?.targetReps?.type === "range" ? <p className={hideExerciseName ? "text-sm font-semibold text-slate-700" : "text-xs text-slate-500"}>{[side, exercise.prescription?.targetReps?.type === "range" ? `Range: ${exercise.prescription.targetReps.min}–${exercise.prescription.targetReps.max} reps` : null].filter(Boolean).join(" · ")}</p> : null}
-          {exercise.programmeNoteSnapshot ? <p className="mt-1 text-xs text-slate-500">{exercise.programmeNoteSnapshot}</p> : null}
-        </div>
-        {!hideExerciseName ? <><button type="button" aria-label={`Move ${exercise.exerciseNameSnapshot} up`} disabled={!index} onClick={() => onMove(index, -1)} className="p-2 disabled:opacity-30"><ChevronUp className="h-4 w-4" /></button><button type="button" aria-label={`Move ${exercise.exerciseNameSnapshot} down`} disabled={index === total - 1} onClick={() => onMove(index, 1)} className="p-2 disabled:opacity-30"><ChevronDown className="h-4 w-4" /></button></> : null}
-        {oneOff ? <button type="button" onClick={() => onRemoveExercise(exercise.id)} className="min-h-10 px-2 text-sm font-medium text-red-600">Remove</button> : null}
-      </div>
-
-      {isSetTickExercise ? <div className="mt-3 space-y-2">{(exercise.recordedSets || []).map((set) => <div key={set.id} className="grid grid-cols-[3.5rem_minmax(0,1fr)_2rem] items-center gap-3 rounded-xl bg-slate-50 p-3"><span className="text-sm font-medium">Set {set.setNumber}</span>{isRepsOnly ? <div className="flex min-w-0 items-center gap-2"><RepsInput exercise={exercise} set={set} onChange={onChange} /><span className="shrink-0 text-sm font-medium text-slate-600">reps</span></div> : <span className="text-sm font-medium text-slate-700">{[fields.time ? prescribedDuration : null, fields.distance && prescribedDistance !== undefined ? `${prescribedDistance} km` : null].filter(Boolean).join(" · ")}</span>}<SetTick checked={Boolean(set.completed)} label={set.completed ? `Mark set ${set.setNumber} incomplete` : `Mark set ${set.setNumber} complete`} onClick={() => onChange(exercise.id, set.id, "setCompleted", !set.completed)} /></div>)}</div>
-      : (isTask || isIntervals) ? <div className="mt-3 flex min-h-12 items-center gap-3 rounded-xl bg-slate-50 px-3 py-2"><CompactContent /><SetTick checked={exercise.completed} label={exercise.completed ? `Mark ${exercise.exerciseNameSnapshot} incomplete` : `Mark ${exercise.exerciseNameSnapshot} complete`} onClick={toggleCompleted} /></div>
-      : <div className="mt-3 space-y-2">{(exercise.recordedSets || []).map((set) => <div key={set.id} className={`grid items-end gap-2 rounded-xl bg-slate-50 p-3 ${isWeighted ? "grid-cols-[3.25rem_minmax(0,1fr)_minmax(0,1fr)]" : "grid-cols-[3.25rem_minmax(0,1fr)]"}`}><span className="pb-2 text-sm font-medium">Set {set.setNumber}</span>{fields.reps ? <label className="min-w-0 text-xs font-medium">Reps<RepsInput exercise={exercise} set={set} onChange={onChange} /></label> : null}{isWeighted ? <label className="min-w-0 text-xs font-medium">Weight (kg)<input aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} weight`} inputMode="decimal" className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-slate-900" value={set.rawWeight ?? set.weight ?? ""} onFocus={(event) => event.currentTarget.select()} onChange={(event) => onChange(exercise.id, set.id, "weight", event.target.value)} /></label> : null}{oneOff && exercise.recordedSets.length > 1 ? <button type="button" className="col-start-2 min-h-10 justify-self-start text-sm text-red-600" onClick={() => onRemoveSet(exercise.id, set.id)}>Remove</button> : null}</div>)}{oneOff ? <button type="button" className="min-h-11 text-sm font-medium text-emerald-700" onClick={() => onAddSet(exercise.id)}>+ Add set</button> : null}</div>}
-    </section>
-  );
+  const fields = fieldsFor(exercise.loggingMethod); const side = displaySideLabel(exercise, hideExerciseName); const isWeighted = fields.weight; const isRepsOnly = exercise.loggingMethod === EXERCISE_LOGGING_METHOD.REPS; const isTask = exercise.loggingMethod === EXERCISE_LOGGING_METHOD.COMPLETED; const isIntervals = exercise.loggingMethod === EXERCISE_LOGGING_METHOD.INTERVALS; const stages = ordered(exercise.prescription?.stages || exercise.prescription?.intervals || []); const prescribedDuration = durationLabel(exercise.prescription?.targetDurationSeconds, exercise.prescription?.durationUnit) || "—"; const prescribedDistance = exercise.prescription?.targetDistance ?? exercise.prescription?.distance; const isSetTickExercise = !isWeighted && (isRepsOnly || fields.time || fields.distance) && (exercise.recordedSets || []).length > 0;
+  return <section className="rounded-2xl border border-slate-200 bg-white p-4"><div className="flex items-start gap-2"><div className="min-w-0 flex-1">{!hideExerciseName ? <h2 className="font-semibold">{exercise.exerciseNameSnapshot}</h2> : null}{side || exercise.prescription?.targetReps?.type === "range" ? <p className={hideExerciseName ? "text-sm font-semibold text-slate-700" : "text-xs text-slate-500"}>{[side, exercise.prescription?.targetReps?.type === "range" ? `Range: ${exercise.prescription.targetReps.min}–${exercise.prescription.targetReps.max} reps` : null].filter(Boolean).join(" · ")}</p> : null}{exercise.programmeNoteSnapshot ? <p className="mt-1 text-xs text-slate-500">{exercise.programmeNoteSnapshot}</p> : null}</div>{!hideExerciseName && onMove ? <><button type="button" disabled={!index} onClick={() => onMove(index, -1)} className="p-2 disabled:opacity-30"><ChevronUp className="h-4 w-4" /></button><button type="button" disabled={index === total - 1} onClick={() => onMove(index, 1)} className="p-2 disabled:opacity-30"><ChevronDown className="h-4 w-4" /></button></> : null}{oneOff ? <button type="button" onClick={() => onRemoveExercise(exercise.id)} className="min-h-10 px-2 text-sm font-medium text-red-600">Remove</button> : null}</div>
+    {isSetTickExercise ? <div className="mt-3 space-y-2">{exercise.recordedSets.map((set) => <div key={set.id} className="grid grid-cols-[3.5rem_minmax(0,1fr)_2rem] items-center gap-3 rounded-xl bg-slate-50 p-3"><span className="text-sm font-medium">Set {set.setNumber}</span>{isRepsOnly ? <div className="flex items-center gap-2"><RepsInput exercise={exercise} set={set} onChange={onChange}/><span className="text-sm">reps</span></div> : <span className="text-sm font-medium">{[fields.time ? prescribedDuration : null, fields.distance && prescribedDistance !== undefined ? `${prescribedDistance} km` : null].filter(Boolean).join(" · ")}</span>}<SetTick checked={Boolean(set.completed)} label={`Toggle set ${set.setNumber}`} onClick={() => onChange(exercise.id, set.id, "setCompleted", !set.completed)}/></div>)}</div>
+    : isTask || isIntervals ? <div className="mt-3 flex min-h-12 items-center gap-3 rounded-xl bg-slate-50 px-3 py-2"><span className="min-w-0 flex-1 text-sm font-medium">{stages.length ? stages.map((stage) => `${durationLabel(stage.durationSeconds, stage.durationUnit)} ${stage.phase}`).join(" · ") : programmeSummary(exercise) || "Complete exercise"}</span><SetTick checked={Boolean(exercise.completed)} label="Toggle exercise" onClick={() => onChange(exercise.id, null, "completed", !exercise.completed)}/></div>
+    : <div className="mt-3 space-y-2">{(exercise.recordedSets || []).map((set) => <div key={set.id} className={`grid items-end gap-2 rounded-xl bg-slate-50 p-3 ${isWeighted ? "grid-cols-[3.25rem_minmax(0,1fr)_minmax(0,1fr)]" : "grid-cols-[3.25rem_minmax(0,1fr)]"}`}><span className="pb-2 text-sm font-medium">Set {set.setNumber}</span>{fields.reps ? <label className="text-xs font-medium">Reps<RepsInput exercise={exercise} set={set} onChange={onChange}/></label> : null}{isWeighted ? <label className="text-xs font-medium">Weight (kg)<input inputMode="decimal" className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3" value={set.rawWeight ?? set.weight ?? ""} onFocus={(event) => event.currentTarget.select()} onChange={(event) => onChange(exercise.id, set.id, "weight", event.target.value)}/></label> : null}</div>)}</div>}
+  </section>;
 }
 
-function buildWorkoutGroups(list) {
-  const groups = [];
-  for (let index = 0; index < list.length; index += 1) {
-    const exercise = list[index];
-    const side = resolveWorkoutExerciseSide(exercise);
-    const next = list[index + 1];
-    const nextSide = resolveWorkoutExerciseSide(next);
-    const pair = supportsSides(exercise) && next && exercise.exerciseId === next.exerciseId && ((side === SIDE.LEFT && nextSide === SIDE.RIGHT) || (side === SIDE.RIGHT && nextSide === SIDE.LEFT));
-    if (pair) { groups.push({ type: "separate", exercises: side === SIDE.LEFT ? [exercise, next] : [next, exercise] }); index += 1; }
-    else groups.push({ type: "single", exercises: [exercise] });
+function changeWorkout(setWorkout, exerciseId, setId, field, value) {
+  setWorkout((current) => { if (field === "completed") return { ...current, exercises: current.exercises.map((exercise) => exercise.id === exerciseId ? { ...exercise, completed: value } : exercise) }; if (field === "setCompleted") return { ...current, exercises: current.exercises.map((exercise) => exercise.id === exerciseId ? { ...exercise, recordedSets: (exercise.recordedSets || []).map((set) => set.id === setId ? { ...set, completed: value } : set) } : exercise) }; return updateRecordedSet(current, exerciseId, setId, field, value); });
+}
+
+function CompletedWorkoutEditor({ user, saved, mode, onClose }) {
+  const original = useRef(saved); const catchUp = mode === "catch_up"; const [entryDate, setEntryDate] = useState(catchUp ? todayString() : saved.date || saved.workoutDate || todayString()); const [draft, setDraft] = useState(() => ({ ...saved, exercises: catchUp ? saved.exercises.filter((exercise) => !exerciseAttempted(exercise)) : saved.exercises })); const [saving, setSaving] = useState(false); const [error, setError] = useState("");
+  async function save() {
+    setSaving(true); setError("");
+    try {
+      const editedById = new Map(draft.exercises.map((exercise) => [exercise.id, exercise]));
+      const exercises = original.current.exercises.map((exercise) => { const edited = editedById.get(exercise.id); if (!edited) return exercise; return { ...edited, completedDate: exerciseAttempted(edited) ? entryDate : edited.completedDate }; });
+      const updated = { ...original.current, exercises, date: catchUp ? original.current.date : entryDate, workoutDate: catchUp ? original.current.workoutDate : entryDate, status: "completed", completed: true, dismissedIncompleteAt: null, updatedAt: serverTimestamp() };
+      await updateDoc(doc(db, "users", user.uid, "workouts", saved.id), updated);
+      sessionStorage.removeItem("completedWorkoutIntent"); onClose();
+    } catch (saveError) { console.error(saveError); setError("Could not save these changes. Please try again."); } finally { setSaving(false); }
   }
-  return groups;
+  if (!draft.exercises.length) return <section className="rounded-2xl border border-slate-200 bg-white p-6"><h1 className="text-xl font-semibold">Nothing left to complete</h1><Button className="mt-4" onClick={onClose}>Back</Button></section>;
+  return <div className="space-y-5"><button type="button" className="text-sm font-medium text-slate-600" onClick={onClose}>← Back</button><section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"><p className="text-sm font-medium text-emerald-700">{catchUp ? "Log missing exercises" : "Edit completed workout"}</p><h1 className="text-2xl font-semibold">{titleFor(saved)}</h1><label className="mt-4 block text-sm font-medium">{catchUp ? "Date completed" : "Workout date"}<input type="date" className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3" value={entryDate} onChange={(event) => setEntryDate(event.target.value)}/></label><div className="mt-5 space-y-3">{ordered(draft.exercises).map((exercise, index) => <ExerciseCard key={exercise.id} exercise={exercise} oneOff={false} index={index} total={draft.exercises.length} onChange={(...args) => changeWorkout(setDraft, ...args)} onMove={null}/>)}</div>{error ? <p className="mt-3 text-sm font-medium text-red-600">{error}</p> : null}<div className="mt-6 flex gap-3"><Button disabled={saving} onClick={save}>{saving ? "Saving…" : catchUp ? "Save completed exercises" : "Save changes"}</Button><Button variant="outline" onClick={onClose}>Cancel</Button></div></section></div>;
 }
 
 export function WorkoutForm({ workout, saveStatus, finishing, finishError, onBack, onChange, onAddSet, onRemoveSet, onRemoveExercise, onReorder, onNotes, onFinish, onDiscard }) {
-  const list = ordered(workout.exercises);
-  const groups = buildWorkoutGroups(list);
-  const move = (index, direction) => { const target = index + direction; if (target < 0 || target >= list.length) return; const next = list.slice(); [next[index], next[target]] = [next[target], next[index]]; onReorder(next.map((item, itemIndex) => ({ ...item, sortOrder: itemIndex }))); };
-  return <div className="space-y-5"><button type="button" className="text-sm font-medium text-slate-600" onClick={onBack}>← Workout options</button><section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"><div className="flex justify-between gap-3"><div><p className="text-sm font-medium text-emerald-700">Workout in progress · {workout.sourceType === "one_off" ? "Quick Workout" : "Programme Workout"}</p><h1 className="text-2xl font-semibold">{titleFor(workout)}</h1></div><span className="text-xs text-slate-500">{saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "Saved" : saveStatus === "error" ? "Could not save" : ""}</span></div><label className="mt-4 block text-sm font-medium">Workout date<input type="date" readOnly className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3" value={workout.date || ""} /></label><div className="mt-5 space-y-3">{groups.map((group) => { if (group.type === "separate") { const firstIndex = list.findIndex((item) => item.id === group.exercises[0].id); return <section key={`${group.exercises[0].id}-separate`} className="rounded-2xl border border-slate-200 bg-white p-4"><div className="mb-3 flex items-center justify-between gap-2"><h2 className="font-semibold">{group.exercises[0].exerciseNameSnapshot}</h2><div className="flex"><button type="button" disabled={!firstIndex} onClick={() => move(firstIndex, -1)} className="p-2 disabled:opacity-30"><ChevronUp className="h-4 w-4" /></button><button type="button" disabled={firstIndex + 1 >= list.length - 1} onClick={() => move(firstIndex + 1, 1)} className="p-2 disabled:opacity-30"><ChevronDown className="h-4 w-4" /></button></div></div><div className="grid gap-3 md:grid-cols-2">{group.exercises.map((exercise) => <ExerciseCard key={exercise.id} exercise={exercise} oneOff={workout.sourceType === "one_off"} index={firstIndex} total={list.length} onChange={onChange} onAddSet={onAddSet} onRemoveSet={onRemoveSet} onRemoveExercise={onRemoveExercise} onMove={move} hideExerciseName />)}</div></section>; } const exercise = group.exercises[0]; const exerciseIndex = list.findIndex((item) => item.id === exercise.id); return <ExerciseCard key={exercise.id} exercise={exercise} oneOff={workout.sourceType === "one_off"} index={exerciseIndex} total={list.length} onChange={onChange} onAddSet={onAddSet} onRemoveSet={onRemoveSet} onRemoveExercise={onRemoveExercise} onMove={move} />; })}</div><label className="mt-5 block text-sm font-medium">Workout notes<textarea className="mt-1 min-h-24 w-full rounded-xl border border-slate-200 p-3" value={workout.notes || ""} onChange={(event) => onNotes(event.target.value)} /></label>{finishError ? <p className="mt-3 text-sm font-medium text-red-600">{finishError}</p> : null}<div className="mt-6 flex flex-col gap-3 sm:flex-row"><Button disabled={finishing} onClick={onFinish}>{finishing ? "Finishing…" : "Complete Workout"}</Button><Button variant="danger" disabled={finishing} onClick={onDiscard}>Discard Workout</Button></div></section></div>;
+  const list = ordered(workout.exercises); const move = (index, direction) => { const target = index + direction; if (target < 0 || target >= list.length) return; const next = list.slice(); [next[index], next[target]] = [next[target], next[index]]; onReorder(next.map((item, itemIndex) => ({ ...item, sortOrder: itemIndex }))); };
+  return <div className="space-y-5"><button type="button" className="text-sm font-medium text-slate-600" onClick={onBack}>← Workout options</button><section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"><div className="flex justify-between"><div><p className="text-sm font-medium text-emerald-700">Workout in progress</p><h1 className="text-2xl font-semibold">{titleFor(workout)}</h1></div><span className="text-xs text-slate-500">{saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "Saved" : ""}</span></div><label className="mt-4 block text-sm font-medium">Workout date<input type="date" readOnly className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3" value={workout.date || ""}/></label><div className="mt-5 space-y-3">{list.map((exercise, index) => <ExerciseCard key={exercise.id} exercise={exercise} oneOff={workout.sourceType === "one_off"} index={index} total={list.length} onChange={onChange} onAddSet={onAddSet} onRemoveSet={onRemoveSet} onRemoveExercise={onRemoveExercise} onMove={move}/>)}</div><label className="mt-5 block text-sm font-medium">Workout notes<textarea className="mt-1 min-h-24 w-full rounded-xl border border-slate-200 p-3" value={workout.notes || ""} onChange={(event) => onNotes(event.target.value)}/></label>{finishError ? <p className="mt-3 text-sm font-medium text-red-600">{finishError}</p> : null}<div className="mt-6 flex gap-3"><Button disabled={finishing} onClick={onFinish}>{finishing ? "Finishing…" : "Complete Workout"}</Button><Button variant="danger" onClick={onDiscard}>Discard Workout</Button></div></section></div>;
 }
 
-export function DiscardWorkoutDialog({ discarding, error, onCancel, onConfirm }) { return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"><div role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl bg-white p-5"><h2 className="text-lg font-semibold">Discard Workout?</h2><p className="mt-2 text-sm text-slate-600">This permanently deletes this unfinished workout.</p>{error ? <p className="mt-2 text-red-600">{error}</p> : null}<div className="mt-5 flex justify-end gap-2"><Button variant="outline" onClick={onCancel}>Cancel</Button><Button variant="danger" disabled={discarding} onClick={onConfirm}>{discarding ? "Discarding…" : "Discard Workout"}</Button></div></div></div>; }
-export function WeightCard({ exercise, onToggle = noop, onWeight = noop, index = 0, total = 1, onNudge = noop }) { return <ExerciseCard exercise={exercise} index={index} total={total} oneOff={false} onChange={(exerciseId, setId, field, value) => field === "completed" ? onToggle(exerciseId) : field === "weight" ? onWeight(exerciseId, setId, value) : noop()} onAddSet={noop} onRemoveSet={noop} onRemoveExercise={noop} onMove={(position, direction) => onNudge(position, direction)} />; }
-export function UnfinishedWorkoutDialog({ unfinishedName, requestedName, confirming, discarding, error, onContinue, onRequestDiscard, onDiscard, onBack, onCancel }) { return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"><div role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl bg-white p-5"><h2 className="text-lg font-semibold">Unfinished workout in progress</h2><p className="mt-2">{unfinishedName}</p>{requestedName ? <p>Start instead: {requestedName}</p> : null}{error ? <p>{error}</p> : null}{confirming ? <><p className="mt-4 text-red-700">Permanently discard this unfinished workout?</p><Button variant="outline" onClick={onBack}>Back</Button><Button variant="danger" disabled={discarding} onClick={onDiscard}>Discard and start</Button></> : <div className="mt-4 flex flex-col gap-2"><Button onClick={onContinue}>Continue workout</Button><Button variant="danger" onClick={onRequestDiscard}>Discard unfinished workout and start this session</Button><Button variant="outline" onClick={onCancel}>Cancel</Button></div>}</div></div>; }
-export function ProgrammeSessionList({ programme, sessions, workouts, today, onSelect }) { return <section className="rounded-3xl border border-slate-200 bg-white p-5"><h2 className="text-lg font-semibold">Programme Workout</h2><p className="text-sm text-slate-500">{programme.name}</p><div className="mt-3 space-y-2">{sessions.map((session) => { const status = sessionWorkoutStatus(programme.id, session.id, workouts, today); return <button type="button" key={session.id} onClick={() => onSelect(session)} className="flex min-h-14 w-full items-center justify-between rounded-xl border border-slate-200 p-3 text-left"><span><b className="block">{session.name}</b><span className="text-sm text-slate-500">{session.exercises?.length || 0} exercises{status.label ? ` · ${status.label}` : ""}</span></span><ChevronRight className="h-5 w-5" /></button>; })}</div></section>; }
+export function DiscardWorkoutDialog({ discarding, error, onCancel, onConfirm }) { return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"><div className="w-full max-w-md rounded-2xl bg-white p-5"><h2 className="text-lg font-semibold">Discard Workout?</h2><p className="mt-2 text-sm text-slate-600">This permanently deletes this unfinished workout.</p>{error ? <p>{error}</p> : null}<div className="mt-5 flex justify-end gap-2"><Button variant="outline" onClick={onCancel}>Cancel</Button><Button variant="danger" disabled={discarding} onClick={onConfirm}>{discarding ? "Discarding…" : "Discard Workout"}</Button></div></div></div>; }
+export function WeightCard({ exercise, onToggle = noop, onWeight = noop, index = 0, total = 1, onNudge = noop }) { return <ExerciseCard exercise={exercise} index={index} total={total} oneOff={false} onChange={(exerciseId, setId, field, value) => field === "completed" ? onToggle(exerciseId) : field === "weight" ? onWeight(exerciseId, setId, value) : noop()} onMove={(position, direction) => onNudge(position, direction)}/>; }
+export function UnfinishedWorkoutDialog() { return null; }
+export function ProgrammeSessionList({ programme, sessions, workouts, today, onSelect }) { return <section className="rounded-3xl border border-slate-200 bg-white p-5"><h2 className="text-lg font-semibold">Programme Workout</h2><p className="text-sm text-slate-500">{programme.name}</p><div className="mt-3 space-y-2">{sessions.map((session) => { const status = sessionWorkoutStatus(programme.id, session.id, workouts, today); return <button type="button" key={session.id} onClick={() => onSelect(session)} className="flex min-h-14 w-full items-center justify-between rounded-xl border border-slate-200 p-3 text-left"><span><b className="block">{session.name}</b><span className="text-sm text-slate-500">{session.exercises?.length || 0} exercises{status.label ? ` · ${status.label}` : ""}</span></span><ChevronRight className="h-5 w-5"/></button>; })}</div></section>; }
 
 export default function WorkoutScreen({ user, repository = defaultRepository, intent, onIntentHandled = noop, onFinished = noop, onDiscarded = noop }) {
-  const [plans, setPlans] = useState([]); const [workouts, setWorkouts] = useState([]); const [library, setLibrary] = useState([]); const [workout, setWorkout] = useState(null); const [builder, setBuilder] = useState(false); const [trainingMode, setTrainingMode] = useState("gym"); const [saveStatus, setSaveStatus] = useState(""); const [finishing, setFinishing] = useState(false); const [finishError, setFinishError] = useState(""); const [discardOpen, setDiscardOpen] = useState(false); const [discarding, setDiscarding] = useState(false); const handled = useRef(null);
+  const [plans, setPlans] = useState([]); const [workouts, setWorkouts] = useState([]); const [library, setLibrary] = useState([]); const [workout, setWorkout] = useState(null); const [editor, setEditor] = useState(null); const [builder, setBuilder] = useState(false); const [trainingMode, setTrainingMode] = useState("gym"); const [saveStatus, setSaveStatus] = useState(""); const [finishing, setFinishing] = useState(false); const [finishError, setFinishError] = useState(""); const [discardOpen, setDiscardOpen] = useState(false); const [discarding, setDiscarding] = useState(false); const handled = useRef(null);
   useEffect(() => repository.subscribePlans(db, user.uid, setPlans, noop), [repository, user.uid]); useEffect(() => repository.subscribeWorkouts(db, user.uid, setWorkouts, noop), [repository, user.uid]); useEffect(() => repository.subscribeExerciseDefinitions(db, user.uid, setLibrary, noop), [repository, user.uid]); useEffect(() => subscribeLegacyRehabData(db, user.uid, (saved) => setTrainingMode(saved.trainingMode || "gym"), noop), [user.uid]);
+  useEffect(() => { const stored = sessionStorage.getItem("completedWorkoutIntent"); if (stored) { try { setEditor(JSON.parse(stored)); } catch { sessionStorage.removeItem("completedWorkoutIntent"); } } }, []);
   const saver = useMemo(() => createDebouncedSaver((value) => repository.updateInProgressWorkoutDocument(db, user.uid, value), 500, setSaveStatus), [repository, user.uid]); useEffect(() => () => { saver.flush().catch(noop); }, [saver]); useEffect(() => { if (workout) saver.schedule(workout); }, [saver, workout]);
-  const programme = useMemo(() => plans.filter((plan) => plan.isActive && !plan.isArchived)[0], [plans]); const unfinished = workouts.find((item) => item.status === "in_progress");
+  const programme = useMemo(() => plans.find((plan) => plan.isActive && !plan.isArchived), [plans]); const unfinished = workouts.find((item) => item.status === "in_progress");
   const syncSavedWithProgramme = useCallback((saved) => { if (!saved || saved.sourceType !== "programme" || !programme || saved.planId !== programme.id) return saved; const session = programme.sessions?.find((item) => item.id === saved.sessionId); if (!session) return saved; const previous = Object.fromEntries((session.exercises || []).map((exercise) => [exercise.id, previousWeightsForExercise(workouts.filter((item) => item.status === "completed"), exercise)])); return resumeWorkout(saved, createInProgressWorkout({ id: saved.id, userId: user.uid, programme, session, date: saved.date || todayString(), previousWeightsByExercise: previous, createdAt: saved.createdAt || saved.startedAt || new Date().toISOString() })); }, [programme, user.uid, workouts]);
   const openSaved = useCallback((saved) => { setWorkout(normalizeWorkoutForDisplay(syncSavedWithProgramme(saved))); setBuilder(false); onIntentHandled(); }, [onIntentHandled, syncSavedWithProgramme]);
-  const startProgramme = async (session) => { if (unfinished) return openSaved(unfinished); const previous = Object.fromEntries((session.exercises || []).map((exercise) => [exercise.id, previousWeightsForExercise(workouts.filter((item) => item.status === "completed"), exercise)])); const next = createInProgressWorkout({ id: `workout-${makeId()}`, userId: user.uid, programme, session, date: todayString(), previousWeightsByExercise: previous, createdAt: new Date().toISOString() }); await repository.createInProgressWorkoutDocument(db, user.uid, next); setWorkouts((all) => [...all, next]); openSaved(next); };
-  const startQuick = async (name, exercises) => { if (unfinished) return openSaved(unfinished); const next = buildQuickWorkout({ id: `workout-${makeId()}`, userId: user.uid, name, exercises, date: todayString() }); await repository.createInProgressWorkoutDocument(db, user.uid, next); setWorkouts((all) => [...all, next]); openSaved(next); };
-  useEffect(() => { if (!intent || handled.current === intent.token) return; if (intent.mode === "continue" && unfinished) { handled.current = intent.token; openSaved(unfinished); } else if (intent.mode === "one_off") { handled.current = intent.token; unfinished ? openSaved(unfinished) : setBuilder(true); } else if (intent.mode === "session" && programme) { const session = programme.sessions?.find((item) => item.id === intent.sessionId); if (session) { handled.current = intent.token; startProgramme(session); } } }, [intent, unfinished, programme]); // eslint-disable-line react-hooks/exhaustive-deps
-  const change = (exerciseId, setId, field, value) => setWorkout((current) => { if (field === "completed") return { ...current, exercises: current.exercises.map((exercise) => exercise.id === exerciseId ? { ...exercise, completed: value } : exercise) }; if (field === "setCompleted") return { ...current, exercises: current.exercises.map((exercise) => { if (exercise.id !== exerciseId) return exercise; const recordedSets = (exercise.recordedSets || []).map((set) => set.id === setId ? { ...set, completed: value } : set); return { ...exercise, recordedSets, completed: recordedSets.some((set) => set.completed) }; }) }; return updateRecordedSet(current, exerciseId, setId, field, value); });
-  const finish = async () => { if (!isMeaningfulWorkout(workout)) { setFinishError("Record at least one completed entry before completing this workout."); return; } setFinishing(true); try { const now = new Date(); const started = new Date(workout.startedAt); const latest = { ...workout, durationSeconds: Number.isNaN(started.getTime()) ? undefined : Math.max(0, Math.round((now - started) / 1000)) }; const completed = await completeWorkout(latest, saver, (item) => repository.finishWorkoutDocument(db, user.uid, item)); setWorkout(null); onFinished(completed); } catch { setFinishError("Could not complete workout. Please try again."); } finally { setFinishing(false); } };
-  const discard = async () => { setDiscarding(true); try { await saver.cancel(); await repository.deleteWorkoutDocument(db, user.uid, workout.id); setWorkouts((items) => items.filter((item) => item.id !== workout.id)); setWorkout(null); setDiscardOpen(false); onDiscarded(); } finally { setDiscarding(false); } };
-  const discardFromOverview = async () => { if (!unfinished || !window.confirm("Discard this unfinished workout? This cannot be undone.")) return; setDiscarding(true); try { await repository.deleteWorkoutDocument(db, user.uid, unfinished.id); setWorkouts((items) => items.filter((item) => item.id !== unfinished.id)); onDiscarded(); } finally { setDiscarding(false); } };
-  if (workout) return <><WorkoutForm workout={workout} saveStatus={saveStatus} finishing={finishing} finishError={finishError} onBack={() => setWorkout(null)} onChange={change} onAddSet={(id) => setWorkout((current) => addRecordedSet(current, id))} onRemoveSet={(id, setId) => setWorkout((current) => removeRecordedSet(current, id, setId))} onRemoveExercise={(id) => setWorkout((current) => ({ ...current, exercises: current.exercises.filter((exercise) => exercise.id !== id) }))} onReorder={(exercises) => setWorkout((current) => ({ ...current, exercises }))} onNotes={(notes) => setWorkout((current) => ({ ...current, notes }))} onFinish={finish} onDiscard={() => setDiscardOpen(true)} />{discardOpen ? <DiscardWorkoutDialog discarding={discarding} onCancel={() => setDiscardOpen(false)} onConfirm={discard} /> : null}</>;
-  if (builder) return <QuickWorkoutBuilder exercises={library} trainingMode={trainingMode} onCancel={() => setBuilder(false)} onStart={startQuick} />;
-  return <div className="space-y-5">{unfinished ? <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5"><h2 className="font-semibold">Workout in progress</h2><p className="text-sm text-slate-600">{titleFor(unfinished)}</p><div className="mt-3 flex flex-wrap gap-2"><Button onClick={() => openSaved(unfinished)}>Continue Workout</Button><Button variant="danger" disabled={discarding} onClick={discardFromOverview}>{discarding ? "Discarding…" : "Discard Workout"}</Button></div></section> : <><Button className="w-full py-3" variant="outline" onClick={() => setBuilder(true)}>Quick Workout</Button>{programme ? <ProgrammeSessionList programme={programme} sessions={ordered(programme.sessions)} workouts={workouts} today={todayString()} onSelect={startProgramme} /> : <section className="rounded-2xl border border-dashed border-slate-300 p-6 text-center"><Dumbbell className="mx-auto text-slate-400" /><p className="mt-2 font-semibold">No active programme</p><p className="text-sm text-slate-500">You can still start a Quick Workout.</p></section>}</>}</div>;
+  const startProgramme = async (session) => { if (unfinished) return openSaved(unfinished); const previous = Object.fromEntries((session.exercises || []).map((exercise) => [exercise.id, previousWeightsForExercise(workouts.filter((item) => item.status === "completed"), exercise)])); const next = createInProgressWorkout({ id: `workout-${makeId()}`, userId: user.uid, programme, session, date: todayString(), previousWeightsByExercise: previous, createdAt: new Date().toISOString() }); await repository.createInProgressWorkoutDocument(db, user.uid, next); openSaved(next); };
+  const startQuick = async (name, exercises) => { if (unfinished) return openSaved(unfinished); const next = buildQuickWorkout({ id: `workout-${makeId()}`, userId: user.uid, name, exercises, date: todayString() }); await repository.createInProgressWorkoutDocument(db, user.uid, next); openSaved(next); };
+  useEffect(() => { if (!intent || handled.current === intent.token) return; handled.current = intent.token; if (["catch_up", "edit_completed"].includes(intent.mode)) { setEditor({ mode: intent.mode, workoutId: intent.workoutId }); onIntentHandled(); } else if (intent.mode === "continue" && unfinished) openSaved(unfinished); else if (intent.mode === "one_off") unfinished ? openSaved(unfinished) : setBuilder(true); else if (intent.mode === "session" && programme) { const session = programme.sessions?.find((item) => item.id === intent.sessionId); if (session) startProgramme(session); } }, [intent, unfinished, programme]); // eslint-disable-line react-hooks/exhaustive-deps
+  const finish = async () => { if (!isMeaningfulWorkout(workout)) { setFinishError("Record at least one completed entry before completing this workout."); return; } setFinishing(true); try { const completed = await completeWorkout(workout, saver, (item) => repository.finishWorkoutDocument(db, user.uid, item)); setWorkout(null); onFinished(completed); } catch { setFinishError("Could not complete workout. Please try again."); } finally { setFinishing(false); } };
+  const discard = async () => { setDiscarding(true); try { await saver.cancel(); await repository.deleteWorkoutDocument(db, user.uid, workout.id); setWorkout(null); setDiscardOpen(false); onDiscarded(); } finally { setDiscarding(false); } };
+  const editorWorkout = editor ? workouts.find((item) => item.id === editor.workoutId && item.status === "completed") : null;
+  if (editor && editorWorkout) return <CompletedWorkoutEditor user={user} saved={normalizeWorkoutForDisplay(editorWorkout)} mode={editor.mode} onClose={() => { sessionStorage.removeItem("completedWorkoutIntent"); setEditor(null); }}/ >;
+  if (workout) return <><WorkoutForm workout={workout} saveStatus={saveStatus} finishing={finishing} finishError={finishError} onBack={() => setWorkout(null)} onChange={(...args) => changeWorkout(setWorkout, ...args)} onAddSet={(id) => setWorkout((current) => addRecordedSet(current, id))} onRemoveSet={(id, setId) => setWorkout((current) => removeRecordedSet(current, id, setId))} onRemoveExercise={(id) => setWorkout((current) => ({ ...current, exercises: current.exercises.filter((exercise) => exercise.id !== id) }))} onReorder={(exercises) => setWorkout((current) => ({ ...current, exercises }))} onNotes={(notes) => setWorkout((current) => ({ ...current, notes }))} onFinish={finish} onDiscard={() => setDiscardOpen(true)}/>{discardOpen ? <DiscardWorkoutDialog discarding={discarding} onCancel={() => setDiscardOpen(false)} onConfirm={discard}/> : null}</>;
+  if (builder) return <QuickWorkoutBuilder exercises={library} trainingMode={trainingMode} onCancel={() => setBuilder(false)} onStart={startQuick}/>;
+  return <div className="space-y-5">{unfinished ? <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5"><h2 className="font-semibold">Workout in progress</h2><p>{titleFor(unfinished)}</p><Button className="mt-3" onClick={() => openSaved(unfinished)}>Continue Workout</Button></section> : <><Button className="w-full py-3" variant="outline" onClick={() => setBuilder(true)}>Quick Workout</Button>{programme ? <ProgrammeSessionList programme={programme} sessions={ordered(programme.sessions)} workouts={workouts} today={todayString()} onSelect={startProgramme}/> : <section className="rounded-2xl border border-dashed border-slate-300 p-6 text-center"><Dumbbell className="mx-auto text-slate-400"/><p className="mt-2 font-semibold">No active programme</p></section>}</>}</div>;
 }

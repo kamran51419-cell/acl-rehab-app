@@ -4,6 +4,12 @@ import { SIDE } from "./v2Models.js";
 import { completedWorkoutHistory, resolveWorkoutExerciseSide } from "./workoutDisplay.js";
 
 export const EXERCISE_VARIANT = Object.freeze({ DOUBLE: "double", SINGLE: "single", SYMMETRY: "symmetry" });
+export const PROGRESS_SIDE_MODE = Object.freeze({
+  STANDARD: "standard",
+  LEFT_RIGHT: "left_right",
+  LEFT_ONLY: "left_only",
+  RIGHT_ONLY: "right_only",
+});
 
 function setReps(set = {}) {
   return Number(set.actualReps ?? set.reps ?? set.rawReps ?? set.prescribedReps?.value ?? set.prescribedReps?.max ?? 0);
@@ -15,16 +21,33 @@ function completedSets(exercise) {
 
 function variantForSide(side) { return side === SIDE.LEFT || side === SIDE.RIGHT ? EXERCISE_VARIANT.SINGLE : EXERCISE_VARIANT.DOUBLE; }
 function exerciseDate(workout, exercise) { return exercise.completedDate || workout.date || workout.workoutDate || ""; }
+function pairedIdentity(exercise = {}) { return String(exercise.id || "").replace(/-(left|right)$/, ""); }
+
+function progressSideMode(exercise, weightedExercises) {
+  const side = resolveWorkoutExerciseSide(exercise);
+  if (side === SIDE.BOTH || side === SIDE.SEPARATE || !side) return PROGRESS_SIDE_MODE.STANDARD;
+  if (side !== SIDE.LEFT && side !== SIDE.RIGHT) return PROGRESS_SIDE_MODE.STANDARD;
+  const opposite = side === SIDE.LEFT ? SIDE.RIGHT : SIDE.LEFT;
+  const paired = weightedExercises.some((candidate) => candidate !== exercise
+    && candidate.exerciseId === exercise.exerciseId
+    && pairedIdentity(candidate) === pairedIdentity(exercise)
+    && resolveWorkoutExerciseSide(candidate) === opposite);
+  if (paired) return PROGRESS_SIDE_MODE.LEFT_RIGHT;
+  return side === SIDE.LEFT ? PROGRESS_SIDE_MODE.LEFT_ONLY : PROGRESS_SIDE_MODE.RIGHT_ONLY;
+}
 
 export function exerciseProgressEntries(workouts = []) {
-  return completedWorkoutHistory(workouts).flatMap((workout) => (workout.exercises || []).flatMap((exercise) => {
-    if (exercise.loggingMethod !== EXERCISE_LOGGING_METHOD.REPS_WEIGHT) return [];
-    const sets = completedSets(exercise);
-    if (!sets.length) return [];
-    const side = resolveWorkoutExerciseSide(exercise);
-    const date = exerciseDate(workout, exercise);
-    return sets.map((set) => ({ id: `${workout.id}:${exercise.id}:${set.id || set.setNumber}`, workoutId: workout.id, exerciseId: exercise.exerciseId, exerciseName: exercise.exerciseNameSnapshot || "Exercise", date, displayDate: formatDate(date).replaceAll("-", "/"), side, variant: variantForSide(side), weight: set.weight, reps: set.reps, setNumber: Number(set.setNumber || 0) }));
-  }));
+  return completedWorkoutHistory(workouts).flatMap((workout) => {
+    const weightedExercises = (workout.exercises || []).filter((exercise) => exercise.loggingMethod === EXERCISE_LOGGING_METHOD.REPS_WEIGHT);
+    return weightedExercises.flatMap((exercise) => {
+      const sets = completedSets(exercise);
+      if (!sets.length) return [];
+      const side = resolveWorkoutExerciseSide(exercise);
+      const sideMode = progressSideMode(exercise, weightedExercises);
+      const date = exerciseDate(workout, exercise);
+      return sets.map((set) => ({ id: `${workout.id}:${exercise.id}:${set.id || set.setNumber}`, workoutId: workout.id, exerciseId: exercise.exerciseId, exerciseName: exercise.exerciseNameSnapshot || "Exercise", date, displayDate: formatDate(date).replaceAll("-", "/"), side, sideMode, variant: variantForSide(side), weight: set.weight, reps: set.reps, setNumber: Number(set.setNumber || 0) }));
+    });
+  });
 }
 
 function newestFirst(a, b) { return String(b.date).localeCompare(String(a.date)) || b.setNumber - a.setNumber; }
@@ -36,17 +59,18 @@ export function groupExerciseProgress(workouts = []) {
 }
 
 export function variantEntries(group, variant) { return (group?.entries || []).filter((entry) => entry.variant === variant).sort(newestFirst); }
+export function sideModeEntries(group, sideMode) { return (group?.entries || []).filter((entry) => entry.sideMode === sideMode).sort(newestFirst); }
 export function heaviestEntry(entries = []) { return entries.slice().sort((a, b) => b.weight - a.weight || String(b.date).localeCompare(String(a.date)) || b.reps - a.reps)[0] || null; }
 
 export function dailyHeaviest(entries = []) {
   const byDateAndSide = new Map();
-  entries.forEach((entry) => { const key = `${entry.date}:${entry.side || SIDE.BOTH}`; const current = byDateAndSide.get(key); if (!current || entry.weight > current.weight || (entry.weight === current.weight && entry.reps > current.reps)) byDateAndSide.set(key, entry); });
+  entries.forEach((entry) => { const key = `${entry.date}:${entry.sideMode || "unknown"}:${entry.side || SIDE.BOTH}`; const current = byDateAndSide.get(key); if (!current || entry.weight > current.weight || (entry.weight === current.weight && entry.reps > current.reps)) byDateAndSide.set(key, entry); });
   return [...byDateAndSide.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)));
 }
 
 export function symmetryEntries(group) {
   const dates = new Map();
-  dailyHeaviest(variantEntries(group, EXERCISE_VARIANT.SINGLE)).forEach((entry) => { if (!dates.has(entry.date)) dates.set(entry.date, {}); if (entry.side === SIDE.LEFT) dates.get(entry.date).left = entry; if (entry.side === SIDE.RIGHT) dates.get(entry.date).right = entry; });
+  dailyHeaviest(sideModeEntries(group, PROGRESS_SIDE_MODE.LEFT_RIGHT)).forEach((entry) => { if (!dates.has(entry.date)) dates.set(entry.date, {}); if (entry.side === SIDE.LEFT) dates.get(entry.date).left = entry; if (entry.side === SIDE.RIGHT) dates.get(entry.date).right = entry; });
   return [...dates.entries()].flatMap(([date, sides]) => { if (!sides.left || !sides.right || Math.max(sides.left.weight, sides.right.weight) <= 0) return []; return [{ date, displayDate: sides.left.displayDate, left: sides.left.weight, right: sides.right.weight, symmetry: Math.round((Math.min(sides.left.weight, sides.right.weight) / Math.max(sides.left.weight, sides.right.weight)) * 100) }]; }).sort((a, b) => String(a.date).localeCompare(String(b.date)));
 }
 

@@ -6,11 +6,33 @@ function headingWithText(text) {
   return [...document.querySelectorAll("h1, h2, h3")].find((heading) => textOf(heading) === text);
 }
 
-function removeLeakedHomeCards() {
+function closestCard(element) {
+  if (!element) return null;
+  return element.closest("section, article, [data-home-summary-cards], .rounded-3xl, .rounded-2xl") || element.parentElement;
+}
+
+function markLeakedHomeCards() {
+  document.querySelectorAll("[data-workout-leaked-card]").forEach((element) => {
+    element.removeAttribute("data-workout-leaked-card");
+  });
+
   const quickWorkoutOpen = Boolean(headingWithText("Quick Workout"));
   const workoutInProgress = Boolean(headingWithText("Workout in progress"));
   if (!quickWorkoutOpen && !workoutInProgress) return;
-  document.querySelectorAll("[data-home-summary-cards]").forEach((element) => element.remove());
+
+  document.querySelectorAll("[data-home-summary-cards]").forEach((element) => {
+    element.dataset.workoutLeakedCard = "true";
+  });
+
+  [...document.querySelectorAll("h1, h2, h3, h4, p, span")]
+    .filter((element) => {
+      const text = textOf(element).toLowerCase();
+      return text === "active programme" || text === "last workout";
+    })
+    .forEach((element) => {
+      const card = closestCard(element);
+      if (card) card.dataset.workoutLeakedCard = "true";
+    });
 }
 
 function removeSessionNotes() {
@@ -33,14 +55,10 @@ function removeSessionNotes() {
 function markQuickWorkoutBuilder() {
   document.querySelectorAll("[data-quick-workout-builder]").forEach((element) => element.removeAttribute("data-quick-workout-builder"));
   const heading = headingWithText("Quick Workout");
-  if (!heading) {
-    document.documentElement.classList.remove("quick-workout-builder-open");
-    return;
-  }
+  if (!heading) return;
 
   const screen = heading.closest(".space-y-5, .space-y-6") || heading.parentElement;
   if (screen) screen.dataset.quickWorkoutBuilder = "true";
-  document.documentElement.classList.add("quick-workout-builder-open");
 }
 
 function markWorkoutStateCards() {
@@ -60,7 +78,7 @@ function markWorkoutLanding() {
 }
 
 function apply() {
-  removeLeakedHomeCards();
+  markLeakedHomeCards();
   removeSessionNotes();
   markQuickWorkoutBuilder();
   markWorkoutStateCards();

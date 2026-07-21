@@ -1,4 +1,5 @@
 const STANDARD = ["anytime", "morning", "afternoon", "evening"];
+const ROUTINE_DAY_ORDER = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 
 function parseTimes(value) {
   if (typeof value === "string" && value.startsWith("multi:")) {
@@ -118,6 +119,21 @@ function enhanceSelect(select) {
   select.addEventListener("change", () => requestAnimationFrame(() => renderEditor(select, host)));
 }
 
+function reorderRoutineDayFields() {
+  document.querySelectorAll("fieldset").forEach((fieldset) => {
+    const legend = fieldset.querySelector(":scope > legend");
+    if (legend?.textContent?.trim() !== "Days") return;
+    const row = legend.nextElementSibling;
+    if (!row || row.dataset.mondayFirst === "true") return;
+    const labels = Array.from(row.children).filter((child) => child.tagName === "LABEL");
+    if (labels.length !== 7) return;
+    const byDay = new Map(labels.map((label) => [label.textContent?.trim().slice(0, 3).toLowerCase(), label]));
+    if (!ROUTINE_DAY_ORDER.every((day) => byDay.has(day))) return;
+    ROUTINE_DAY_ORDER.forEach((day) => row.appendChild(byDay.get(day)));
+    row.dataset.mondayFirst = "true";
+  });
+}
+
 function formatEncodedSummaries() {
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   const nodes = [];
@@ -137,6 +153,7 @@ function formatEncodedSummaries() {
 
 function enhance() {
   document.querySelectorAll("select").forEach(enhanceSelect);
+  reorderRoutineDayFields();
   formatEncodedSummaries();
 }
 

@@ -21,7 +21,7 @@ function enableRepeatedExerciseAdds(editor) {
   if (!picker) return
 
   picker.querySelectorAll('button').forEach((button) => {
-    if (!['Selected', 'Add'].includes(textOf(button))) return
+    if (!['Selected', 'Added', 'Add'].includes(textOf(button))) return
     button.disabled = false
     button.removeAttribute('disabled')
     button.setAttribute('aria-disabled', 'false')
@@ -38,10 +38,10 @@ function cleanStandardSummaries(root = document) {
 
     const exerciseCard = label.closest("[class*='rounded-xl'], [class*='rounded-2xl']")
     const sideSelect = [...(exerciseCard?.querySelectorAll('select') || [])].find((select) =>
-      [...select.options].some((option) => textOf(option) === 'Standard'),
+      [...select.options].some((option) => option.textContent === 'Standard'),
     )
 
-    if (sideSelect?.selectedOptions?.[0] && textOf(sideSelect.selectedOptions[0]) === 'Standard') {
+    if (sideSelect?.selectedOptions?.[0]?.textContent === 'Standard') {
       label.textContent = text.replace(/\s+both$/i, '')
     }
   })
@@ -55,21 +55,30 @@ function prepareNumericInputs(editor) {
   })
 }
 
-function ensureDiscardDialogVisible() {
-  const heading = [...document.querySelectorAll('h1, h2, h3')].find(
-    (element) => textOf(element) === 'Discard changes?',
-  )
+function raiseDiscardDialog() {
+  const heading = [...document.querySelectorAll('h1, h2, h3')].find((element) => textOf(element) === 'Discard changes?')
   const dialog = heading?.closest('[role="dialog"]')
   const overlay = dialog?.parentElement
   if (!dialog || !overlay) return
 
-  overlay.style.setProperty('z-index', '10000', 'important')
+  let ancestor = overlay
+  while (ancestor) {
+    ancestor.hidden = false
+    ancestor.style.pointerEvents = 'auto'
+    ancestor = ancestor.parentElement
+  }
+
+  overlay.style.setProperty('display', 'flex', 'important')
+  overlay.style.setProperty('visibility', 'visible', 'important')
+  overlay.style.setProperty('opacity', '1', 'important')
   overlay.style.setProperty('pointer-events', 'auto', 'important')
+  overlay.style.setProperty('z-index', '2147483647', 'important')
+
   dialog.style.setProperty('pointer-events', 'auto', 'important')
-  overlay.querySelectorAll('button').forEach((button) => {
-    button.style.setProperty('pointer-events', 'auto', 'important')
+  dialog.querySelectorAll('button').forEach((button) => {
     button.disabled = false
     button.removeAttribute('disabled')
+    button.style.pointerEvents = 'auto'
   })
 }
 
@@ -80,7 +89,7 @@ function applyProgrammeCreatorFixes() {
     prepareNumericInputs(editor)
   }
   cleanStandardSummaries(document)
-  ensureDiscardDialogVisible()
+  raiseDiscardDialog()
 }
 
 export function installProgrammeCreatorInputFixes() {
@@ -95,7 +104,7 @@ export function installProgrammeCreatorInputFixes() {
 
   const unlockPickerButton = (event) => {
     const button = event.target?.closest?.('button')
-    if (!button || !['Selected', 'Add'].includes(textOf(button))) return
+    if (!button || !['Selected', 'Added', 'Add'].includes(textOf(button))) return
     const editor = programmeEditor()
     if (!editor || !exercisePicker(editor)?.contains(button)) return
     button.disabled = false
@@ -112,9 +121,11 @@ export function installProgrammeCreatorInputFixes() {
     button.disabled = false
     button.removeAttribute('disabled')
     button.style.pointerEvents = 'auto'
+
     requestAnimationFrame(() => {
-      ensureDiscardDialogVisible()
-      setTimeout(ensureDiscardDialogVisible, 0)
+      raiseDiscardDialog()
+      setTimeout(raiseDiscardDialog, 0)
+      setTimeout(raiseDiscardDialog, 50)
     })
   }
 
@@ -123,6 +134,8 @@ export function installProgrammeCreatorInputFixes() {
   document.addEventListener('pointerdown', unlockPickerButton, true)
   document.addEventListener('touchstart', unlockPickerButton, true)
   document.addEventListener('click', handleProgrammeClose, true)
+  document.addEventListener('pointerup', handleProgrammeClose, true)
+  document.addEventListener('touchend', handleProgrammeClose, true)
 
   let queued = false
   const schedule = () => {
@@ -136,7 +149,7 @@ export function installProgrammeCreatorInputFixes() {
 
   applyProgrammeCreatorFixes()
   const observer = new MutationObserver(schedule)
-  observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['disabled', 'value'] })
+  observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['disabled', 'hidden', 'style'] })
 
   return () => {
     observer.disconnect()
@@ -145,5 +158,7 @@ export function installProgrammeCreatorInputFixes() {
     document.removeEventListener('pointerdown', unlockPickerButton, true)
     document.removeEventListener('touchstart', unlockPickerButton, true)
     document.removeEventListener('click', handleProgrammeClose, true)
+    document.removeEventListener('pointerup', handleProgrammeClose, true)
+    document.removeEventListener('touchend', handleProgrammeClose, true)
   }
 }

@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { registerSW } from 'virtual:pwa-register'
 import './index.css'
 import './uiPolish.css'
+import './finalUxPolish.css'
 import App from './App.jsx'
 import { installUiRuntimeFixes } from './uiRuntimeFixes'
 import { installProgrammeButtonLabels } from './programmeButtonLabels'
@@ -13,6 +14,7 @@ import { installProgrammeScreenNavigation } from './programmeScreenNavigation'
 import { installDuplicateAndPairedExerciseFix } from './duplicateAndPairedExerciseFix'
 import { installHomeSummaryAndSettingsFix } from './homeSummaryAndSettingsFix'
 import { installTaskAndVariationLabels } from './taskAndVariationLabels'
+import { installQuickWorkoutCancelCleanup } from './quickWorkoutCancelCleanup'
 
 const updateSW = registerSW({
   immediate: true,
@@ -30,6 +32,7 @@ installProgrammeScreenNavigation()
 installDuplicateAndPairedExerciseFix()
 installHomeSummaryAndSettingsFix()
 installTaskAndVariationLabels()
+installQuickWorkoutCancelCleanup()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

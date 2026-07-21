@@ -1,0 +1,144 @@
+/* Final consistency pass: typography, controls, chips, empty states and spacing. */
+:root {
+  --app-control-height: 2.75rem;
+  --app-control-radius: 0.75rem;
+  --app-section-gap: 1.25rem;
+}
+
+/* Typography hierarchy */
+main h1 {
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+}
+
+main h2,
+main h3 {
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+}
+
+main p,
+main label,
+main input,
+main select,
+main textarea,
+main button {
+  line-height: 1.45;
+}
+
+.text-slate-500,
+.text-slate-600 {
+  text-wrap: pretty;
+}
+
+/* Consistent controls */
+input:not([type='checkbox']):not([type='radio']),
+select,
+textarea {
+  border-radius: var(--app-control-radius) !important;
+  border-color: rgb(203 213 225 / 0.95) !important;
+  background-color: #fff;
+}
+
+input:not([type='checkbox']):not([type='radio']),
+select {
+  min-height: var(--app-control-height);
+}
+
+textarea {
+  min-height: 6rem;
+  resize: vertical;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #94a3b8;
+}
+
+button.rounded-md,
+button.rounded-lg,
+button.rounded-xl {
+  min-height: 2.5rem;
+}
+
+/* Refined selected chips and badges */
+.rounded-full.border,
+button.rounded-full,
+span.rounded-full {
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+button.rounded-full,
+button.rounded-xl.border,
+button.rounded-lg.border {
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+}
+
+/* Cleaner card/list rhythm */
+main .space-y-6 > section,
+main .space-y-5 > section,
+main .space-y-4 > section {
+  scroll-margin-top: 1rem;
+}
+
+main section.rounded-2xl,
+main section.rounded-3xl,
+main div.rounded-2xl.border.bg-white,
+main div.rounded-3xl.border.bg-white {
+  border-color: rgb(226 232 240 / 0.92) !important;
+}
+
+main section > h1 + p,
+main section > h2 + p,
+main section > h3 + p {
+  margin-top: 0.35rem;
+}
+
+/* Empty states */
+main .border-dashed {
+  background-image: linear-gradient(180deg, rgb(248 250 252 / 0.75), rgb(255 255 255 / 0.95));
+  border-width: 1.5px;
+}
+
+main .border-dashed svg {
+  width: 2rem;
+  height: 2rem;
+  stroke-width: 1.75;
+}
+
+/* More consistent icon alignment */
+button > svg,
+a > svg {
+  flex: 0 0 auto;
+}
+
+button.inline-flex > svg,
+a.inline-flex > svg {
+  align-self: center;
+}
+
+/* Softer separators and compact mobile spacing */
+.border-b,
+.border-t {
+  border-color: rgb(226 232 240 / 0.8);
+}
+
+@media (max-width: 639px) {
+  main h1 {
+    font-size: 1.5rem;
+  }
+
+  main h2 {
+    font-size: 1.125rem;
+  }
+
+  main .rounded-3xl.p-6,
+  main .rounded-3xl.sm\:p-6 {
+    padding: 1rem !important;
+  }
+
+  main .flex.gap-3:has(> button) {
+    gap: 0.625rem;
+  }
+}

@@ -140,16 +140,44 @@ function markProgrammeActiveCard() {
     });
 }
 
-function clearTabOverrides() {
-  document.querySelectorAll("[data-app-tab-surface]").forEach((element) => element.removeAttribute("data-app-tab-surface"));
+function markStandardTabs() {
+  document.querySelectorAll("[data-standard-tab]").forEach((element) => element.removeAttribute("data-standard-tab"));
+  const labels = new Set(["Active", "Inactive", "Draft", "Archived", "Stats", "Workout History", "Sessions", "Exercises", "Details", "All", "Strength", "Cardio", "Plyometric", "Balance", "Mobility", "Stretch", "Other"]);
+  [...document.querySelectorAll("button")]
+    .filter((button) => labels.has(textOf(button)))
+    .forEach((button) => {
+      const selected = button.getAttribute("aria-selected") === "true" || /bg-(blue|indigo)-[5-9]00/.test(button.className);
+      button.dataset.standardTab = selected ? "selected" : "true";
+      button.removeAttribute("data-app-surface-card");
+    });
 }
 
 function markExerciseCards() {
   [...document.querySelectorAll("h2, h3")].forEach((heading) => {
     const card = closestCard(heading);
-    if (!card || card.dataset.appSurfaceCard || card.dataset.workoutStateCard) return;
+    if (!card || card.dataset.appSurfaceCard || card.dataset.workoutStateCard || card.dataset.standardTab) return;
     const hasExerciseContent = card.querySelector("input, select, [class*='set'], [class*='exercise']") || heading.closest("[data-quick-workout-builder='true']");
     if (hasExerciseContent) card.dataset.appSurfaceCard = "exercise";
+  });
+}
+
+function markStatsAndHistoryRows() {
+  document.querySelectorAll("[data-app-list-card]").forEach((element) => element.removeAttribute("data-app-list-card"));
+
+  [...document.querySelectorAll("button, article, section, div")].forEach((element) => {
+    if (element.dataset.standardTab || element.dataset.quickWorkoutAction) return;
+    const text = textOf(element);
+    if (!text || text.length > 500) return;
+
+    const looksLikeStatsExercise = /View stats/i.test(text) && element.querySelector("h2, h3, h4, p, span");
+    const looksLikeHistorySession = /sets completed|Completed\s+\d{1,2}\s+[A-Z][a-z]{2}\s+\d{4}/i.test(text) && /Edit|Delete|session/i.test(text);
+    if (!looksLikeStatsExercise && !looksLikeHistorySession) return;
+
+    const card = closestCard(element) || element;
+    if (card.matches("button, article, section, [class*='rounded-']")) {
+      card.dataset.appSurfaceCard = "history-item";
+      card.dataset.appListCard = "true";
+    }
   });
 }
 
@@ -159,10 +187,10 @@ function markConsistentSurfaceCards() {
   ["Settings", "Inactive programmes", "Exercise Library", "Training mode", "Surgery date", "Account", "Today's Tasks", "Due tasks", "Needs attention"]
     .forEach((label) => markCardsByExactText(label, "section"));
 
-  ["Improvement", "Latest performance", "Best set", "Last Workout"]
+  ["Improvement", "Latest performance", "Best set"]
     .forEach((label) => markCardsByExactText(label, "metric"));
 
-  ["New programme"]
+  ["Active Programme", "Last Workout", "New programme"]
     .forEach((label) => markCardsByExactText(label, "active"));
 
   ["Weight progress", "Stats", "Workout History"]
@@ -171,6 +199,7 @@ function markConsistentSurfaceCards() {
   markTimelineCards();
   markProgrammeActiveCard();
   markExerciseCards();
+  markStatsAndHistoryRows();
 }
 
 function markPageAndDialogSurfaces() {
@@ -189,8 +218,8 @@ function apply() {
   markQuickWorkoutBuilder();
   markWorkoutStateCard();
   markQuickWorkoutButtons();
-  clearTabOverrides();
   markConsistentSurfaceCards();
+  markStandardTabs();
   markPageAndDialogSurfaces();
 }
 

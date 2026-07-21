@@ -66,18 +66,20 @@ function manageWorkoutOptionsNavigation() {
   continueButton.click();
 }
 
-function allExactText(label) {
-  return [...document.querySelectorAll("h1, h2, h3, h4, p, span, div")].filter((element) => textOf(element) === label);
+function exactTextElements(label) {
+  return [...document.querySelectorAll("h1, h2, h3, h4, p, span, div")].filter((element) => {
+    if (textOf(element) !== label) return false;
+    return ![...element.children].some((child) => textOf(child) === label);
+  });
 }
 
 function markCardsByExactText(label, variant = "soft") {
   const cards = new Set();
-  allExactText(label).forEach((match) => {
+  exactTextElements(label).forEach((match) => {
     const card = closestCard(match);
-    if (card) {
-      card.dataset.appSurfaceCard = variant;
-      cards.add(card);
-    }
+    if (!card || card.dataset.standardTab || card.dataset.quickWorkoutAction) return;
+    card.dataset.appSurfaceCard = variant;
+    cards.add(card);
   });
   return [...cards];
 }
@@ -116,10 +118,18 @@ function markTimelineCards() {
 }
 
 function markQuickWorkoutButtons() {
-  document.querySelectorAll("[data-quick-workout-action]").forEach((element) => element.removeAttribute("data-quick-workout-action"));
+  document.querySelectorAll("[data-quick-workout-action], [data-quick-workout-wrapper]").forEach((element) => {
+    element.removeAttribute("data-quick-workout-action");
+    element.removeAttribute("data-quick-workout-wrapper");
+  });
+
   [...document.querySelectorAll("button")]
     .filter((button) => textOf(button) === "Quick Workout")
-    .forEach((button) => { button.dataset.quickWorkoutAction = "true"; });
+    .forEach((button) => {
+      button.dataset.quickWorkoutAction = "true";
+      const wrapper = button.parentElement;
+      if (wrapper && wrapper.children.length === 1) wrapper.dataset.quickWorkoutWrapper = "true";
+    });
 }
 
 function markProgrammeActiveCard() {
@@ -130,7 +140,7 @@ function markProgrammeActiveCard() {
   const heading = headingWithText("Active");
   if (!heading) return;
   heading.dataset.programmeActiveHeading = "true";
-  const card = markFollowingCard("Active", "active");
+  const card = markFollowingCard("Active", "primary-summary");
   if (!card) return;
   card.dataset.programmeActiveCard = "true";
   [...card.querySelectorAll("span, div, p")]
@@ -149,7 +159,55 @@ function markStandardTabs() {
       const selected = button.getAttribute("aria-selected") === "true" || /bg-(blue|indigo)-[5-9]00/.test(button.className);
       button.dataset.standardTab = selected ? "selected" : "true";
       button.removeAttribute("data-app-surface-card");
+      let parent = button.parentElement;
+      for (let depth = 0; parent && depth < 2; depth += 1, parent = parent.parentElement) {
+        if (parent.dataset.appSurfaceCard && parent.children.length <= 2) parent.removeAttribute("data-app-surface-card");
+      }
     });
+}
+
+function markStatsExerciseCards() {
+  document.querySelectorAll("[data-app-list-card], [data-app-list-wrapper]").forEach((element) => {
+    element.removeAttribute("data-app-list-card");
+    element.removeAttribute("data-app-list-wrapper");
+  });
+
+  [...document.querySelectorAll("button, article, section")].forEach((element) => {
+    const text = textOf(element);
+    if (!/View stats/i.test(text) || text.length > 400) return;
+    const card = element.matches("[class*='rounded-']") ? element : closestCard(element);
+    if (!card || card.dataset.standardTab) return;
+    card.dataset.appSurfaceCard = "secondary-card";
+    card.dataset.appListCard = "true";
+
+    const wrapper = card.parentElement;
+    if (wrapper && wrapper.children.length <= 3 && !wrapper.matches("main, section[class*='rounded-'], article[class*='rounded-']")) {
+      wrapper.dataset.appListWrapper = "true";
+    }
+  });
+}
+
+function markHistorySessionCards() {
+  [...document.querySelectorAll("article, section, button")].forEach((element) => {
+    const text = textOf(element);
+    if (!text || text.length > 700) return;
+    const looksLikeHistorySession = /sets completed|Completed\s+\d{1,2}\s+[A-Z][a-z]{2}\s+\d{4}/i.test(text) && /Edit|Delete|session/i.test(text);
+    if (!looksLikeHistorySession) return;
+    const card = element.matches("[class*='rounded-']") ? element : closestCard(element);
+    if (card && !card.dataset.standardTab) card.dataset.appSurfaceCard = "history-item";
+  });
+}
+
+function markHomeSummaryWrappers() {
+  document.querySelectorAll("[data-home-summary-wrapper]").forEach((element) => element.removeAttribute("data-home-summary-wrapper"));
+  ["Active Programme", "Last Workout"].forEach((label) => {
+    markCardsByExactText(label, "primary-summary").forEach((card) => {
+      const wrapper = card.parentElement;
+      if (wrapper && wrapper.children.length <= 3 && wrapper.querySelectorAll("[data-app-surface-card='primary-summary']").length >= 1) {
+        wrapper.dataset.homeSummaryWrapper = "true";
+      }
+    });
+  });
 }
 
 function markExerciseCards() {
@@ -161,45 +219,27 @@ function markExerciseCards() {
   });
 }
 
-function markStatsAndHistoryRows() {
-  document.querySelectorAll("[data-app-list-card]").forEach((element) => element.removeAttribute("data-app-list-card"));
-
-  [...document.querySelectorAll("button, article, section, div")].forEach((element) => {
-    if (element.dataset.standardTab || element.dataset.quickWorkoutAction) return;
-    const text = textOf(element);
-    if (!text || text.length > 500) return;
-
-    const looksLikeStatsExercise = /View stats/i.test(text) && element.querySelector("h2, h3, h4, p, span");
-    const looksLikeHistorySession = /sets completed|Completed\s+\d{1,2}\s+[A-Z][a-z]{2}\s+\d{4}/i.test(text) && /Edit|Delete|session/i.test(text);
-    if (!looksLikeStatsExercise && !looksLikeHistorySession) return;
-
-    const card = closestCard(element) || element;
-    if (card.matches("button, article, section, [class*='rounded-']")) {
-      card.dataset.appSurfaceCard = "history-item";
-      card.dataset.appListCard = "true";
-    }
-  });
-}
-
 function markConsistentSurfaceCards() {
   document.querySelectorAll("[data-app-surface-card]").forEach((element) => element.removeAttribute("data-app-surface-card"));
 
-  ["Settings", "Inactive programmes", "Exercise Library", "Training mode", "Surgery date", "Account", "Today's Tasks", "Due tasks", "Needs attention"]
+  ["Settings", "Training mode", "Surgery date", "Account", "Today's Tasks", "Due tasks", "Needs attention"]
     .forEach((label) => markCardsByExactText(label, "section"));
 
   ["Improvement", "Latest performance", "Best set"]
     .forEach((label) => markCardsByExactText(label, "metric"));
 
-  ["Active Programme", "Last Workout", "New programme"]
-    .forEach((label) => markCardsByExactText(label, "active"));
+  ["New programme", "Inactive programmes", "Exercise Library"]
+    .forEach((label) => markCardsByExactText(label, "secondary-card"));
 
   ["Weight progress", "Stats", "Workout History"]
     .forEach((label) => markFollowingCard(label, "section"));
 
   markTimelineCards();
   markProgrammeActiveCard();
+  markHomeSummaryWrappers();
   markExerciseCards();
-  markStatsAndHistoryRows();
+  markStatsExerciseCards();
+  markHistorySessionCards();
 }
 
 function markPageAndDialogSurfaces() {

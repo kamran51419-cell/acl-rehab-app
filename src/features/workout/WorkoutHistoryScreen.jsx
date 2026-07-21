@@ -3,6 +3,7 @@ import { BarChart3, ChevronDown, ChevronRight } from "lucide-react";
 import Button from "../../components/ui/Button";
 import { db } from "../../firebase";
 import { formatDate } from "../../lib/domain/date";
+import { EXERCISE_LOGGING_METHOD } from "../../lib/domain/plans";
 import { completedWorkoutHistory, durationLabel, workoutExerciseSideLabel, workoutItem } from "../../lib/domain/workoutDisplay";
 import { deleteWorkoutDocument, subscribeWorkouts } from "../../lib/firebase/planRepository";
 
@@ -34,15 +35,40 @@ function weekHeading(value) {
   return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }).format(date);
 }
 
+function validWeight(set) {
+  const value = set?.rawWeight ?? set?.weight;
+  return value !== "" && value !== undefined && value !== null && Number.isFinite(Number(value));
+}
+
+function setCompleted(exercise, set) {
+  return exercise?.loggingMethod === EXERCISE_LOGGING_METHOD.REPS_WEIGHT ? validWeight(set) : Boolean(set?.completed);
+}
+
 function exerciseDone(exercise) {
   if (exercise?.completed) return true;
-  return (exercise?.recordedSets || []).some((set) => set.completed || set.actualReps !== undefined || set.rawReps !== undefined || set.weight !== undefined || set.rawWeight !== undefined);
+  return (exercise?.recordedSets || []).some((set) => setCompleted(exercise, set));
+}
+
+function exerciseSetStats(exercise) {
+  const sets = exercise?.recordedSets || [];
+  if (sets.length) return { completed: sets.filter((set) => setCompleted(exercise, set)).length, total: sets.length };
+  return { completed: exercise?.completed ? 1 : 0, total: 1 };
 }
 
 function workoutStats(workout) {
   const exercises = workout.exercises || [];
-  const completed = exercises.filter(exerciseDone).length;
-  return { exercises: exercises.length, completed, incomplete: exercises.length > 0 && completed < exercises.length };
+  const exerciseCompleted = exercises.filter(exerciseDone).length;
+  const setStats = exercises.reduce((totals, exercise) => {
+    const stats = exerciseSetStats(exercise);
+    return { completed: totals.completed + stats.completed, total: totals.total + stats.total };
+  }, { completed: 0, total: 0 });
+  return {
+    exercises: exercises.length,
+    exerciseCompleted,
+    setsCompleted: setStats.completed,
+    setsTotal: setStats.total,
+    incomplete: setStats.total > 0 && setStats.completed < setStats.total,
+  };
 }
 
 function sortedExercises(workout) {
@@ -56,7 +82,8 @@ function ExerciseDetails({ exercise }) {
   const side = workoutExerciseSideLabel(exercise);
   const summary = workoutItem(exercise).summary;
   const stages = (exercise.prescription?.stages || []).slice().sort((a, b) => a.sortOrder - b.sortOrder);
-  return <div className="rounded-xl border border-slate-200 bg-white p-3"><div className="font-medium">{exercise.exerciseNameSnapshot}</div>{side ? <div className="text-xs font-medium text-slate-500">{side}</div> : null}{exercise.programmeNoteSnapshot ? <div className="text-xs text-slate-500">{exercise.programmeNoteSnapshot}</div> : null}{summary ? <div className="mt-1 text-sm text-slate-600">{summary}</div> : null}{exercise.recordedSets?.length ? <div className="mt-2 space-y-1 text-sm">{exercise.recordedSets.map((set) => <div key={set.id}>Set {set.setNumber}: {repsLabel(set.prescribedReps, set)} · {set.weight === "" || set.weight === undefined ? "—" : `${set.weight} kg`}</div>)}</div> : null}{stages.length ? <div className="mt-2 space-y-1 text-sm">{stages.map((stage) => <div key={stage.id}>{stage.phase === "rest" ? "Rest" : "Work"} · {durationLabel(stage.durationSeconds, stage.durationUnit)}</div>)}</div> : null}<div className="mt-2 text-xs text-slate-500">{exerciseDone(exercise) ? "Completed" : "Not completed"}</div></div>;
+  const stats = exerciseSetStats(exercise);
+  return <div className="rounded-xl border border-slate-200 bg-white p-3"><div className="font-medium">{exercise.exerciseNameSnapshot}</div>{side ? <div className="text-xs font-medium text-slate-500">{side}</div> : null}{exercise.programmeNoteSnapshot ? <div className="text-xs text-slate-500">{exercise.programmeNoteSnapshot}</div> : null}{summary ? <div className="mt-1 text-sm text-slate-600">{summary}</div> : null}{exercise.recordedSets?.length ? <div className="mt-2 space-y-1 text-sm">{exercise.recordedSets.map((set) => <div key={set.id}>Set {set.setNumber}: {repsLabel(set.prescribedReps, set)} · {set.weight === "" || set.weight === undefined ? "—" : `${set.weight} kg`}</div>)}</div> : null}{stages.length ? <div className="mt-2 space-y-1 text-sm">{stages.map((stage) => <div key={stage.id}>{stage.phase === "rest" ? "Rest" : "Work"} · {durationLabel(stage.durationSeconds, stage.durationUnit)}</div>)}</div> : null}<div className={`mt-2 text-xs ${stats.completed < stats.total ? "font-medium text-orange-700" : "text-slate-500"}`}>{stats.completed}/{stats.total} set{stats.total === 1 ? "" : "s"} completed</div></div>;
 }
 
 function openProgress() {
@@ -73,7 +100,7 @@ export function WorkoutHistoryView({ workouts, deletingId, deleteError, onReques
     return [...grouped.entries()].sort(([a], [b]) => b.localeCompare(a));
   }, [completed]);
 
-  return <div className="space-y-5">{showNavigation ? <div className="flex gap-2"><Button>Workout history</Button><Button variant="outline" onClick={openProgress}><BarChart3 className="mr-2 h-4 w-4" />Progress</Button></div> : null}{deleteError ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{deleteError}</div> : null}{weeks.length ? weeks.map(([start, weekWorkouts]) => <section key={start} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className="border-b border-slate-100 pb-3"><h2 className="text-lg font-semibold">Week commencing {weekHeading(start)}</h2><p className="text-sm text-slate-500">{weekWorkouts.length} session{weekWorkouts.length === 1 ? "" : "s"}</p></div><div className="mt-3 space-y-2">{weekWorkouts.map((workout) => { const expanded = visibleExpandedId === workout.id; const stats = workoutStats(workout); return <article key={workout.id} className={`overflow-hidden rounded-xl border ${stats.incomplete ? "border-orange-200" : "border-slate-200"}`}><div className="flex items-center gap-2 p-2"><button type="button" onClick={() => setExpandedId(expanded ? null : workout.id)} className="flex min-w-0 flex-1 items-center gap-3 p-2 text-left">{expanded ? <ChevronDown className="h-5 w-5 shrink-0 text-slate-400" /> : <ChevronRight className="h-5 w-5 shrink-0 text-slate-400" />}<span className="min-w-0 flex-1"><span className="flex items-center gap-2"><span className="block font-semibold">{workout.sessionNameSnapshot || workout.name || "Workout"}</span>{stats.incomplete ? <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-700">Incomplete</span> : null}</span><span className={`block text-sm ${stats.incomplete ? "font-medium text-orange-700" : "text-slate-500"}`}>{formatDate(workout.date || workout.workoutDate)} · {stats.completed}/{stats.exercises} exercises completed{workout.programmeNameSnapshot ? ` · ${workout.programmeNameSnapshot}` : ""}</span></span></button><Button variant="danger" size="sm" onClick={() => onRequestDelete(workout)}>Delete</Button></div>{expanded ? <div className="border-t border-slate-100 bg-slate-50 p-4"><div className="space-y-2">{sortedExercises(workout).map((exercise) => <ExerciseDetails key={exercise.id} exercise={exercise} />)}</div>{workout.notes ? <div className="mt-4 rounded-xl bg-white p-3"><div className="text-sm font-medium">Workout notes</div><p className="text-sm text-slate-600">{workout.notes}</p></div> : null}{completionTimeLabel(workout.completedAt) ? <div className="mt-3 text-xs text-slate-500">Completed {completionTimeLabel(workout.completedAt)}</div> : null}</div> : null}</article>; })}</div></section>) : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500">No completed workouts yet</div>}{deletingId ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"><div role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl bg-white p-5"><h2 className="text-lg font-semibold">Delete workout?</h2><p className="mt-2 text-sm text-slate-600">This will permanently remove this workout and its recorded data.</p>{deleteError ? <p className="mt-3 text-sm font-medium text-red-600">{deleteError}</p> : null}<div className="mt-5 flex justify-end gap-2"><Button variant="outline" disabled={deletingId === "pending"} onClick={onCancelDelete}>Cancel</Button><Button variant="danger" disabled={deletingId === "pending"} onClick={onConfirmDelete}>{deletingId === "pending" ? "Deleting…" : "Delete Workout"}</Button></div></div></div> : null}</div>;
+  return <div className="space-y-5">{showNavigation ? <div className="flex gap-2"><Button>Workout history</Button><Button variant="outline" onClick={openProgress}><BarChart3 className="mr-2 h-4 w-4" />Progress</Button></div> : null}{deleteError ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{deleteError}</div> : null}{weeks.length ? weeks.map(([start, weekWorkouts]) => <section key={start} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className="border-b border-slate-100 pb-3"><h2 className="text-lg font-semibold">Week commencing {weekHeading(start)}</h2><p className="text-sm text-slate-500">{weekWorkouts.length} session{weekWorkouts.length === 1 ? "" : "s"}</p></div><div className="mt-3 space-y-2">{weekWorkouts.map((workout) => { const expanded = visibleExpandedId === workout.id; const stats = workoutStats(workout); return <article key={workout.id} className={`overflow-hidden rounded-xl border ${stats.incomplete ? "border-orange-200" : "border-slate-200"}`}><div className="flex items-center gap-2 p-2"><button type="button" onClick={() => setExpandedId(expanded ? null : workout.id)} className="flex min-w-0 flex-1 items-center gap-3 p-2 text-left">{expanded ? <ChevronDown className="h-5 w-5 shrink-0 text-slate-400" /> : <ChevronRight className="h-5 w-5 shrink-0 text-slate-400" />}<span className="min-w-0 flex-1"><span className="flex items-center gap-2"><span className="block font-semibold">{workout.sessionNameSnapshot || workout.name || "Workout"}</span>{stats.incomplete ? <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-700">Incomplete</span> : null}</span><span className={`block text-sm ${stats.incomplete ? "font-medium text-orange-700" : "text-slate-500"}`}>{formatDate(workout.date || workout.workoutDate)} · {stats.setsCompleted}/{stats.setsTotal} sets completed{workout.programmeNameSnapshot ? ` · ${workout.programmeNameSnapshot}` : ""}</span></span></button><Button variant="danger" size="sm" onClick={() => onRequestDelete(workout)}>Delete</Button></div>{expanded ? <div className="border-t border-slate-100 bg-slate-50 p-4"><div className="space-y-2">{sortedExercises(workout).map((exercise) => <ExerciseDetails key={exercise.id} exercise={exercise} />)}</div>{workout.notes ? <div className="mt-4 rounded-xl bg-white p-3"><div className="text-sm font-medium">Workout notes</div><p className="text-sm text-slate-600">{workout.notes}</p></div> : null}{completionTimeLabel(workout.completedAt) ? <div className="mt-3 text-xs text-slate-500">Completed {completionTimeLabel(workout.completedAt)}</div> : null}</div> : null}</article>; })}</div></section>) : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500">No completed workouts yet</div>}{deletingId ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"><div role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl bg-white p-5"><h2 className="text-lg font-semibold">Delete workout?</h2><p className="mt-2 text-sm text-slate-600">This will permanently remove this workout and its recorded data.</p>{deleteError ? <p className="mt-3 text-sm font-medium text-red-600">{deleteError}</p> : null}<div className="mt-5 flex justify-end gap-2"><Button variant="outline" disabled={deletingId === "pending"} onClick={onCancelDelete}>Cancel</Button><Button variant="danger" disabled={deletingId === "pending"} onClick={onConfirmDelete}>{deletingId === "pending" ? "Deleting…" : "Delete Workout"}</Button></div></div></div> : null}</div>;
 }
 
 export default function WorkoutHistoryScreen({ user, repository = defaultRepository, showNavigation = true }) {

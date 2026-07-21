@@ -7,6 +7,7 @@ import { installUiRuntimeFixes } from './uiRuntimeFixes'
 import { installProgrammeButtonLabels } from './programmeButtonLabels'
 import { installWorkoutFlowUiFixes } from './workoutFlowUiFixes'
 import { installRoutineTaskTimeEditor } from './routineTaskTimeEditor'
+import { installProgrammeScreenNavigation } from './programmeScreenNavigation'
 
 const updateSW = registerSW({
   immediate: true,
@@ -19,6 +20,7 @@ installUiRuntimeFixes()
 installProgrammeButtonLabels()
 installWorkoutFlowUiFixes()
 installRoutineTaskTimeEditor()
+installProgrammeScreenNavigation()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

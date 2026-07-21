@@ -12,6 +12,7 @@ import { installRoutineCustomTimePersistenceFix } from './routineCustomTimePersi
 import { installProgrammeScreenNavigation } from './programmeScreenNavigation'
 import { installDuplicateAndPairedExerciseFix } from './duplicateAndPairedExerciseFix'
 import { installHomeSummaryAndSettingsFix } from './homeSummaryAndSettingsFix'
+import { installTaskAndVariationLabels } from './taskAndVariationLabels'
 
 const updateSW = registerSW({
   immediate: true,
@@ -28,6 +29,7 @@ installRoutineTaskTimeEditor()
 installProgrammeScreenNavigation()
 installDuplicateAndPairedExerciseFix()
 installHomeSummaryAndSettingsFix()
+installTaskAndVariationLabels()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

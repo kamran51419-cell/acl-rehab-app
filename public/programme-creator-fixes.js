@@ -1,5 +1,6 @@
 (() => {
   const text = (value) => String(value || "").replace(/\s+/g, " ").trim();
+  let keepWorkoutAfterDiscard = false;
 
   function programmeEditor() {
     const heading = [...document.querySelectorAll("h2")].find((item) => {
@@ -94,22 +95,32 @@
     });
   }
 
-  function selectWorkoutTabOnce() {
-    const workoutButton = [...document.querySelectorAll("button")].find((button) => text(button.textContent) === "Workout");
-    if (!workoutButton) return;
+  function dedupeSideOptions() {
+    document.querySelectorAll("select").forEach((select) => {
+      const options = [...select.options];
+      const values = options.map((option) => option.value);
+      if (!values.includes("both") || !values.includes("separate")) return;
 
-    const alreadySelected = workoutButton.getAttribute("aria-current") === "page"
-      || workoutButton.getAttribute("aria-selected") === "true"
-      || workoutButton.dataset.active === "true";
-
-    if (!alreadySelected) workoutButton.click();
+      ["left", "right"].forEach((value) => {
+        options.filter((option) => option.value === value).slice(1).forEach((option) => option.remove());
+      });
+    });
   }
 
-  document.addEventListener("click", (event) => {
-    const button = event.target.closest("button");
-    if (!button?.matches("[data-confirm-discard]")) return;
-    window.setTimeout(selectWorkoutTabOnce, 120);
-  }, true);
+  function workoutTabButton() {
+    return [...document.querySelectorAll("button")].find((button) => text(button.textContent) === "Workout");
+  }
+
+  function retainWorkoutTabAfterDiscard() {
+    if (!keepWorkoutAfterDiscard) return;
+    if (document.querySelector('[role="dialog"]')) return;
+    if ([...document.querySelectorAll("p")].some((item) => text(item.textContent).startsWith("Workout in progress ·"))) return;
+
+    const workoutButton = workoutTabButton();
+    if (!workoutButton) return;
+    keepWorkoutAfterDiscard = false;
+    workoutButton.click();
+  }
 
   window.removeStandardBothLabels = fixProgrammeSummaries;
   window.allowRepeatedProgrammeExercises = makeRepeatedAddsWork;
@@ -124,13 +135,23 @@
       makeRepeatedAddsWork();
       fixExerciseCount();
       fixQuickWorkoutLabels();
+      dedupeSideOptions();
+      retainWorkoutTabAfterDiscard();
     });
   }
+
+  document.addEventListener("click", (event) => {
+    const button = event.target.closest("button");
+    if (!button) return;
+    const isCustomConfirmation = button.matches("[data-confirm-discard]");
+    const isReactConfirmation = text(button.textContent) === "Discard Workout" && Boolean(button.closest('[role="dialog"]'));
+    if (isCustomConfirmation || isReactConfirmation) keepWorkoutAfterDiscard = true;
+    setTimeout(apply, 0);
+  }, true);
 
   document.addEventListener("change", (event) => {
     if (event.target instanceof HTMLSelectElement) apply();
   });
-  document.addEventListener("click", () => setTimeout(apply, 0));
   new MutationObserver(apply).observe(document.getElementById("root") || document.body, { childList: true, subtree: true });
   apply();
 })();

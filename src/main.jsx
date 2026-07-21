@@ -7,6 +7,7 @@ import { installUiRuntimeFixes } from './uiRuntimeFixes'
 import { installProgrammeButtonLabels } from './programmeButtonLabels'
 import { installWorkoutFlowUiFixes } from './workoutFlowUiFixes'
 import { installRoutineTaskTimeEditor } from './routineTaskTimeEditor'
+import { installRoutineCustomTimePersistenceFix } from './routineCustomTimePersistenceFix'
 import { installProgrammeScreenNavigation } from './programmeScreenNavigation'
 
 const updateSW = registerSW({
@@ -19,6 +20,7 @@ const updateSW = registerSW({
 installUiRuntimeFixes()
 installProgrammeButtonLabels()
 installWorkoutFlowUiFixes()
+installRoutineCustomTimePersistenceFix()
 installRoutineTaskTimeEditor()
 installProgrammeScreenNavigation()
 

@@ -74,6 +74,26 @@
     if (text(badge.textContent) !== expected) badge.textContent = expected;
   }
 
+  function fixQuickWorkoutLabels() {
+    const replacements = new Map([
+      ["One-off Workout", "Quick Workout"],
+      ["Build a One-off Workout", "Build a Quick Workout"],
+      ["Start One-off Workout", "Start Quick Workout"],
+      ["Workout in progress · One-off Workout", "Workout in progress · Quick Workout"],
+    ]);
+
+    const walker = document.createTreeWalker(document.getElementById("root") || document.body, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      const current = text(node.nodeValue);
+      if (replacements.has(current)) node.nodeValue = node.nodeValue.replace(current, replacements.get(current));
+    }
+
+    document.querySelectorAll('input[placeholder="One-off Workout"]').forEach((input) => {
+      input.placeholder = "Quick Workout";
+    });
+  }
+
   function selectWorkoutTabOnce() {
     const workoutButton = [...document.querySelectorAll("button")].find((button) => text(button.textContent) === "Workout");
     if (!workoutButton) return;
@@ -85,15 +105,12 @@
     if (!alreadySelected) workoutButton.click();
   }
 
-  // Wait for the discard state update to finish, then correct the tab at most once.
-  // The previous version clicked Workout twice, which caused the visible glitch.
   document.addEventListener("click", (event) => {
     const button = event.target.closest("button");
     if (!button?.matches("[data-confirm-discard]")) return;
     window.setTimeout(selectWorkoutTabOnce, 120);
   }, true);
 
-  // Replace the older broad helper so it only removes "both" for Standard.
   window.removeStandardBothLabels = fixProgrammeSummaries;
   window.allowRepeatedProgrammeExercises = makeRepeatedAddsWork;
 
@@ -106,6 +123,7 @@
       fixProgrammeSummaries();
       makeRepeatedAddsWork();
       fixExerciseCount();
+      fixQuickWorkoutLabels();
     });
   }
 

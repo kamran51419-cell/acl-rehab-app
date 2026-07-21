@@ -1,4 +1,4 @@
-/* Keeps page, card, workout, tab and modal surfaces visually consistent. */
+/* Keeps page, card, workout and modal surfaces visually consistent. */
 html[data-app-blue-tinge="true"] body,
 html[data-app-blue-tinge="true"] #root,
 html[data-app-blue-tinge="true"] .min-h-screen {
@@ -11,61 +11,50 @@ html[data-app-blue-tinge="true"] .min-h-screen {
   margin-inline: auto;
   max-width: 64rem;
   border-radius: 1.5rem;
-  background: linear-gradient(100deg, rgb(239 246 255 / 0.76) 0%, rgb(248 250 252 / 0.96) 30%, rgb(255 255 255) 70%) !important;
+  background: linear-gradient(100deg, rgb(239 246 255 / 0.72) 0%, rgb(248 250 252 / 0.96) 34%, rgb(255 255 255) 76%) !important;
 }
 
 [data-workout-state-card="progress"],
 [data-app-surface-card] {
   overflow: hidden;
   border-color: rgb(219 234 254 / 0.92) !important;
-  background: linear-gradient(100deg, rgb(239 246 255 / 0.62) 0%, rgb(248 250 252 / 0.98) 30%, rgb(255 255 255) 72%) !important;
+  background: linear-gradient(100deg, rgb(239 246 255 / 0.58) 0%, rgb(248 250 252 / 0.98) 34%, rgb(255 255 255) 76%) !important;
   box-shadow: 0 12px 30px rgb(15 23 42 / 0.07), 0 2px 8px rgb(15 23 42 / 0.04) !important;
 }
 
 [data-app-surface-card="section"] {
-  background: linear-gradient(100deg, rgb(239 246 255 / 0.54) 0%, rgb(248 250 252 / 0.98) 34%, rgb(255 255 255) 76%) !important;
+  background: linear-gradient(100deg, rgb(239 246 255 / 0.54) 0%, rgb(248 250 252 / 0.98) 36%, rgb(255 255 255) 78%) !important;
 }
 
 [data-app-surface-card="metric"] {
-  background: linear-gradient(100deg, rgb(219 234 254 / 0.62) 0%, rgb(239 246 255 / 0.52) 24%, rgb(255 255 255) 70%) !important;
+  background: linear-gradient(100deg, rgb(219 234 254 / 0.6) 0%, rgb(239 246 255 / 0.5) 26%, rgb(255 255 255) 72%) !important;
 }
 
 [data-app-surface-card="exercise"] {
-  background: linear-gradient(100deg, rgb(239 246 255 / 0.46) 0%, rgb(248 250 252 / 0.98) 28%, rgb(255 255 255) 72%) !important;
+  background: linear-gradient(100deg, rgb(239 246 255 / 0.46) 0%, rgb(248 250 252 / 0.98) 30%, rgb(255 255 255) 74%) !important;
 }
 
 [data-app-surface-card="active"] {
   border-color: rgb(147 197 253 / 0.95) !important;
-  background: linear-gradient(100deg, rgb(191 219 254 / 0.72) 0%, rgb(219 234 254 / 0.56) 26%, rgb(255 255 255) 72%) !important;
+  background: linear-gradient(100deg, rgb(191 219 254 / 0.7) 0%, rgb(219 234 254 / 0.54) 28%, rgb(255 255 255) 74%) !important;
   box-shadow: 0 14px 34px rgb(29 78 216 / 0.11), 0 2px 8px rgb(15 23 42 / 0.05) !important;
 }
 
 [data-app-dialog-panel="true"] {
   border: 1px solid rgb(191 219 254 / 0.9) !important;
-  background: linear-gradient(100deg, rgb(239 246 255 / 0.68) 0%, rgb(248 250 252 / 0.98) 32%, rgb(255 255 255) 74%) !important;
+  background: linear-gradient(100deg, rgb(239 246 255 / 0.66) 0%, rgb(248 250 252 / 0.98) 34%, rgb(255 255 255) 76%) !important;
   box-shadow: 0 24px 70px rgb(15 23 42 / 0.2), 0 3px 12px rgb(29 78 216 / 0.08) !important;
 }
 
 [data-quick-workout-action="true"] {
-  border-color: rgb(147 197 253 / 0.95) !important;
-  background: linear-gradient(100deg, rgb(191 219 254 / 0.82) 0%, rgb(219 234 254 / 0.72) 36%, rgb(239 246 255 / 0.92) 100%) !important;
+  border-color: rgb(147 197 253 / 0.9) !important;
+  background: linear-gradient(100deg, rgb(219 234 254 / 0.88) 0%, rgb(239 246 255 / 0.9) 48%, rgb(255 255 255) 100%) !important;
   color: rgb(30 64 175) !important;
-  box-shadow: 0 10px 24px rgb(29 78 216 / 0.11) !important;
+  box-shadow: 0 10px 24px rgb(29 78 216 / 0.09) !important;
 }
 
 [data-quick-workout-action="true"]:hover {
-  background: linear-gradient(100deg, rgb(147 197 253 / 0.78) 0%, rgb(191 219 254 / 0.68) 36%, rgb(219 234 254 / 0.88) 100%) !important;
-}
-
-[data-app-tab-surface] {
-  border-color: rgb(219 234 254 / 0.95) !important;
-  background: linear-gradient(100deg, rgb(239 246 255 / 0.7) 0%, rgb(248 250 252 / 0.98) 48%, rgb(255 255 255) 100%) !important;
-}
-
-[data-app-tab-surface="selected"] {
-  border-color: rgb(147 197 253 / 0.95) !important;
-  background: linear-gradient(100deg, rgb(191 219 254 / 0.82) 0%, rgb(219 234 254 / 0.62) 46%, rgb(239 246 255 / 0.9) 100%) !important;
-  color: rgb(30 64 175) !important;
+  background: linear-gradient(100deg, rgb(191 219 254 / 0.86) 0%, rgb(219 234 254 / 0.78) 48%, rgb(239 246 255 / 0.96) 100%) !important;
 }
 
 [data-programme-active-heading="true"] {

@@ -4,6 +4,7 @@ import Button from "../../components/ui/Button";
 import { db } from "../../firebase";
 import { rehabTimeline } from "../../lib/domain/homeDashboard";
 import { todayString } from "../../lib/domain/date";
+import { EXERCISE_LOGGING_METHOD } from "../../lib/domain/plans";
 import { ROUTINE_STATUS, occurrenceId, scheduledRoutineTasks } from "../../lib/domain/routineTasks";
 import { setRoutineOccurrenceStatus, subscribePlans, subscribeWorkouts } from "../../lib/firebase/planRepository";
 import PlansScreen from "../plans/PlansScreen";
@@ -59,7 +60,13 @@ function routineGroups(programme, occurrences, today) {
 
 function exerciseDone(exercise) {
   if (exercise?.completed) return true;
-  return (exercise?.recordedSets || []).some((set) => set.completed || set.actualReps !== undefined || set.rawReps !== undefined || set.weight !== undefined || set.rawWeight !== undefined);
+  const sets = exercise?.recordedSets || [];
+  if (sets.some((set) => set.completed)) return true;
+  if (exercise?.loggingMethod !== EXERCISE_LOGGING_METHOD.REPS_WEIGHT) return false;
+  return sets.some((set) => {
+    const weight = set.rawWeight ?? set.weight;
+    return weight !== "" && weight !== undefined && weight !== null && Number.isFinite(Number(weight));
+  });
 }
 
 function workoutProgress(workout) {

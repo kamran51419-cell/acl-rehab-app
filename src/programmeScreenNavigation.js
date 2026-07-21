@@ -70,6 +70,11 @@ function showInactiveScreen(root, inactiveSection) {
   inactiveSection.querySelector(":scope > h2")?.classList.add("hidden");
 }
 
+function openExerciseLibrary() {
+  sessionStorage.setItem(VIEW_KEY, "library");
+  goToTab("Home");
+}
+
 function enhanceProgramme() {
   const root = programmeRoot();
   if (!root || root.dataset.programmeNavigationEnhanced === "true") return;
@@ -87,10 +92,7 @@ function enhanceProgramme() {
   inactiveRow.dataset.programmeOverviewRow = "true";
   activeSection.insertAdjacentElement("afterend", inactiveRow);
 
-  const libraryRow = makeChevronRow("Exercise Library", undefined, () => {
-    sessionStorage.setItem(VIEW_KEY, "library");
-    goToTab("Home");
-  });
+  const libraryRow = makeChevronRow("Exercise Library", undefined, openExerciseLibrary);
   libraryRow.dataset.programmeOverviewRow = "true";
   inactiveRow.insertAdjacentElement("afterend", libraryRow);
 
@@ -114,6 +116,9 @@ function enhanceHomeLibrary() {
     if (child !== library && child.dataset.programmeLibraryHeader !== "true") child.hidden = true;
   });
 
+  const helper = [...library.querySelectorAll("p")].find((item) => text(item) === "Define what an exercise is. Configure it inside a programme.");
+  helper?.remove();
+
   if (!homeContainer.querySelector("[data-programme-library-header]")) {
     const header = makeBackHeader("Exercise Library", () => {
       sessionStorage.removeItem(VIEW_KEY);
@@ -133,6 +138,12 @@ function restoreNormalHome() {
   [...container.children].forEach((child) => { child.hidden = child === library; });
 }
 
+function captureProgrammeLibraryButton(event) {
+  const button = event.target.closest("button");
+  if (!button || text(button) !== "Manage Exercise Library") return;
+  sessionStorage.setItem(VIEW_KEY, "library");
+}
+
 function enhance() {
   enhanceProgramme();
   enhanceHomeLibrary();
@@ -141,8 +152,12 @@ function enhance() {
 
 export function installProgrammeScreenNavigation() {
   if (typeof document === "undefined" || typeof MutationObserver === "undefined") return () => {};
+  document.addEventListener("click", captureProgrammeLibraryButton, true);
   enhance();
   const observer = new MutationObserver(() => requestAnimationFrame(enhance));
   observer.observe(document.body, { childList: true, subtree: true });
-  return () => observer.disconnect();
+  return () => {
+    document.removeEventListener("click", captureProgrammeLibraryButton, true);
+    observer.disconnect();
+  };
 }

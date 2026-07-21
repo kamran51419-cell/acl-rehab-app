@@ -3,7 +3,8 @@ import { BarChart3, ChevronDown, ChevronRight } from "lucide-react";
 import Button from "../../components/ui/Button";
 import { db } from "../../firebase";
 import { formatDate } from "../../lib/domain/date";
-import { completedWorkoutHistory, durationLabel, workoutExerciseSideLabel, workoutItem } from "../../lib/domain/workoutDisplay";
+import { completedWorkoutHistory, durationLabel, resolveWorkoutExerciseSide, workoutExerciseSideLabel, workoutItem } from "../../lib/domain/workoutDisplay";
+import { SIDE } from "../../lib/domain/v2Models";
 import { deleteWorkoutDocument, subscribeWorkouts } from "../../lib/firebase/planRepository";
 
 const defaultRepository = { deleteWorkoutDocument, subscribeWorkouts };
@@ -65,6 +66,33 @@ function sortedExercises(workout) {
   return (workout.exercises || []).slice().sort((a, b) => (TYPE_ORDER[a.exerciseType] ?? 99) - (TYPE_ORDER[b.exerciseType] ?? 99) || Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
 }
 
+function pairBaseId(exercise) {
+  return String(exercise.id || "").replace(/-(left|right)$/, "");
+}
+
+function historyItems(workout) {
+  const exercises = sortedExercises(workout);
+  const result = [];
+  for (let index = 0; index < exercises.length; index += 1) {
+    const current = exercises[index];
+    const next = exercises[index + 1];
+    const currentSide = resolveWorkoutExerciseSide(current);
+    const nextSide = resolveWorkoutExerciseSide(next);
+    const paired = next
+      && current.exerciseId === next.exerciseId
+      && pairBaseId(current) === pairBaseId(next)
+      && currentSide === SIDE.LEFT
+      && nextSide === SIDE.RIGHT;
+    if (paired) {
+      result.push({ type: "pair", left: current, right: next, key: `${current.id}:${next.id}` });
+      index += 1;
+    } else {
+      result.push({ type: "single", exercise: current, key: current.id });
+    }
+  }
+  return result;
+}
+
 function setContent(exercise, set) {
   if (exercise.loggingMethod === "reps_weight") return `${actualRepsLabel(set)} · ${hasEnteredWeight(set) ? `${set.weight ?? set.rawWeight} kg` : "—"}`;
   if (exercise.loggingMethod === "reps") return actualRepsLabel(set);
@@ -76,16 +104,28 @@ function setContent(exercise, set) {
   return workoutItem(exercise).summary || "Exercise";
 }
 
+function SetRows({ exercise, compact = false }) {
+  return exercise.recordedSets?.length ? <div className={`mt-2 space-y-1.5 ${compact ? "text-xs" : "text-sm"}`}>{exercise.recordedSets.map((set) => { const done = setDone(exercise, set); return <div key={set.id} className={`rounded-lg px-2 py-1.5 leading-snug ${done ? "bg-emerald-50 text-emerald-900" : "bg-orange-50 text-orange-900"}`}><span className="font-medium">Set {set.setNumber}:</span> {setContent(exercise, set)} <span className="font-semibold">{done ? "✓" : "Not completed"}</span></div>; })}</div> : null;
+}
+
+function SideHistoryColumn({ exercise, label }) {
+  const summary = workoutItem(exercise).summary;
+  const progress = exerciseProgress(exercise);
+  return <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-2 sm:p-3"><div className="text-sm font-semibold text-slate-700">{label}</div>{summary ? <div className="mt-1 text-xs text-slate-500">{summary.replace(/\s+(left|right)$/i, "")}</div> : null}<SetRows exercise={exercise} compact/>{progress.completed < progress.total ? <div className="mt-2 text-xs font-medium text-orange-700">{progress.completed}/{progress.total} sets completed</div> : null}</div>;
+}
+
+function PairedExerciseDetails({ left, right, workoutDate }) {
+  const completionDate = left.completedDate && left.completedDate !== workoutDate ? formatDate(left.completedDate) : right.completedDate && right.completedDate !== workoutDate ? formatDate(right.completedDate) : "";
+  return <div className="rounded-xl border border-slate-200 bg-white p-3"><div className="font-medium">{left.exerciseNameSnapshot}</div>{completionDate ? <div className="mt-1 text-xs text-slate-400">Completed {completionDate}</div> : null}{left.programmeNoteSnapshot ? <div className="text-xs text-slate-500">{left.programmeNoteSnapshot}</div> : null}<div className="mt-3 grid grid-cols-2 gap-2 sm:gap-3"><SideHistoryColumn exercise={left} label="Left"/><SideHistoryColumn exercise={right} label="Right"/></div></div>;
+}
+
 function ExerciseDetails({ exercise, workoutDate }) {
   const side = workoutExerciseSideLabel(exercise);
   const summary = workoutItem(exercise).summary;
   const stages = (exercise.prescription?.stages || exercise.prescription?.intervals || []).slice().sort((a, b) => a.sortOrder - b.sortOrder);
   const progress = exerciseProgress(exercise);
   const completionDate = exercise.completedDate && exercise.completedDate !== workoutDate ? formatDate(exercise.completedDate) : "";
-  return <div className="rounded-xl border border-slate-200 bg-white p-3"><div className="font-medium">{exercise.exerciseNameSnapshot}</div>{side ? <div className="text-xs font-medium text-slate-500">{side}</div> : null}{completionDate ? <div className="mt-1 text-xs text-slate-400">Completed {completionDate}</div> : null}{exercise.programmeNoteSnapshot ? <div className="text-xs text-slate-500">{exercise.programmeNoteSnapshot}</div> : null}{summary ? <div className="mt-1 text-sm text-slate-600">{summary}</div> : null}
-    {exercise.recordedSets?.length ? <div className="mt-2 space-y-1.5 text-sm">{exercise.recordedSets.map((set) => { const done = setDone(exercise, set); return <div key={set.id} className={`rounded-lg px-2 py-1.5 ${done ? "bg-emerald-50 text-emerald-900" : "bg-orange-50 text-orange-900"}`}><span className="font-medium">Set {set.setNumber}:</span> {setContent(exercise, set)} <span className="ml-1 font-semibold">{done ? "✓" : "Not completed"}</span></div>; })}</div> : null}
-    {stages.length ? <div className={`mt-2 rounded-lg px-2 py-1.5 text-sm ${exercise.completed ? "bg-emerald-50 text-emerald-900" : "bg-orange-50 text-orange-900"}`}>{stages.map((stage, index) => <span key={stage.id || index}>{index ? " · " : ""}{stage.phase === "rest" ? "Rest" : "Work"} {durationLabel(stage.durationSeconds, stage.durationUnit)}</span>)} <span className="font-semibold">{exercise.completed ? "✓" : "Not completed"}</span></div> : null}
-    {progress.completed < progress.total ? <div className="mt-2 text-xs font-medium text-orange-700">{progress.completed}/{progress.total} sets completed</div> : null}</div>;
+  return <div className="rounded-xl border border-slate-200 bg-white p-3"><div className="font-medium">{exercise.exerciseNameSnapshot}</div>{side ? <div className="text-xs font-medium text-slate-500">{side}</div> : null}{completionDate ? <div className="mt-1 text-xs text-slate-400">Completed {completionDate}</div> : null}{exercise.programmeNoteSnapshot ? <div className="text-xs text-slate-500">{exercise.programmeNoteSnapshot}</div> : null}{summary ? <div className="mt-1 text-sm text-slate-600">{summary}</div> : null}<SetRows exercise={exercise}/>{stages.length ? <div className={`mt-2 rounded-lg px-2 py-1.5 text-sm ${exercise.completed ? "bg-emerald-50 text-emerald-900" : "bg-orange-50 text-orange-900"}`}>{stages.map((stage, index) => <span key={stage.id || index}>{index ? " · " : ""}{stage.phase === "rest" ? "Rest" : "Work"} {durationLabel(stage.durationSeconds, stage.durationUnit)}</span>)} <span className="font-semibold">{exercise.completed ? "✓" : "Not completed"}</span></div> : null}{progress.completed < progress.total ? <div className="mt-2 text-xs font-medium text-orange-700">{progress.completed}/{progress.total} sets completed</div> : null}</div>;
 }
 
 function openProgress() { [...document.querySelectorAll("button")].find((item) => item.textContent?.trim() === "Progress")?.click(); }
@@ -104,7 +144,7 @@ export function WorkoutHistoryView({ workouts, deletingId, deleteError, onReques
     return [...grouped.entries()].sort(([a], [b]) => b.localeCompare(a));
   }, [completed]);
 
-  return <div className="space-y-5">{showNavigation ? <div className="flex gap-2"><Button>Workout history</Button><Button variant="outline" onClick={openProgress}><BarChart3 className="mr-2 h-4 w-4"/>Progress</Button></div> : null}{deleteError ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{deleteError}</div> : null}{weeks.length ? weeks.map(([start, weekWorkouts]) => <section key={start} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className="border-b border-slate-100 pb-3"><h2 className="text-lg font-semibold">{weekHeading(start)}</h2><p className="text-sm text-slate-500">{weekWorkouts.length} session{weekWorkouts.length === 1 ? "" : "s"}</p></div><div className="mt-3 space-y-2">{weekWorkouts.map((workout) => { const expanded = visibleExpandedId === workout.id; const stats = workoutStats(workout); return <article key={workout.id} className={`overflow-hidden rounded-xl border ${stats.incomplete ? "border-orange-200" : "border-slate-200"}`}><div className="flex items-center gap-2 p-2"><button type="button" onClick={() => setExpandedId(expanded ? null : workout.id)} className="flex min-w-0 flex-1 items-center gap-3 p-2 text-left">{expanded ? <ChevronDown className="h-5 w-5 shrink-0 text-slate-400"/> : <ChevronRight className="h-5 w-5 shrink-0 text-slate-400"/>}<span className="min-w-0 flex-1"><span className="flex items-center gap-2"><span className="block font-semibold">{workout.sessionNameSnapshot || workout.name || "Workout"}</span>{stats.incomplete ? <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-700">Incomplete</span> : null}</span><span className={`block text-sm ${stats.incomplete ? "font-medium text-orange-700" : "text-slate-500"}`}>{formatDate(workout.date || workout.workoutDate)} · {stats.completedSets}/{stats.totalSets} sets completed{workout.programmeNameSnapshot ? ` · ${workout.programmeNameSnapshot}` : ""}</span></span></button><Button variant="outline" size="sm" onClick={() => editWorkout(workout)}>Edit</Button><Button variant="danger" size="sm" onClick={() => onRequestDelete(workout)}>Delete</Button></div>{expanded ? <div className="border-t border-slate-100 bg-slate-50 p-4"><div className="space-y-2">{sortedExercises(workout).map((exercise) => <ExerciseDetails key={exercise.id} exercise={exercise} workoutDate={workout.date || workout.workoutDate}/>)}</div>{workout.notes ? <div className="mt-4 rounded-xl bg-white p-3"><div className="text-sm font-medium">Workout notes</div><p className="text-sm text-slate-600">{workout.notes}</p></div> : null}{completionTimeLabel(workout.completedAt) ? <div className="mt-3 text-xs text-slate-500">Completed {completionTimeLabel(workout.completedAt)}</div> : null}</div> : null}</article>; })}</div></section>) : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500">No completed workouts yet</div>}{deletingId ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"><div role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl bg-white p-5"><h2 className="text-lg font-semibold">Delete workout?</h2><p className="mt-2 text-sm text-slate-600">This will permanently remove this workout and its recorded data.</p>{deleteError ? <p className="mt-3 text-sm font-medium text-red-600">{deleteError}</p> : null}<div className="mt-5 flex justify-end gap-2"><Button variant="outline" disabled={deletingId === "pending"} onClick={onCancelDelete}>Cancel</Button><Button variant="danger" disabled={deletingId === "pending"} onClick={onConfirmDelete}>{deletingId === "pending" ? "Deleting…" : "Delete Workout"}</Button></div></div></div> : null}</div>;
+  return <div className="space-y-5">{showNavigation ? <div className="flex gap-2"><Button>Workout history</Button><Button variant="outline" onClick={openProgress}><BarChart3 className="mr-2 h-4 w-4"/>Progress</Button></div> : null}{deleteError ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{deleteError}</div> : null}{weeks.length ? weeks.map(([start, weekWorkouts]) => <section key={start} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className="border-b border-slate-100 pb-3"><h2 className="text-lg font-semibold">{weekHeading(start)}</h2><p className="text-sm text-slate-500">{weekWorkouts.length} session{weekWorkouts.length === 1 ? "" : "s"}</p></div><div className="mt-3 space-y-2">{weekWorkouts.map((workout) => { const expanded = visibleExpandedId === workout.id; const stats = workoutStats(workout); return <article key={workout.id} className={`overflow-hidden rounded-xl border ${stats.incomplete ? "border-orange-200" : "border-slate-200"}`}><div className="flex items-center gap-2 p-2"><button type="button" onClick={() => setExpandedId(expanded ? null : workout.id)} className="flex min-w-0 flex-1 items-center gap-3 p-2 text-left">{expanded ? <ChevronDown className="h-5 w-5 shrink-0 text-slate-400"/> : <ChevronRight className="h-5 w-5 shrink-0 text-slate-400"/>}<span className="min-w-0 flex-1"><span className="flex items-center gap-2"><span className="block font-semibold">{workout.sessionNameSnapshot || workout.name || "Workout"}</span>{stats.incomplete ? <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-700">Incomplete</span> : null}</span><span className={`block text-sm ${stats.incomplete ? "font-medium text-orange-700" : "text-slate-500"}`}>{formatDate(workout.date || workout.workoutDate)} · {stats.completedSets}/{stats.totalSets} sets completed{workout.programmeNameSnapshot ? ` · ${workout.programmeNameSnapshot}` : ""}</span></span></button><Button variant="outline" size="sm" onClick={() => editWorkout(workout)}>Edit</Button><Button variant="danger" size="sm" onClick={() => onRequestDelete(workout)}>Delete</Button></div>{expanded ? <div className="border-t border-slate-100 bg-slate-50 p-3 sm:p-4"><div className="space-y-2">{historyItems(workout).map((item) => item.type === "pair" ? <PairedExerciseDetails key={item.key} left={item.left} right={item.right} workoutDate={workout.date || workout.workoutDate}/> : <ExerciseDetails key={item.key} exercise={item.exercise} workoutDate={workout.date || workout.workoutDate}/>)}</div>{workout.notes ? <div className="mt-4 rounded-xl bg-white p-3"><div className="text-sm font-medium">Workout notes</div><p className="text-sm text-slate-600">{workout.notes}</p></div> : null}{completionTimeLabel(workout.completedAt) ? <div className="mt-3 text-xs text-slate-500">Completed {completionTimeLabel(workout.completedAt)}</div> : null}</div> : null}</article>; })}</div></section>) : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500">No completed workouts yet</div>}{deletingId ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"><div role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl bg-white p-5"><h2 className="text-lg font-semibold">Delete workout?</h2><p className="mt-2 text-sm text-slate-600">This will permanently remove this workout and its recorded data.</p>{deleteError ? <p className="mt-3 text-sm font-medium text-red-600">{deleteError}</p> : null}<div className="mt-5 flex justify-end gap-2"><Button variant="outline" disabled={deletingId === "pending"} onClick={onCancelDelete}>Cancel</Button><Button variant="danger" disabled={deletingId === "pending"} onClick={onConfirmDelete}>{deletingId === "pending" ? "Deleting…" : "Delete Workout"}</Button></div></div></div> : null}</div>;
 }
 
 export default function WorkoutHistoryScreen({ user, repository = defaultRepository, showNavigation = true }) {

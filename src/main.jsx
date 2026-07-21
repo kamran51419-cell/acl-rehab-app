@@ -20,6 +20,7 @@ import { installQuickWorkoutCancelCleanup } from './quickWorkoutCancelCleanup'
 import { installWorkoutFlowConsistencyFix } from './workoutFlowConsistencyFix'
 import { installFinalTargetedUiFixes } from './finalTargetedUiFix'
 import { installTodayTaskOrderFix } from './todayTaskOrderFix'
+import { installProgrammeCreatorInputFixes } from './programmeCreatorInputFixes'
 
 const updateSW = registerSW({
   immediate: true,
@@ -41,6 +42,7 @@ installQuickWorkoutCancelCleanup()
 installWorkoutFlowConsistencyFix()
 installFinalTargetedUiFixes()
 installTodayTaskOrderFix()
+installProgrammeCreatorInputFixes()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

@@ -17,12 +17,16 @@ function sessionForPicker(picker) {
   return picker.closest("div.space-y-4.rounded-2xl");
 }
 
-function duplicateMatchingExercise(picker, exerciseName) {
+function matchingExerciseCard(picker, exerciseName) {
   const session = sessionForPicker(picker);
-  if (!session || !exerciseName) return false;
+  if (!session || !exerciseName) return null;
 
   const cards = [...session.querySelectorAll("div.space-y-3.rounded-xl.border.bg-white.p-3")];
-  const matchingCard = cards.find((card) => textOf(card.querySelector(".font-semibold")) === exerciseName);
+  return cards.find((card) => textOf(card.querySelector(".font-semibold")) === exerciseName) || null;
+}
+
+function duplicateMatchingExercise(picker, exerciseName) {
+  const matchingCard = matchingExerciseCard(picker, exerciseName);
   if (!matchingCard) return false;
 
   const duplicateButton = [...matchingCard.querySelectorAll("button")].find((button) => textOf(button) === "Duplicate");
@@ -34,8 +38,11 @@ function duplicateMatchingExercise(picker, exerciseName) {
 
 function enableRepeatExerciseAdds() {
   document.querySelectorAll("button").forEach((button) => {
-    if (textOf(button) !== "Selected") return;
-    if (!pickerFor(button)) return;
+    const picker = pickerFor(button);
+    if (!picker || !["Selected", "Add"].includes(textOf(button))) return;
+
+    const exerciseName = selectedExerciseName(button);
+    if (!matchingExerciseCard(picker, exerciseName)) return;
 
     button.dataset.repeatExerciseAdd = "true";
     button.disabled = false;
@@ -125,13 +132,15 @@ export function installDuplicateAndPairedExerciseFix() {
   if (typeof document === "undefined" || typeof MutationObserver === "undefined") return () => {};
 
   const forceRepeatAdd = (event) => {
-    const button = event.target.closest?.("button[data-repeat-exercise-add='true']");
-    if (!button) return;
+    const button = event.target.closest?.("button");
+    if (!button || textOf(button) !== "Add") return;
 
     const picker = pickerFor(button);
     if (!picker) return;
 
     const exerciseName = selectedExerciseName(button);
+    if (!matchingExerciseCard(picker, exerciseName)) return;
+
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();

@@ -1,6 +1,5 @@
 (() => {
   const text = (value) => String(value || "").replace(/\s+/g, " ").trim();
-  let keepWorkoutAfterDiscard = false;
   let discardNavigationAttempts = 0;
 
   function programmeEditor() {
@@ -108,41 +107,6 @@
     });
   }
 
-  function workoutTabButton() {
-    return [...document.querySelectorAll("button")].find((button) => text(button.textContent) === "Workout");
-  }
-
-  function retainWorkoutTabAfterDiscard() {
-    if (!keepWorkoutAfterDiscard) return;
-
-    const workoutButton = workoutTabButton();
-    if (!workoutButton) return;
-
-    const isWorkoutSelected = workoutButton.classList.contains("bg-slate-900")
-      || workoutButton.classList.contains("bg-slate-100")
-      || workoutButton.getAttribute("aria-current") === "page"
-      || workoutButton.getAttribute("aria-selected") === "true";
-
-    if (!isWorkoutSelected) workoutButton.click();
-
-    discardNavigationAttempts += 1;
-    if (isWorkoutSelected || discardNavigationAttempts >= 12) {
-      keepWorkoutAfterDiscard = false;
-      discardNavigationAttempts = 0;
-      return;
-    }
-
-    requestAnimationFrame(retainWorkoutTabAfterDiscard);
-  }
-
-  function beginWorkoutTabRetention() {
-    keepWorkoutAfterDiscard = true;
-    discardNavigationAttempts = 0;
-    queueMicrotask(retainWorkoutTabAfterDiscard);
-    requestAnimationFrame(retainWorkoutTabAfterDiscard);
-    setTimeout(retainWorkoutTabAfterDiscard, 0);
-  }
-
   window.removeStandardBothLabels = fixProgrammeSummaries;
   window.allowRepeatedProgrammeExercises = makeRepeatedAddsWork;
 
@@ -157,18 +121,8 @@
       fixExerciseCount();
       fixQuickWorkoutLabels();
       dedupeSideOptions();
-      retainWorkoutTabAfterDiscard();
     });
   }
-
-  document.addEventListener("click", (event) => {
-    const button = event.target.closest("button");
-    if (!button) return;
-    const isCustomConfirmation = button.matches("[data-confirm-discard]");
-    const isReactConfirmation = text(button.textContent) === "Discard Workout" && Boolean(button.closest('[role="dialog"]'));
-    if (isCustomConfirmation || isReactConfirmation) beginWorkoutTabRetention();
-    setTimeout(apply, 0);
-  }, true);
 
   document.addEventListener("change", (event) => {
     if (event.target instanceof HTMLSelectElement) apply();

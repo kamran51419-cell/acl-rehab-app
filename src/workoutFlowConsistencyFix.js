@@ -61,14 +61,24 @@ function markWorkoutStateCard() {
   if (card) card.dataset.workoutStateCard = "progress";
 }
 
+function markCardByExactText(label, variant = "soft") {
+  const match = [...document.querySelectorAll("h1, h2, h3, h4, p, span, div")]
+    .find((element) => textOf(element) === label);
+  const card = closestCard(match);
+  if (card) card.dataset.appSurfaceCard = variant;
+}
+
 function markConsistentSurfaceCards() {
   document.querySelectorAll("[data-app-surface-card]").forEach((element) => element.removeAttribute("data-app-surface-card"));
-  const labels = ["Inactive programmes", "Exercise Library", "Stats", "Workout History"];
-  labels.forEach((label) => {
+
+  ["Inactive programmes", "Exercise Library", "Stats", "Workout History"].forEach((label) => {
     const heading = headingWithText(label);
     const card = closestCard(heading);
     if (card) card.dataset.appSurfaceCard = "soft";
   });
+
+  ["Improvement", "Latest performance", "Best set"].forEach((label) => markCardByExactText(label, "metric"));
+  ["Today's Tasks", "Active Programme", "Last Workout", "Rehab timeline"].forEach((label) => markCardByExactText(label, "summary"));
 }
 
 function apply() {

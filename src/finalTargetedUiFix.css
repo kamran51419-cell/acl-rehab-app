@@ -1,0 +1,31 @@
+/* Final targeted fixes only: programme editor opacity, stats exercise gradients, and matched Home summaries. */
+[data-final-programme-editor="true"] {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483000 !important;
+  overflow-y: auto !important;
+  isolation: isolate !important;
+  background:
+    linear-gradient(100deg, rgb(219 234 254 / 0.34) 0%, rgb(248 250 252) 40%, rgb(255 255 255) 82%) !important;
+  background-color: rgb(248 250 252) !important;
+}
+
+[data-final-programme-editor="true"]::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: rgb(248 250 252);
+}
+
+[data-final-stats-card="true"],
+[data-final-summary-card="true"] {
+  border-color: rgb(147 197 253 / 0.68) !important;
+  background:
+    linear-gradient(100deg, rgb(191 219 254 / 0.48) 0%, rgb(219 234 254 / 0.36) 31%, rgb(255 255 255) 78%) !important;
+  box-shadow: 0 10px 24px rgb(29 78 216 / 0.06), 0 2px 6px rgb(15 23 42 / 0.03) !important;
+}
+
+[data-final-stats-card="true"] {
+  background-color: transparent !important;
+}

@@ -18,3 +18,13 @@
 input[type="date"] + .mt-2 > p.text-slate-500 {
   display: none;
 }
+
+/* The surgery-date action clears the saved date rather than removing a record. */
+input[type="date"] + .mt-2 > button {
+  font-size: 0;
+}
+
+input[type="date"] + .mt-2 > button::after {
+  content: "Clear";
+  font-size: 0.875rem;
+}

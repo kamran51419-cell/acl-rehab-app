@@ -20,21 +20,12 @@ function markProgrammeEditor() {
   )
   if (!heading) return
 
-  let candidate = heading.parentElement
-  while (candidate && candidate !== document.body && candidate !== document.documentElement) {
-    const text = textOf(candidate)
-    const hasSaveButton = [...candidate.querySelectorAll('button')].some(
-      (button) => textOf(button) === 'Save programme',
-    )
-    const hasSessions = /\bSessions\b/.test(text)
-    const hasProgrammeInput = candidate.querySelector('input')
+  const editor = closestRoundedCard(heading)
+  const hasSaveButton = editor && [...editor.querySelectorAll('button')].some(
+    (button) => textOf(button) === 'Save programme',
+  )
 
-    if (hasSaveButton && hasSessions && hasProgrammeInput) {
-      candidate.dataset.finalProgrammeEditor = 'true'
-      return
-    }
-    candidate = candidate.parentElement
-  }
+  if (editor && hasSaveButton) editor.dataset.finalProgrammeEditor = 'true'
 }
 
 function markStatsExerciseCards() {
@@ -64,10 +55,27 @@ function markHomeSummaryCards() {
   })
 }
 
+function hideProgrammeActiveHeading() {
+  document.querySelectorAll('[data-hide-programme-active-heading]').forEach((element) => {
+    element.removeAttribute('data-hide-programme-active-heading')
+  })
+
+  const editorOpen = [...document.querySelectorAll('h1, h2, h3')].some((element) =>
+    /^(Edit|Create) programme$/i.test(textOf(element)),
+  )
+  if (editorOpen) return
+
+  const heading = [...document.querySelectorAll('h1, h2, h3')].find(
+    (element) => textOf(element) === 'Active',
+  )
+  if (heading) heading.dataset.hideProgrammeActiveHeading = 'true'
+}
+
 function applyFinalTargetedUiFixes() {
   markProgrammeEditor()
   markStatsExerciseCards()
   markHomeSummaryCards()
+  hideProgrammeActiveHeading()
 }
 
 export function installFinalTargetedUiFixes() {

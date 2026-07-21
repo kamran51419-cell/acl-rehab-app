@@ -5,6 +5,7 @@
   z-index: 2147483000 !important;
   overflow-y: auto !important;
   isolation: isolate !important;
+  border-radius: 0 !important;
   background:
     linear-gradient(100deg, rgb(219 234 254 / 0.34) 0%, rgb(248 250 252) 40%, rgb(255 255 255) 82%) !important;
   background-color: rgb(248 250 252) !important;
@@ -16,6 +17,10 @@
   inset: 0;
   z-index: -1;
   background: rgb(248 250 252);
+}
+
+[data-hide-programme-active-heading="true"] {
+  display: none !important;
 }
 
 [data-final-stats-card="true"],

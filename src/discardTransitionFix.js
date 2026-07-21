@@ -1,62 +1,72 @@
-let discardInFlight = false;
-let restoreTimer = null;
+let discardConfirmed = false;
+let originalConfirmButton = null;
+let resetTimer = null;
 
-function isConfirmDiscardButton(target) {
-  return target instanceof Element && target.closest("button")?.textContent?.trim() === "Confirm discard";
+function buttonText(button) {
+  return button?.textContent?.trim() || "";
 }
 
-function hideStaleDiscardCard() {
-  if (!discardInFlight) return;
-
-  document.querySelectorAll("button").forEach((button) => {
-    if (button.textContent?.trim() !== "Confirm discard") return;
-    const card = button.closest("section");
-    if (card) card.style.display = "none";
+function visibleConfirmButtons() {
+  return Array.from(document.querySelectorAll("button")).filter((button) => {
+    if (buttonText(button) !== "Confirm discard") return false;
+    const style = window.getComputedStyle(button);
+    return style.display !== "none" && style.visibility !== "hidden";
   });
 }
 
-function finishDiscardTransition() {
-  const stillHasWorkout = Array.from(document.querySelectorAll("h2")).some(
-    (heading) => heading.textContent?.trim() === "Workout in progress"
-  );
+function hideRepeatedConfirmation(button) {
+  const card = button.closest("section, [role='dialog'], .fixed");
+  if (card) card.style.display = "none";
+}
 
-  if (!stillHasWorkout) {
-    discardInFlight = false;
-    if (restoreTimer) window.clearTimeout(restoreTimer);
-    restoreTimer = null;
-  }
+function finishRepeatedDiscard() {
+  if (!discardConfirmed) return;
+
+  const repeated = visibleConfirmButtons().find((button) => button !== originalConfirmButton);
+  if (!repeated) return;
+
+  hideRepeatedConfirmation(repeated);
+  discardConfirmed = false;
+  repeated.click();
+
+  if (resetTimer) window.clearTimeout(resetTimer);
+  resetTimer = null;
 }
 
 export function installDiscardTransitionFix() {
   if (typeof document === "undefined" || typeof MutationObserver === "undefined") return () => {};
 
   const onClick = (event) => {
-    if (!isConfirmDiscardButton(event.target)) return;
+    const button = event.target instanceof Element ? event.target.closest("button") : null;
+    if (buttonText(button) !== "Confirm discard") return;
 
-    discardInFlight = true;
-    hideStaleDiscardCard();
+    if (!discardConfirmed) {
+      discardConfirmed = true;
+      originalConfirmButton = button;
 
-    if (restoreTimer) window.clearTimeout(restoreTimer);
-    restoreTimer = window.setTimeout(() => {
-      discardInFlight = false;
-      restoreTimer = null;
-      document.querySelectorAll("section[style*='display: none']").forEach((card) => {
-        card.style.display = "";
-      });
-    }, 8000);
+      if (resetTimer) window.clearTimeout(resetTimer);
+      resetTimer = window.setTimeout(() => {
+        discardConfirmed = false;
+        originalConfirmButton = null;
+        resetTimer = null;
+      }, 5000);
+      return;
+    }
+
+    discardConfirmed = false;
+    originalConfirmButton = null;
   };
 
   document.addEventListener("click", onClick, true);
 
   const observer = new MutationObserver(() => {
-    hideStaleDiscardCard();
-    finishDiscardTransition();
+    window.requestAnimationFrame(finishRepeatedDiscard);
   });
   observer.observe(document.body, { childList: true, subtree: true });
 
   return () => {
     document.removeEventListener("click", onClick, true);
     observer.disconnect();
-    if (restoreTimer) window.clearTimeout(restoreTimer);
+    if (resetTimer) window.clearTimeout(resetTimer);
   };
 }

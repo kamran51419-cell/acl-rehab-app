@@ -10,6 +10,7 @@ import { installRoutineTaskTimeEditor } from './routineTaskTimeEditor'
 import { installRoutineCustomTimePersistenceFix } from './routineCustomTimePersistenceFix'
 import { installProgrammeScreenNavigation } from './programmeScreenNavigation'
 import { installDuplicateAndPairedExerciseFix } from './duplicateAndPairedExerciseFix'
+import { installHomeSummaryAndSettingsFix } from './homeSummaryAndSettingsFix'
 
 const updateSW = registerSW({
   immediate: true,
@@ -25,6 +26,7 @@ installRoutineCustomTimePersistenceFix()
 installRoutineTaskTimeEditor()
 installProgrammeScreenNavigation()
 installDuplicateAndPairedExerciseFix()
+installHomeSummaryAndSettingsFix()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

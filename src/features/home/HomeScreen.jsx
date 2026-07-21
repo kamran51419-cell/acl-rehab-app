@@ -4,7 +4,7 @@ import Button from "../../components/ui/Button";
 import { db } from "../../firebase";
 import { rehabTimeline } from "../../lib/domain/homeDashboard";
 import { todayString } from "../../lib/domain/date";
-import { ROUTINE_STATUS, occurrenceId, scheduledRoutineTasks } from "../../lib/domain/routineTasks";
+import { ROUTINE_STATUS, occurrenceId, routineTimeMinutes, scheduledRoutineTasks } from "../../lib/domain/routineTasks";
 import { setRoutineOccurrenceStatus, subscribePlans, subscribeWorkouts } from "../../lib/firebase/planRepository";
 import PlansScreen from "../plans/PlansScreen";
 
@@ -17,7 +17,12 @@ function timestampDate(value) {
   return date && !Number.isNaN(date.getTime()) ? date : null;
 }
 
-function dateString(date) { return date.toISOString().slice(0, 10); }
+function dateString(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
 function routineStartDate(programme, today) {
   const created = timestampDate(programme?.activatedAt) || timestampDate(programme?.createdAt);
@@ -29,27 +34,50 @@ function routineStartDate(programme, today) {
   return start > fallback ? start : fallback;
 }
 
+function taskOccurrenceId(programme, scheduledDate, task) {
+  return occurrenceId(programme.id, scheduledDate, task.baseTaskId || task.id, task.occurrenceTimeKey || "");
+}
+
+function sameTaskOccurrence(a, b) {
+  return (a.baseTaskId || a.id) === (b.baseTaskId || b.id) && (a.occurrenceTimeKey || "") === (b.occurrenceTimeKey || "");
+}
+
+function customTimeHasPassed(task, now) {
+  if (!/^\d{2}:\d{2}$/.test(task.occurrenceTimeKey || "")) return false;
+  return now.getHours() * 60 + now.getMinutes() >= routineTimeMinutes(task.occurrenceTimeKey);
+}
+
 function routineGroups(programme, occurrences, today) {
   if (!programme) return { overdue: [], due: [], done: [] };
-  const byId = new Map(occurrences.map((item) => [item.id || occurrenceId(item.programmeId, item.scheduledDate, item.taskId), item]));
+  const byId = new Map(occurrences.map((item) => [item.id || occurrenceId(item.programmeId, item.scheduledDate, item.taskId, item.occurrenceTimeKey), item]));
+  const now = new Date();
   const todayDate = new Date(`${today}T12:00:00`);
-  const due = scheduledRoutineTasks(programme, todayDate).map((task) => {
-    const occurrence = byId.get(occurrenceId(programme.id, today, task.id));
+  const scheduledToday = scheduledRoutineTasks(programme, todayDate).map((task) => {
+    const occurrence = byId.get(taskOccurrenceId(programme, today, task));
     return { ...task, scheduledDate: today, status: occurrence?.status || ROUTINE_STATUS.PENDING, occurrence };
   });
-  const done = due.filter((task) => task.status === ROUTINE_STATUS.COMPLETED);
-  const pendingDue = due.filter((task) => task.status !== ROUTINE_STATUS.COMPLETED);
-  const latestMissedByTask = new Map();
+  const done = scheduledToday.filter((task) => task.status === ROUTINE_STATUS.COMPLETED);
+  const overdueToday = scheduledToday.filter((task) => task.status !== ROUTINE_STATUS.COMPLETED && customTimeHasPassed(task, now));
+  const pendingDue = scheduledToday.filter((task) => task.status !== ROUTINE_STATUS.COMPLETED && !customTimeHasPassed(task, now));
+  const latestMissedByTaskTime = new Map();
   const cursor = routineStartDate(programme, today);
   while (cursor < todayDate) {
     const scheduledDate = dateString(cursor);
+    const nextDate = new Date(cursor);
+    nextDate.setDate(nextDate.getDate() + 1);
+    const nextDayTasks = scheduledRoutineTasks(programme, nextDate);
     scheduledRoutineTasks(programme, cursor).forEach((task) => {
-      const occurrence = byId.get(occurrenceId(programme.id, scheduledDate, task.id));
-      if (occurrence?.status !== ROUTINE_STATUS.COMPLETED) latestMissedByTask.set(task.id, { ...task, scheduledDate, status: ROUTINE_STATUS.PENDING, occurrence });
+      const occurrence = byId.get(taskOccurrenceId(programme, scheduledDate, task));
+      if (occurrence?.status === ROUTINE_STATUS.COMPLETED) return;
+      if (nextDayTasks.some((nextTask) => sameTaskOccurrence(task, nextTask))) return;
+      const key = `${task.baseTaskId || task.id}_${task.occurrenceTimeKey || ""}`;
+      latestMissedByTaskTime.set(key, { ...task, scheduledDate, status: ROUTINE_STATUS.PENDING, occurrence });
     });
     cursor.setDate(cursor.getDate() + 1);
   }
-  return { overdue: [...latestMissedByTask.values()].sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate)), due: pendingDue, done };
+  const overdue = [...latestMissedByTaskTime.values(), ...overdueToday]
+    .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate) || routineTimeMinutes(a.occurrenceTimeKey) - routineTimeMinutes(b.occurrenceTimeKey));
+  return { overdue, due: pendingDue, done };
 }
 
 function hasEnteredWeight(set) {
@@ -75,14 +103,14 @@ function incompleteWorkouts(workouts) {
 function TaskRow({ task, overdue = false, completed = false, onStatus }) {
   return <article className={`flex min-h-14 items-center gap-3 rounded-xl border px-3 py-2 ${overdue ? "border-orange-200 bg-orange-50" : completed ? "border-emerald-100 bg-slate-50" : "border-slate-200 bg-white"}`}>
     {completed ? <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 font-bold text-emerald-700">✓</span> : <button type="button" aria-label={`Complete ${task.name}`} className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold text-transparent hover:text-emerald-600 ${overdue ? "border-orange-400 hover:border-emerald-600" : "border-slate-300 hover:border-emerald-600"}`} onClick={() => onStatus(task, ROUTINE_STATUS.COMPLETED)}>✓</button>}
-    <div className="min-w-0 flex-1"><div className={`font-medium ${completed ? "text-slate-500 line-through" : ""}`}>{task.name}</div><div className={`flex min-w-0 gap-2 text-xs capitalize ${overdue ? "text-orange-700" : completed ? "text-slate-400" : "text-slate-500"}`}>{overdue ? <span>{task.scheduledDate}</span> : <span>{task.timeOfDay}</span>}{task.notes ? <span className="truncate">· {task.notes}</span> : null}</div></div>
+    <div className="min-w-0 flex-1"><div className={`font-medium ${completed ? "text-slate-500 line-through" : ""}`}>{task.name}</div><div className={`flex min-w-0 gap-2 text-xs ${overdue ? "text-orange-700" : completed ? "text-slate-400" : "text-slate-500"}`}>{overdue && task.scheduledDate !== todayString() ? <span>{task.scheduledDate}</span> : <span>{task.timeLabel || task.timeOfDay}</span>}{task.notes ? <span className="truncate">· {task.notes}</span> : null}</div></div>
   </article>;
 }
 
 function TaskSection({ title, tasks, tone, expanded, onToggle, onStatus, completed = false }) {
   if (!tasks.length) return null;
   const visible = expanded ? tasks : tasks.slice(0, VISIBLE_TASKS);
-  return <div className="space-y-2"><div className="flex items-center justify-between"><h3 className={`text-sm font-semibold ${tone}`}>{title}</h3>{tasks.length > VISIBLE_TASKS ? <button type="button" className="text-sm font-medium text-slate-600" onClick={onToggle}>{expanded ? "Show Less" : "Show All"}</button> : null}</div><div className="space-y-1.5">{visible.map((task) => <TaskRow key={`${task.id}-${task.scheduledDate}`} task={task} overdue={title === "Overdue"} completed={completed} onStatus={onStatus}/>)}</div></div>;
+  return <div className="space-y-2"><div className="flex items-center justify-between"><h3 className={`text-sm font-semibold ${tone}`}>{title}</h3>{tasks.length > VISIBLE_TASKS ? <button type="button" className="text-sm font-medium text-slate-600" onClick={onToggle}>{expanded ? "Show Less" : "Show All"}</button> : null}</div><div className="space-y-1.5">{visible.map((task) => <TaskRow key={`${task.baseTaskId || task.id}-${task.scheduledDate}-${task.occurrenceTimeKey || ""}`} task={task} overdue={title === "Overdue"} completed={completed} onStatus={onStatus}/>)}</div></div>;
 }
 
 export function TodayRoutine({ groups, expanded = false, onToggle, onStatus }) {
@@ -105,7 +133,7 @@ function IncompleteWorkouts({ workouts, expanded, onToggle, onContinue, onDismis
 export function HomeDashboard({ programme, unfinishedWorkout, incompleteWorkoutList, incompleteExpanded, surgeryDate, trainingMode = "gym", today, showSessions, onStart, onContinue, onContinueIncomplete, onDismissIncomplete, onToggleIncomplete, onChooseSession, onOneOff, routineGroups: groups, routineExpanded = false, onToggleRoutine, onRoutineStatus }) {
   const sessions = (programme?.sessions || []).slice().sort((a, b) => a.sortOrder - b.sortOrder);
   const timeline = trainingMode === "rehab" && surgeryDate ? rehabTimeline(surgeryDate, today) : null;
-  return <div className="mx-auto max-w-2xl space-y-5"><TodayRoutine groups={groups} expanded={routineExpanded} onToggle={onToggleRoutine} onStatus={onRoutineStatus}/><IncompleteWorkouts workouts={incompleteWorkoutList} expanded={incompleteExpanded} onToggle={onToggleIncomplete} onContinue={onContinueIncomplete} onDismiss={onDismissIncomplete}/><section className="space-y-4">{unfinishedWorkout ? <Button className="w-full py-3 text-base" onClick={onContinue}>Continue Workout</Button> : <Button className="w-full py-3 text-base" disabled={!programme} onClick={onStart}>Start Workout</Button>}{!unfinishedWorkout ? <Button className="w-full py-3 text-base" variant="outline" onClick={onOneOff}>Quick Workout</Button> : null}{showSessions && programme && !unfinishedWorkout ? <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><h2 className="font-semibold">Choose a session</h2><div className="mt-3 space-y-2">{sessions.map((session) => <button type="button" key={session.id} onClick={() => onChooseSession(session.id)} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-left font-medium hover:bg-slate-50">{session.name}</button>)}</div></div> : null}</section>{timeline ? <><div className="border-t border-slate-200"/><section><h2 className="text-sm font-medium text-slate-500">Rehab timeline</h2><div className="mt-3 grid grid-cols-3 gap-2">{Object.values(timeline).map((label) => <div key={label} className="rounded-xl bg-white p-3 text-center text-sm font-medium shadow-sm">{label}</div>)}</div></section></> : null}</div>;
+  return <div className="mx-auto max-w-2xl space-y-5"><TodayRoutine groups={groups} expanded={routineExpanded} onToggle={onToggleRoutine} onStatus={onRoutineStatus}/><IncompleteWorkouts workouts={incompleteWorkoutList} expanded={incompleteExpanded} onToggle={onToggleIncomplete} onContinue={onContinueIncomplete} onDismiss={onDismissIncomplete}/><section className="space-y-4">{unfinishedWorkout ? <Button className="w-full py-3 text-base" onClick={onContinue}>Continue Workout</Button> : <><Button className="w-full py-3 text-base" disabled={!programme} onClick={onStart}>Start Workout</Button>{showSessions && programme ? <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><h2 className="font-semibold">Choose a session</h2><div className="mt-3 space-y-2">{sessions.map((session) => <button type="button" key={session.id} onClick={() => onChooseSession(session.id)} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-left font-medium hover:bg-slate-50">{session.name}</button>)}</div></div> : null}<Button className="w-full py-3 text-base" variant="outline" onClick={onOneOff}>Quick Workout</Button></>}</section>{timeline ? <><div className="border-t border-slate-200"/><section><h2 className="text-sm font-medium text-slate-500">Rehab timeline</h2><div className="mt-3 grid grid-cols-3 gap-2">{Object.values(timeline).map((label) => <div key={label} className="rounded-xl bg-white p-3 text-center text-sm font-medium shadow-sm">{label}</div>)}</div></section></> : null}</div>;
 }
 
 export default function HomeScreen({ user, surgeryDate, trainingMode = "gym", onOpenWorkout, fromProgramme = false, onBackToProgramme, repository = defaultRepository }) {
@@ -118,7 +146,11 @@ export default function HomeScreen({ user, surgeryDate, trainingMode = "gym", on
   const unfinishedWorkout = useMemo(() => workouts.find((item) => item.status === "in_progress") || null, [workouts]);
   const incompleteWorkoutList = useMemo(() => incompleteWorkouts(workouts), [workouts]);
   const groups = useMemo(() => routineGroups(programme, occurrences, today), [programme, occurrences, today]);
-  async function setStatus(task, status) { const saved = await repository.setRoutineOccurrenceStatus(db, user.uid, { id: occurrenceId(programme.id, task.scheduledDate, task.id), programmeId: programme.id, taskId: task.id, scheduledDate: task.scheduledDate, status }); setOccurrences((current) => [...current.filter((item) => item.id !== saved.id), saved]); }
+  async function setStatus(task, status) {
+    const taskId = task.baseTaskId || task.id;
+    const saved = await repository.setRoutineOccurrenceStatus(db, user.uid, { id: occurrenceId(programme.id, task.scheduledDate, taskId, task.occurrenceTimeKey), programmeId: programme.id, taskId, occurrenceTimeKey: task.occurrenceTimeKey || "", scheduledDate: task.scheduledDate, status });
+    setOccurrences((current) => [...current.filter((item) => item.id !== saved.id), saved]);
+  }
   function continueIncomplete(workout) { onOpenWorkout({ mode: "catch_up", workoutId: workout.id }); }
   async function dismissIncomplete(workout) { await updateDoc(doc(db, "users", user.uid, "workouts", workout.id), { dismissedIncompleteAt: serverTimestamp(), updatedAt: serverTimestamp() }); }
   return <div className="space-y-8">{fromProgramme ? <Button variant="outline" onClick={onBackToProgramme}>← Back to programme</Button> : null}<HomeDashboard programme={programme} unfinishedWorkout={unfinishedWorkout} incompleteWorkoutList={incompleteWorkoutList} incompleteExpanded={incompleteExpanded} surgeryDate={surgeryDate} trainingMode={trainingMode} today={today} routineGroups={groups} routineExpanded={routineExpanded} onToggleRoutine={() => setRoutineExpanded((value) => !value)} onRoutineStatus={setStatus} showSessions={showSessions} onStart={() => setShowSessions(true)} onContinue={() => onOpenWorkout({ mode: "continue", workoutId: unfinishedWorkout.id })} onContinueIncomplete={continueIncomplete} onDismissIncomplete={dismissIncomplete} onToggleIncomplete={() => setIncompleteExpanded((value) => !value)} onChooseSession={(sessionId) => onOpenWorkout({ mode: "session", sessionId })} onOneOff={() => onOpenWorkout({ mode: "one_off" })}/><section id="exercise-library" className="scroll-mt-6"><PlansScreen user={user} view="exercises" trainingMode={trainingMode}/></section></div>;

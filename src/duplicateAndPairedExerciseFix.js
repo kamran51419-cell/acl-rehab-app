@@ -2,6 +2,11 @@ function textOf(element) {
   return (element?.textContent || "").trim();
 }
 
+function reactClickHandler(button) {
+  const propsKey = Object.keys(button).find((key) => key.startsWith("__reactProps$"));
+  return propsKey ? button[propsKey]?.onClick : null;
+}
+
 function pickerFor(button) {
   const picker = button.closest("div.rounded-xl.border-dashed");
   const heading = picker?.querySelector("strong");
@@ -25,17 +30,6 @@ function matchingExerciseCard(picker, exerciseName) {
   return cards.find((card) => textOf(card.querySelector(".font-semibold")) === exerciseName) || null;
 }
 
-function duplicateMatchingExercise(picker, exerciseName) {
-  const matchingCard = matchingExerciseCard(picker, exerciseName);
-  if (!matchingCard) return false;
-
-  const duplicateButton = [...matchingCard.querySelectorAll("button")].find((button) => textOf(button) === "Duplicate");
-  if (!duplicateButton) return false;
-
-  duplicateButton.click();
-  return true;
-}
-
 function enableRepeatExerciseAdds() {
   document.querySelectorAll("button").forEach((button) => {
     const picker = pickerFor(button);
@@ -47,8 +41,10 @@ function enableRepeatExerciseAdds() {
     button.dataset.repeatExerciseAdd = "true";
     button.disabled = false;
     button.removeAttribute("disabled");
+    button.setAttribute("aria-disabled", "false");
     button.textContent = "Add";
     button.classList.remove("opacity-50", "cursor-not-allowed");
+    button.style.pointerEvents = "auto";
   });
 }
 
@@ -132,25 +128,30 @@ export function installDuplicateAndPairedExerciseFix() {
   if (typeof document === "undefined" || typeof MutationObserver === "undefined") return () => {};
 
   const forceRepeatAdd = (event) => {
-    const button = event.target.closest?.("button");
+    const button = event.target.closest?.("button[data-repeat-exercise-add='true']");
     if (!button || textOf(button) !== "Add") return;
 
     const picker = pickerFor(button);
     if (!picker) return;
 
-    const exerciseName = selectedExerciseName(button);
-    if (!matchingExerciseCard(picker, exerciseName)) return;
+    const handler = reactClickHandler(button);
+    if (typeof handler !== "function") return;
 
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
 
-    if (!duplicateMatchingExercise(picker, exerciseName)) return;
-
-    const closeButton = [...picker.querySelectorAll("button")].find((candidate) => textOf(candidate) === "Close");
-    closeButton?.click();
+    button.disabled = false;
+    button.removeAttribute("disabled");
+    handler({
+      currentTarget: button,
+      target: button,
+      preventDefault() {},
+      stopPropagation() {},
+    });
   };
 
+  document.addEventListener("pointerdown", forceRepeatAdd, true);
   document.addEventListener("click", forceRepeatAdd, true);
 
   let queued = false;
@@ -168,6 +169,7 @@ export function installDuplicateAndPairedExerciseFix() {
   observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["disabled"] });
   return () => {
     observer.disconnect();
+    document.removeEventListener("pointerdown", forceRepeatAdd, true);
     document.removeEventListener("click", forceRepeatAdd, true);
   };
 }

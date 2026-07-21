@@ -8,9 +8,11 @@ function headingWithText(text) {
 
 function closestCard(element) {
   if (!element) return null;
-  const rounded = element.closest("[class*='rounded-2xl'], [class*='rounded-3xl']");
-  if (rounded) return rounded;
-  return element.closest("section.border, article.border");
+  const rounded = element.closest("[class*='rounded-xl'], [class*='rounded-2xl'], [class*='rounded-3xl']");
+  if (rounded && !rounded.matches("button")) return rounded;
+  const parentRounded = rounded?.parentElement?.closest("[class*='rounded-xl'], [class*='rounded-2xl'], [class*='rounded-3xl']");
+  if (parentRounded && !parentRounded.matches("button")) return parentRounded;
+  return element.closest("section.border, article.border, div.border");
 }
 
 function removeLeakedProgrammeCards() {
@@ -67,19 +69,11 @@ function manageWorkoutOptionsNavigation() {
 }
 
 function markCardByExactText(label, variant = "soft") {
-  const match = [...document.querySelectorAll("h1, h2, h3, h4, p, span, div")].find((element) => textOf(element) === label);
+  const match = [...document.querySelectorAll("h1, h2, h3, h4, p, span, div")]
+    .find((element) => textOf(element) === label && !element.closest("button"));
   const card = closestCard(match);
   if (card) card.dataset.appSurfaceCard = variant;
   return card;
-}
-
-function markFollowingCard(label, variant = "section") {
-  const heading = headingWithText(label);
-  if (!heading) return null;
-  let candidate = heading.nextElementSibling;
-  while (candidate && !candidate.matches("[class*='rounded-2xl'], [class*='rounded-3xl'], section.border, article.border")) candidate = candidate.nextElementSibling;
-  if (candidate) candidate.dataset.appSurfaceCard = variant;
-  return candidate;
 }
 
 function markQuickWorkoutBuilder() {
@@ -99,7 +93,7 @@ function markWorkoutStateCard() {
 
 function markTimelineCards() {
   [...document.querySelectorAll("div, p, span")]
-    .filter((element) => /(?:days|weeks|months) post-op$/i.test(textOf(element)))
+    .filter((element) => /(?:days|weeks|months) post-op$/i.test(textOf(element)) && !element.closest("button"))
     .forEach((label) => {
       const card = closestCard(label);
       if (card) card.dataset.appSurfaceCard = "metric";
@@ -114,64 +108,56 @@ function markQuickWorkoutButtons() {
 }
 
 function markProgrammeActiveCard() {
-  document.querySelectorAll("[data-programme-active-heading], [data-programme-active-card]").forEach((element) => {
+  document.querySelectorAll("[data-programme-active-heading], [data-programme-active-card], [data-hide-active-badge]").forEach((element) => {
     element.removeAttribute("data-programme-active-heading");
     element.removeAttribute("data-programme-active-card");
+    element.removeAttribute("data-hide-active-badge");
   });
+
   const heading = headingWithText("Active");
-  if (!heading) return;
-  heading.dataset.programmeActiveHeading = "true";
-  const card = markFollowingCard("Active", "active");
+  if (heading) heading.dataset.programmeActiveHeading = "true";
+
+  const programmeTitle = [...document.querySelectorAll("h1, h2, h3")]
+    .find((element) => textOf(element) !== "Active" && element.closest("section, article, [class*='rounded-2xl'], [class*='rounded-3xl']") && element.parentElement?.querySelector("button"));
+  const card = closestCard(programmeTitle);
   if (!card) return;
+  card.dataset.appSurfaceCard = "active";
   card.dataset.programmeActiveCard = "true";
   [...card.querySelectorAll("span, div, p")]
     .filter((element) => textOf(element) === "Active" && element.children.length === 0)
-    .forEach((badge) => {
-      if (badge !== heading) badge.dataset.hideActiveBadge = "true";
-    });
-}
-
-function markTabs() {
-  document.querySelectorAll("[data-app-tab-surface]").forEach((element) => element.removeAttribute("data-app-tab-surface"));
-  const labels = new Set(["Active", "Inactive", "Draft", "Archived", "Stats", "Workout History", "Sessions", "Exercises", "Details", "All", "Strength", "Cardio", "Plyometric", "Balance", "Mobility", "Stretch", "Other"]);
-  [...document.querySelectorAll("button")]
-    .filter((button) => labels.has(textOf(button)))
-    .forEach((button) => { button.dataset.appTabSurface = button.getAttribute("aria-selected") === "true" || button.className.includes("bg-blue") ? "selected" : "true"; });
+    .forEach((badge) => { badge.dataset.hideActiveBadge = "true"; });
 }
 
 function markBroadSuitableCards() {
-  const roots = [...document.querySelectorAll("main, #root > div > div")];
-  roots.forEach((root) => {
-    root.querySelectorAll("section[class*='rounded-'], article[class*='rounded-']").forEach((card) => {
-      if (!card.dataset.appSurfaceCard && !card.dataset.workoutStateCard) card.dataset.appSurfaceCard = "soft";
-    });
-  });
-  [...document.querySelectorAll("h2, h3")]
-    .filter((heading) => ["Bench press", "Bike"].includes(textOf(heading)) || heading.closest("[data-quick-workout-builder='true']"))
-    .forEach((heading) => {
-      const card = closestCard(heading);
-      if (card && !card.dataset.appSurfaceCard) card.dataset.appSurfaceCard = "exercise";
+  document.querySelectorAll("section[class*='rounded-'], article[class*='rounded-'], div.border[class*='rounded-']")
+    .forEach((card) => {
+      if (card.matches("button") || card.closest("button")) return;
+      if (!card.dataset.appSurfaceCard && !card.dataset.workoutStateCard && !card.dataset.appDialogPanel) {
+        card.dataset.appSurfaceCard = "soft";
+      }
     });
 }
 
 function markConsistentSurfaceCards() {
   document.querySelectorAll("[data-app-surface-card]").forEach((element) => element.removeAttribute("data-app-surface-card"));
-  ["Inactive programmes", "Exercise Library", "Training mode", "Surgery date", "Account", "Today's Tasks", "Due tasks", "Needs attention"]
+  ["Settings", "Inactive programmes", "Exercise Library", "Training mode", "Surgery date", "Account", "Today's Tasks", "Due tasks", "Needs attention"]
     .forEach((label) => markCardByExactText(label, "section"));
   ["Improvement", "Latest performance", "Best set", "Last Workout"]
     .forEach((label) => markCardByExactText(label, "metric"));
-  ["Weight progress", "Stats", "Workout History"]
-    .forEach((label) => markFollowingCard(label, "section"));
   markTimelineCards();
   markProgrammeActiveCard();
   markBroadSuitableCards();
+}
+
+function restoreStandardTabs() {
+  document.querySelectorAll("[data-app-tab-surface]").forEach((element) => element.removeAttribute("data-app-tab-surface"));
 }
 
 function markPageAndDialogSurfaces() {
   document.documentElement.dataset.appBlueTinge = "true";
   document.querySelectorAll("[data-app-dialog-panel]").forEach((element) => element.removeAttribute("data-app-dialog-panel"));
   document.querySelectorAll(".fixed.inset-0").forEach((overlay) => {
-    const panel = [...overlay.children].find((child) => child.matches("[class*='rounded-2xl'], [class*='rounded-3xl']"));
+    const panel = [...overlay.children].find((child) => child.matches("[class*='rounded-xl'], [class*='rounded-2xl'], [class*='rounded-3xl']"));
     if (panel) panel.dataset.appDialogPanel = "true";
   });
 }
@@ -184,7 +170,7 @@ function apply() {
   markWorkoutStateCard();
   markQuickWorkoutButtons();
   markConsistentSurfaceCards();
-  markTabs();
+  restoreStandardTabs();
   markPageAndDialogSurfaces();
 }
 

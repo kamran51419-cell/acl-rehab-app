@@ -45,6 +45,20 @@ function removeSessionNotes() {
   });
 }
 
+function openActiveWorkoutDirectly() {
+  const heading = headingWithText("Workout in progress");
+  if (!heading) return;
+
+  const card = closestCard(heading);
+  if (!card) return;
+
+  const continueButton = [...card.querySelectorAll("button")].find((button) => textOf(button) === "Continue Workout");
+  if (!continueButton || continueButton.dataset.autoContinueHandled === "true") return;
+
+  continueButton.dataset.autoContinueHandled = "true";
+  continueButton.click();
+}
+
 function markQuickWorkoutBuilder() {
   document.querySelectorAll("[data-quick-workout-builder]").forEach((element) => element.removeAttribute("data-quick-workout-builder"));
   const heading = headingWithText("Quick Workout");
@@ -61,19 +75,42 @@ function markWorkoutStateCard() {
   if (card) card.dataset.workoutStateCard = "progress";
 }
 
+function markCardByExactText(label, variant = "soft") {
+  const match = [...document.querySelectorAll("h1, h2, h3, h4, p, span, div")]
+    .find((element) => textOf(element) === label);
+  const card = closestCard(match);
+  if (card) card.dataset.appSurfaceCard = variant;
+}
+
 function markConsistentSurfaceCards() {
   document.querySelectorAll("[data-app-surface-card]").forEach((element) => element.removeAttribute("data-app-surface-card"));
-  const labels = ["Inactive programmes", "Exercise Library", "Stats", "Workout History"];
-  labels.forEach((label) => {
-    const heading = headingWithText(label);
-    const card = closestCard(heading);
-    if (card) card.dataset.appSurfaceCard = "soft";
-  });
+
+  [
+    "Inactive programmes",
+    "Exercise Library",
+    "Stats",
+    "Workout History",
+    "Weight progress",
+    "Training mode",
+    "Surgery date",
+    "Account",
+  ].forEach((label) => markCardByExactText(label, "section"));
+
+  ["Improvement", "Latest performance", "Best set"].forEach((label) => markCardByExactText(label, "metric"));
+
+  [
+    "Today's Tasks",
+    "Active Programme",
+    "Last Workout",
+    "Rehab timeline",
+    "Active",
+  ].forEach((label) => markCardByExactText(label, "summary"));
 }
 
 function apply() {
   removeLeakedProgrammeCards();
   removeSessionNotes();
+  openActiveWorkoutDirectly();
   markQuickWorkoutBuilder();
   markWorkoutStateCard();
   markConsistentSurfaceCards();

@@ -62,9 +62,11 @@ html[data-app-blue-tinge="true"] .min-h-screen {
   display: none !important;
 }
 
+/* Editor and modal panels must be opaque so the page underneath cannot show through. */
 [data-app-dialog-panel="true"] {
   border: 1px solid rgb(191 219 254 / 0.58) !important;
-  background: linear-gradient(100deg, rgb(239 246 255 / 0.3) 0%, rgb(248 250 252 / 0.99) 40%, rgb(255 255 255) 82%) !important;
+  background: linear-gradient(100deg, rgb(239 246 255) 0%, rgb(248 250 252) 40%, rgb(255 255 255) 82%) !important;
+  background-color: rgb(255 255 255) !important;
   box-shadow: 0 22px 60px rgb(15 23 42 / 0.18), 0 3px 10px rgb(29 78 216 / 0.045) !important;
 }
 

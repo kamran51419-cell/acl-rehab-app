@@ -74,18 +74,23 @@
     if (text(badge.textContent) !== expected) badge.textContent = expected;
   }
 
-  function selectWorkoutTab() {
+  function selectWorkoutTabOnce() {
     const workoutButton = [...document.querySelectorAll("button")].find((button) => text(button.textContent) === "Workout");
-    workoutButton?.click();
+    if (!workoutButton) return;
+
+    const alreadySelected = workoutButton.getAttribute("aria-current") === "page"
+      || workoutButton.getAttribute("aria-selected") === "true"
+      || workoutButton.dataset.active === "true";
+
+    if (!alreadySelected) workoutButton.click();
   }
 
-  // The app currently resets to Home when the confirmed discard clears the active workout.
-  // Re-select Workout only after the confirmation button is pressed, not when opening the dialog.
+  // Wait for the discard state update to finish, then correct the tab at most once.
+  // The previous version clicked Workout twice, which caused the visible glitch.
   document.addEventListener("click", (event) => {
     const button = event.target.closest("button");
     if (!button?.matches("[data-confirm-discard]")) return;
-    window.setTimeout(selectWorkoutTab, 50);
-    window.setTimeout(selectWorkoutTab, 250);
+    window.setTimeout(selectWorkoutTabOnce, 120);
   }, true);
 
   // Replace the older broad helper so it only removes "both" for Standard.

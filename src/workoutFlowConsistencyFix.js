@@ -8,9 +8,9 @@ function headingWithText(text) {
 
 function closestCard(element) {
   if (!element) return null;
-  const rounded = element.closest("[class*='rounded-2xl'], [class*='rounded-3xl']");
+  const rounded = element.closest("[class*='rounded-xl'], [class*='rounded-2xl'], [class*='rounded-3xl']");
   if (rounded) return rounded;
-  return element.closest("section.border, article.border");
+  return element.closest("section.border, article.border, button.border");
 }
 
 function removeLeakedProgrammeCards() {
@@ -66,18 +66,27 @@ function manageWorkoutOptionsNavigation() {
   continueButton.click();
 }
 
-function markCardByExactText(label, variant = "soft") {
-  const match = [...document.querySelectorAll("h1, h2, h3, h4, p, span, div")].find((element) => textOf(element) === label);
-  const card = closestCard(match);
-  if (card) card.dataset.appSurfaceCard = variant;
-  return card;
+function allExactText(label) {
+  return [...document.querySelectorAll("h1, h2, h3, h4, p, span, div")].filter((element) => textOf(element) === label);
+}
+
+function markCardsByExactText(label, variant = "soft") {
+  const cards = new Set();
+  allExactText(label).forEach((match) => {
+    const card = closestCard(match);
+    if (card) {
+      card.dataset.appSurfaceCard = variant;
+      cards.add(card);
+    }
+  });
+  return [...cards];
 }
 
 function markFollowingCard(label, variant = "section") {
   const heading = headingWithText(label);
   if (!heading) return null;
   let candidate = heading.nextElementSibling;
-  while (candidate && !candidate.matches("[class*='rounded-2xl'], [class*='rounded-3xl'], section.border, article.border")) candidate = candidate.nextElementSibling;
+  while (candidate && !candidate.matches("[class*='rounded-xl'], [class*='rounded-2xl'], [class*='rounded-3xl'], section.border, article.border")) candidate = candidate.nextElementSibling;
   if (candidate) candidate.dataset.appSurfaceCard = variant;
   return candidate;
 }
@@ -101,7 +110,7 @@ function markTimelineCards() {
   [...document.querySelectorAll("div, p, span")]
     .filter((element) => /(?:days|weeks|months) post-op$/i.test(textOf(element)))
     .forEach((label) => {
-      const card = closestCard(label);
+      const card = closestCard(label) || label.parentElement;
       if (card) card.dataset.appSurfaceCard = "metric";
     });
 }
@@ -131,12 +140,8 @@ function markProgrammeActiveCard() {
     });
 }
 
-function markTabs() {
+function clearTabOverrides() {
   document.querySelectorAll("[data-app-tab-surface]").forEach((element) => element.removeAttribute("data-app-tab-surface"));
-  const labels = new Set(["Active", "Inactive", "Draft", "Archived", "Stats", "Workout History", "Sessions", "Exercises", "Details", "All", "Strength", "Cardio", "Plyometric", "Balance", "Mobility", "Stretch", "Other"]);
-  [...document.querySelectorAll("button")]
-    .filter((button) => labels.has(textOf(button)))
-    .forEach((button) => { button.dataset.appTabSurface = button.getAttribute("aria-selected") === "true" || button.className.includes("bg-blue") ? "selected" : "true"; });
 }
 
 function markBroadSuitableCards() {
@@ -146,8 +151,9 @@ function markBroadSuitableCards() {
       if (!card.dataset.appSurfaceCard && !card.dataset.workoutStateCard) card.dataset.appSurfaceCard = "soft";
     });
   });
+
   [...document.querySelectorAll("h2, h3")]
-    .filter((heading) => ["Bench press", "Bike"].includes(textOf(heading)) || heading.closest("[data-quick-workout-builder='true']"))
+    .filter((heading) => heading.closest("[data-quick-workout-builder='true']") || heading.closest("section[class*='rounded-'], article[class*='rounded-']"))
     .forEach((heading) => {
       const card = closestCard(heading);
       if (card && !card.dataset.appSurfaceCard) card.dataset.appSurfaceCard = "exercise";
@@ -156,12 +162,19 @@ function markBroadSuitableCards() {
 
 function markConsistentSurfaceCards() {
   document.querySelectorAll("[data-app-surface-card]").forEach((element) => element.removeAttribute("data-app-surface-card"));
-  ["Inactive programmes", "Exercise Library", "Training mode", "Surgery date", "Account", "Today's Tasks", "Due tasks", "Needs attention"]
-    .forEach((label) => markCardByExactText(label, "section"));
+
+  ["Settings", "Inactive programmes", "Exercise Library", "Training mode", "Surgery date", "Account", "Today's Tasks", "Due tasks", "Needs attention"]
+    .forEach((label) => markCardsByExactText(label, "section"));
+
   ["Improvement", "Latest performance", "Best set", "Last Workout"]
-    .forEach((label) => markCardByExactText(label, "metric"));
+    .forEach((label) => markCardsByExactText(label, "metric"));
+
+  ["New programme"]
+    .forEach((label) => markCardsByExactText(label, "active"));
+
   ["Weight progress", "Stats", "Workout History"]
     .forEach((label) => markFollowingCard(label, "section"));
+
   markTimelineCards();
   markProgrammeActiveCard();
   markBroadSuitableCards();
@@ -171,7 +184,7 @@ function markPageAndDialogSurfaces() {
   document.documentElement.dataset.appBlueTinge = "true";
   document.querySelectorAll("[data-app-dialog-panel]").forEach((element) => element.removeAttribute("data-app-dialog-panel"));
   document.querySelectorAll(".fixed.inset-0").forEach((overlay) => {
-    const panel = [...overlay.children].find((child) => child.matches("[class*='rounded-2xl'], [class*='rounded-3xl']"));
+    const panel = [...overlay.children].find((child) => child.matches("[class*='rounded-xl'], [class*='rounded-2xl'], [class*='rounded-3xl']"));
     if (panel) panel.dataset.appDialogPanel = "true";
   });
 }
@@ -183,8 +196,8 @@ function apply() {
   markQuickWorkoutBuilder();
   markWorkoutStateCard();
   markQuickWorkoutButtons();
+  clearTabOverrides();
   markConsistentSurfaceCards();
-  markTabs();
   markPageAndDialogSurfaces();
 }
 

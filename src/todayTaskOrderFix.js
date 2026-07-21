@@ -11,20 +11,39 @@ function directTaskSection(routine, title) {
   }) || null
 }
 
+function removeVerticalSpace(element) {
+  if (!element) return
+  element.style.setProperty('margin-top', '0', 'important')
+  element.style.setProperty('margin-bottom', '0', 'important')
+}
+
 function compactTaskSection(section) {
   if (!section) return
 
-  section.style.setProperty('gap', '0.375rem')
+  section.style.setProperty('gap', '0.25rem', 'important')
+  removeVerticalSpace(section)
 
-  const rows = section.querySelectorAll('article')
-  rows.forEach((row) => {
-    row.style.setProperty('min-height', '3rem')
-    row.style.setProperty('padding-top', '0.375rem')
-    row.style.setProperty('padding-bottom', '0.375rem')
-  })
+  ;[...section.children].forEach(removeVerticalSpace)
+
+  const header = [...section.children].find((child) => child.querySelector('h3'))
+  if (header) {
+    header.style.setProperty('min-height', 'auto', 'important')
+    removeVerticalSpace(header)
+  }
 
   const rowList = [...section.children].find((child) => child.querySelector('article'))
-  rowList?.style.setProperty('gap', '0.25rem')
+  if (rowList) {
+    rowList.style.setProperty('gap', '0.25rem', 'important')
+    removeVerticalSpace(rowList)
+    ;[...rowList.children].forEach(removeVerticalSpace)
+  }
+
+  section.querySelectorAll('article').forEach((row) => {
+    row.style.setProperty('min-height', '2.75rem', 'important')
+    row.style.setProperty('padding-top', '0.25rem', 'important')
+    row.style.setProperty('padding-bottom', '0.25rem', 'important')
+    removeVerticalSpace(row)
+  })
 }
 
 function applyTodayTaskOrder() {
@@ -35,7 +54,8 @@ function applyTodayTaskOrder() {
   const routine = heading?.closest('section')
   if (!routine) return
 
-  routine.style.setProperty('gap', '0.75rem')
+  routine.style.setProperty('gap', '0.625rem', 'important')
+  ;[...routine.children].forEach(removeVerticalSpace)
 
   const due = directTaskSection(routine, 'Due Today')
   const overdue = directTaskSection(routine, 'Overdue')

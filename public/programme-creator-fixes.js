@@ -74,6 +74,20 @@
     if (text(badge.textContent) !== expected) badge.textContent = expected;
   }
 
+  function selectWorkoutTab() {
+    const workoutButton = [...document.querySelectorAll("button")].find((button) => text(button.textContent) === "Workout");
+    workoutButton?.click();
+  }
+
+  // The app currently resets to Home when the confirmed discard clears the active workout.
+  // Re-select Workout only after the confirmation button is pressed, not when opening the dialog.
+  document.addEventListener("click", (event) => {
+    const button = event.target.closest("button");
+    if (!button?.matches("[data-confirm-discard]")) return;
+    window.setTimeout(selectWorkoutTab, 50);
+    window.setTimeout(selectWorkoutTab, 250);
+  }, true);
+
   // Replace the older broad helper so it only removes "both" for Standard.
   window.removeStandardBothLabels = fixProgrammeSummaries;
   window.allowRepeatedProgrammeExercises = makeRepeatedAddsWork;

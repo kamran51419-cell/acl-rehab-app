@@ -22,41 +22,44 @@ html[data-app-blue-tinge="true"] .min-h-screen {
   box-shadow: 0 9px 22px rgb(15 23 42 / 0.045), 0 2px 6px rgb(15 23 42 / 0.025) !important;
 }
 
-/* Active Programme and Last Workout intentionally share exactly the same treatment. */
-[data-app-surface-card="primary-summary"] {
-  border-color: rgb(147 197 253 / 0.56) !important;
-  background: linear-gradient(100deg, rgb(219 234 254 / 0.38) 0%, rgb(239 246 255 / 0.3) 32%, rgb(255 255 255) 78%) !important;
-  box-shadow: 0 10px 24px rgb(29 78 216 / 0.055), 0 2px 6px rgb(15 23 42 / 0.03) !important;
-}
-
-/* Programme/library/stat exercise cards intentionally share one secondary treatment. */
+/* All tappable summary, programme and stats cards use one visible but restrained treatment. */
+[data-app-surface-card="primary-summary"],
 [data-app-surface-card="secondary-card"],
-[data-app-surface-card="exercise"] {
-  border-color: rgb(219 234 254 / 0.62) !important;
-  background: linear-gradient(100deg, rgb(239 246 255 / 0.3) 0%, rgb(248 250 252 / 0.99) 38%, rgb(255 255 255) 80%) !important;
-  box-shadow: 0 9px 22px rgb(15 23 42 / 0.045), 0 2px 6px rgb(15 23 42 / 0.025) !important;
+[data-app-surface-card="exercise"],
+[data-app-surface-card="metric"] {
+  border-color: rgb(191 219 254 / 0.62) !important;
+  background: linear-gradient(100deg, rgb(219 234 254 / 0.4) 0%, rgb(239 246 255 / 0.32) 30%, rgb(255 255 255) 78%) !important;
+  box-shadow: 0 10px 24px rgb(29 78 216 / 0.052), 0 2px 6px rgb(15 23 42 / 0.028) !important;
 }
 
 [data-app-surface-card="section"] {
   background: linear-gradient(100deg, rgb(239 246 255 / 0.26) 0%, rgb(248 250 252 / 0.99) 42%, rgb(255 255 255) 82%) !important;
 }
 
-[data-app-surface-card="metric"] {
-  background: linear-gradient(100deg, rgb(219 234 254 / 0.3) 0%, rgb(239 246 255 / 0.22) 32%, rgb(255 255 255) 78%) !important;
-}
-
 [data-app-surface-card="history-item"] {
   background: linear-gradient(100deg, rgb(239 246 255 / 0.28) 0%, rgb(248 250 252 / 0.99) 40%, rgb(255 255 255) 82%) !important;
 }
 
-/* Remove accidental darker wrappers behind individually styled cards. */
+/* Parent containers stay transparent so individually styled cards never appear boxed in. */
 [data-app-list-wrapper="true"],
 [data-home-summary-wrapper="true"],
 [data-quick-workout-wrapper="true"] {
   background: transparent !important;
+  background-color: transparent !important;
   background-image: none !important;
-  border-color: transparent !important;
+  border: 0 !important;
+  outline: 0 !important;
   box-shadow: none !important;
+}
+
+[data-app-list-wrapper="true"]::before,
+[data-app-list-wrapper="true"]::after,
+[data-home-summary-wrapper="true"]::before,
+[data-home-summary-wrapper="true"]::after,
+[data-quick-workout-wrapper="true"]::before,
+[data-quick-workout-wrapper="true"]::after {
+  content: none !important;
+  display: none !important;
 }
 
 [data-app-dialog-panel="true"] {

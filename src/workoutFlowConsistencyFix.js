@@ -6,11 +6,26 @@ function headingWithText(text) {
   return [...document.querySelectorAll("h1, h2, h3")].find((heading) => textOf(heading) === text);
 }
 
-function removeLeakedHomeCards() {
+function closestCard(element) {
+  return element?.closest("section, article, [class*='rounded-2xl'], [class*='rounded-3xl']") || null;
+}
+
+function removeLeakedProgrammeCards() {
   const quickWorkoutOpen = Boolean(headingWithText("Quick Workout"));
   const workoutInProgress = Boolean(headingWithText("Workout in progress"));
   if (!quickWorkoutOpen && !workoutInProgress) return;
+
   document.querySelectorAll("[data-home-summary-cards]").forEach((element) => element.remove());
+
+  [...document.querySelectorAll("h1, h2, h3, p, span, div")]
+    .filter((element) => {
+      const text = textOf(element).toLowerCase();
+      return text === "active programme" || text === "last workout";
+    })
+    .forEach((label) => {
+      const card = closestCard(label);
+      if (card && !card.querySelector("h1, h2, h3")?.textContent?.includes("Workout in progress")) card.remove();
+    });
 }
 
 function removeSessionNotes() {
@@ -33,38 +48,35 @@ function removeSessionNotes() {
 function markQuickWorkoutBuilder() {
   document.querySelectorAll("[data-quick-workout-builder]").forEach((element) => element.removeAttribute("data-quick-workout-builder"));
   const heading = headingWithText("Quick Workout");
-  if (!heading) {
-    document.documentElement.classList.remove("quick-workout-builder-open");
-    return;
-  }
-
+  if (!heading) return;
   const screen = heading.closest(".space-y-5, .space-y-6") || heading.parentElement;
   if (screen) screen.dataset.quickWorkoutBuilder = "true";
-  document.documentElement.classList.add("quick-workout-builder-open");
 }
 
-function markWorkoutStateCards() {
+function markWorkoutStateCard() {
   document.querySelectorAll("[data-workout-state-card]").forEach((element) => element.removeAttribute("data-workout-state-card"));
   const heading = headingWithText("Workout in progress");
   if (!heading) return;
-  const card = heading.closest("section");
+  const card = closestCard(heading);
   if (card) card.dataset.workoutStateCard = "progress";
 }
 
-function markWorkoutLanding() {
-  document.querySelectorAll("[data-workout-landing]").forEach((element) => element.removeAttribute("data-workout-landing"));
-  const quickButton = [...document.querySelectorAll("button")].find((button) => textOf(button) === "Quick Workout");
-  if (!quickButton || headingWithText("Quick Workout") || headingWithText("Workout in progress")) return;
-  const screen = quickButton.closest(".space-y-5") || quickButton.parentElement;
-  if (screen) screen.dataset.workoutLanding = "true";
+function markConsistentSurfaceCards() {
+  document.querySelectorAll("[data-app-surface-card]").forEach((element) => element.removeAttribute("data-app-surface-card"));
+  const labels = ["Inactive programmes", "Exercise Library", "Stats", "Workout History"];
+  labels.forEach((label) => {
+    const heading = headingWithText(label);
+    const card = closestCard(heading);
+    if (card) card.dataset.appSurfaceCard = "soft";
+  });
 }
 
 function apply() {
-  removeLeakedHomeCards();
+  removeLeakedProgrammeCards();
   removeSessionNotes();
   markQuickWorkoutBuilder();
-  markWorkoutStateCards();
-  markWorkoutLanding();
+  markWorkoutStateCard();
+  markConsistentSurfaceCards();
 }
 
 export function installWorkoutFlowConsistencyFix() {

@@ -31,17 +31,17 @@ function enableRepeatedExerciseAdds(editor) {
   })
 }
 
-function cleanStandardSummaries(editor) {
-  editor.querySelectorAll("[class*='text-slate-500']").forEach((label) => {
+function cleanStandardSummaries(root = document) {
+  root.querySelectorAll("[class*='text-slate-500']").forEach((label) => {
     const text = textOf(label)
     if (!/^\d+\s*[×x]\s*(?:\d+|\d+[–-]\d+)\s+both$/i.test(text)) return
 
-    const exerciseCard = label.closest("[class*='rounded-xl']")
+    const exerciseCard = label.closest("[class*='rounded-xl'], [class*='rounded-2xl']")
     const sideSelect = [...(exerciseCard?.querySelectorAll('select') || [])].find((select) =>
-      [...select.options].some((option) => option.textContent === 'Standard'),
+      [...select.options].some((option) => textOf(option) === 'Standard'),
     )
 
-    if (sideSelect?.selectedOptions?.[0]?.textContent === 'Standard') {
+    if (sideSelect?.selectedOptions?.[0] && textOf(sideSelect.selectedOptions[0]) === 'Standard') {
       label.textContent = text.replace(/\s+both$/i, '')
     }
   })
@@ -55,12 +55,32 @@ function prepareNumericInputs(editor) {
   })
 }
 
+function ensureDiscardDialogVisible() {
+  const heading = [...document.querySelectorAll('h1, h2, h3')].find(
+    (element) => textOf(element) === 'Discard changes?',
+  )
+  const dialog = heading?.closest('[role="dialog"]')
+  const overlay = dialog?.parentElement
+  if (!dialog || !overlay) return
+
+  overlay.style.setProperty('z-index', '10000', 'important')
+  overlay.style.setProperty('pointer-events', 'auto', 'important')
+  dialog.style.setProperty('pointer-events', 'auto', 'important')
+  overlay.querySelectorAll('button').forEach((button) => {
+    button.style.setProperty('pointer-events', 'auto', 'important')
+    button.disabled = false
+    button.removeAttribute('disabled')
+  })
+}
+
 function applyProgrammeCreatorFixes() {
   const editor = programmeEditor()
-  if (!editor) return
-  enableRepeatedExerciseAdds(editor)
-  cleanStandardSummaries(editor)
-  prepareNumericInputs(editor)
+  if (editor) {
+    enableRepeatedExerciseAdds(editor)
+    prepareNumericInputs(editor)
+  }
+  cleanStandardSummaries(document)
+  ensureDiscardDialogVisible()
 }
 
 export function installProgrammeCreatorInputFixes() {
@@ -83,22 +103,26 @@ export function installProgrammeCreatorInputFixes() {
     button.setAttribute('aria-disabled', 'false')
   }
 
-  const ensureCloseIsClickable = (event) => {
+  const handleProgrammeClose = (event) => {
     const button = event.target?.closest?.('button')
     if (!button || textOf(button) !== 'Close') return
     const editor = programmeEditor()
     if (!editor || !editor.contains(button)) return
+
     button.disabled = false
     button.removeAttribute('disabled')
     button.style.pointerEvents = 'auto'
+    requestAnimationFrame(() => {
+      ensureDiscardDialogVisible()
+      setTimeout(ensureDiscardDialogVisible, 0)
+    })
   }
 
   document.addEventListener('focusin', selectNumericInput)
   document.addEventListener('pointerup', selectNumericInput)
   document.addEventListener('pointerdown', unlockPickerButton, true)
   document.addEventListener('touchstart', unlockPickerButton, true)
-  document.addEventListener('pointerdown', ensureCloseIsClickable, true)
-  document.addEventListener('touchstart', ensureCloseIsClickable, true)
+  document.addEventListener('click', handleProgrammeClose, true)
 
   let queued = false
   const schedule = () => {
@@ -112,7 +136,7 @@ export function installProgrammeCreatorInputFixes() {
 
   applyProgrammeCreatorFixes()
   const observer = new MutationObserver(schedule)
-  observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['disabled'] })
+  observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['disabled', 'value'] })
 
   return () => {
     observer.disconnect()
@@ -120,7 +144,6 @@ export function installProgrammeCreatorInputFixes() {
     document.removeEventListener('pointerup', selectNumericInput)
     document.removeEventListener('pointerdown', unlockPickerButton, true)
     document.removeEventListener('touchstart', unlockPickerButton, true)
-    document.removeEventListener('pointerdown', ensureCloseIsClickable, true)
-    document.removeEventListener('touchstart', ensureCloseIsClickable, true)
+    document.removeEventListener('click', handleProgrammeClose, true)
   }
 }

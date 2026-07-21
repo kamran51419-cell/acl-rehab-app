@@ -32,7 +32,22 @@
 }
 
 [data-final-stats-card="true"] {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  overflow: hidden !important;
+  outline: 0 !important;
+  box-shadow: none !important;
   background-color: transparent !important;
+  background-clip: padding-box !important;
+  filter: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+[data-final-stats-card="true"]:focus,
+[data-final-stats-card="true"]:focus-visible,
+[data-final-stats-card="true"]:active,
+[data-final-stats-card="true"]:hover {
+  outline: 0 !important;
   box-shadow: none !important;
 }
 

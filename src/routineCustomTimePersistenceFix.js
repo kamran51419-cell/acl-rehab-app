@@ -27,18 +27,26 @@ function preserveSelectValue(select) {
   const value = reactControlledValue(select);
   if (!value || value === "anytime" || value === "morning" || value === "afternoon" || value === "evening") return;
 
+  const alreadyHydrated = select.dataset.hydratedRoutineTimeValue === value;
   select.dataset.savedRoutineTimeValue = value;
 
+  let changed = false;
   if (![...select.options].some((option) => option.value === value)) {
     select.add(new Option(value, value));
+    changed = true;
   }
 
   if (select.value !== value) {
     const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value")?.set;
     setter?.call(select, value);
+    changed = true;
   }
 
-  if (select.dataset.multiRoutineTime === "true") {
+  // Re-render the enhanced control once after restoring the saved option.
+  // Do not dispatch on every MutationObserver pass: that continuously replaced
+  // the buttons while the user was clicking them and made the controls appear frozen.
+  if (changed && !alreadyHydrated && select.dataset.multiRoutineTime === "true") {
+    select.dataset.hydratedRoutineTimeValue = value;
     select.dispatchEvent(new Event("change", { bubbles: false }));
   }
 }

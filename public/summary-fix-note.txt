@@ -1,1 +1,0 @@
-Safe programme summary and exercise count fixes.

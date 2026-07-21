@@ -32,5 +32,37 @@
 }
 
 [data-final-stats-card="true"] {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  overflow: hidden !important;
+  outline: 0 !important;
+  box-shadow: none !important;
   background-color: transparent !important;
+  background-clip: padding-box !important;
+  filter: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+[data-final-stats-card="true"]:focus,
+[data-final-stats-card="true"]:focus-visible,
+[data-final-stats-card="true"]:active,
+[data-final-stats-card="true"]:hover {
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
+/* The Stats list wrapper must stay invisible so only the exercise card is visible. */
+[data-final-stats-wrapper="true"] {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
+[data-final-stats-wrapper="true"]::before,
+[data-final-stats-wrapper="true"]::after {
+  content: none !important;
+  display: none !important;
 }

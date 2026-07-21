@@ -29,15 +29,23 @@ function markProgrammeEditor() {
 }
 
 function markStatsExerciseCards() {
-  document.querySelectorAll('[data-final-stats-card]').forEach((element) => {
+  document.querySelectorAll('[data-final-stats-card], [data-final-stats-wrapper]').forEach((element) => {
     element.removeAttribute('data-final-stats-card')
+    element.removeAttribute('data-final-stats-wrapper')
   })
 
   ;[...document.querySelectorAll('button, a, div, span')]
     .filter((element) => textOf(element) === 'View stats')
     .forEach((label) => {
       const card = closestRoundedCard(label)
-      if (card) card.dataset.finalStatsCard = 'true'
+      if (!card) return
+
+      card.dataset.finalStatsCard = 'true'
+
+      const wrapper = card.parentElement
+      if (wrapper && wrapper.children.length === 1) {
+        wrapper.dataset.finalStatsWrapper = 'true'
+      }
     })
 }
 

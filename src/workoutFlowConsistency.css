@@ -3,41 +3,42 @@ html[data-app-blue-tinge="true"] body,
 html[data-app-blue-tinge="true"] #root,
 html[data-app-blue-tinge="true"] .min-h-screen {
   background:
-    radial-gradient(circle at top left, rgb(219 234 254 / 0.18), transparent 32rem),
-    linear-gradient(180deg, rgb(248 250 252), rgb(245 247 250 / 0.99) 62%, rgb(239 246 255 / 0.2)) !important;
+    radial-gradient(circle at top left, rgb(219 234 254 / 0.21), transparent 32rem),
+    linear-gradient(180deg, rgb(248 250 252), rgb(245 247 250 / 0.99) 62%, rgb(239 246 255 / 0.23)) !important;
 }
 
 [data-quick-workout-builder="true"] {
   margin-inline: auto;
   max-width: 64rem;
   border-radius: 1.5rem;
-  background: linear-gradient(100deg, rgb(239 246 255 / 0.34) 0%, rgb(248 250 252 / 0.98) 40%, rgb(255 255 255) 80%) !important;
+  background: linear-gradient(100deg, rgb(219 234 254 / 0.32) 0%, rgb(248 250 252 / 0.98) 40%, rgb(255 255 255) 80%) !important;
 }
 
 [data-workout-state-card="progress"],
 [data-app-surface-card] {
   overflow: hidden;
-  border-color: rgb(219 234 254 / 0.64) !important;
-  background: linear-gradient(100deg, rgb(239 246 255 / 0.3) 0%, rgb(248 250 252 / 0.99) 38%, rgb(255 255 255) 80%) !important;
-  box-shadow: 0 9px 22px rgb(15 23 42 / 0.045), 0 2px 6px rgb(15 23 42 / 0.025) !important;
+  border-color: rgb(191 219 254 / 0.68) !important;
+  background: linear-gradient(100deg, rgb(219 234 254 / 0.36) 0%, rgb(239 246 255 / 0.29) 32%, rgb(255 255 255) 79%) !important;
+  box-shadow: 0 9px 22px rgb(15 23 42 / 0.05), 0 2px 6px rgb(15 23 42 / 0.03) !important;
 }
 
-/* All tappable summary, programme and stats cards use one visible but restrained treatment. */
+/* All tappable summary, programme, metric and stats cards share one visible treatment. */
 [data-app-surface-card="primary-summary"],
 [data-app-surface-card="secondary-card"],
 [data-app-surface-card="exercise"],
-[data-app-surface-card="metric"] {
-  border-color: rgb(191 219 254 / 0.62) !important;
-  background: linear-gradient(100deg, rgb(219 234 254 / 0.4) 0%, rgb(239 246 255 / 0.32) 30%, rgb(255 255 255) 78%) !important;
-  box-shadow: 0 10px 24px rgb(29 78 216 / 0.052), 0 2px 6px rgb(15 23 42 / 0.028) !important;
+[data-app-surface-card="metric"],
+[data-app-list-card="true"] {
+  border-color: rgb(147 197 253 / 0.68) !important;
+  background: linear-gradient(100deg, rgb(191 219 254 / 0.48) 0%, rgb(219 234 254 / 0.36) 31%, rgb(255 255 255) 78%) !important;
+  box-shadow: 0 10px 24px rgb(29 78 216 / 0.06), 0 2px 6px rgb(15 23 42 / 0.03) !important;
 }
 
 [data-app-surface-card="section"] {
-  background: linear-gradient(100deg, rgb(239 246 255 / 0.26) 0%, rgb(248 250 252 / 0.99) 42%, rgb(255 255 255) 82%) !important;
+  background: linear-gradient(100deg, rgb(219 234 254 / 0.3) 0%, rgb(248 250 252 / 0.99) 42%, rgb(255 255 255) 82%) !important;
 }
 
 [data-app-surface-card="history-item"] {
-  background: linear-gradient(100deg, rgb(239 246 255 / 0.28) 0%, rgb(248 250 252 / 0.99) 40%, rgb(255 255 255) 82%) !important;
+  background: linear-gradient(100deg, rgb(219 234 254 / 0.32) 0%, rgb(248 250 252 / 0.99) 40%, rgb(255 255 255) 82%) !important;
 }
 
 /* Parent containers stay transparent so individually styled cards never appear boxed in. */
@@ -62,12 +63,35 @@ html[data-app-blue-tinge="true"] .min-h-screen {
   display: none !important;
 }
 
-/* Editor and modal panels must be opaque so the page underneath cannot show through. */
-[data-app-dialog-panel="true"] {
-  border: 1px solid rgb(191 219 254 / 0.58) !important;
-  background: linear-gradient(100deg, rgb(239 246 255) 0%, rgb(248 250 252) 40%, rgb(255 255 255) 82%) !important;
+/* Every full-screen modal gets an opaque backdrop so the page beneath cannot show through. */
+.fixed.inset-0 {
+  z-index: 1000 !important;
+  background: rgb(248 250 252) !important;
+}
+
+.fixed.inset-0 > div,
+.fixed.inset-0 [class*="rounded-xl"],
+.fixed.inset-0 [class*="rounded-2xl"],
+.fixed.inset-0 [class*="rounded-3xl"] {
   background-color: rgb(255 255 255) !important;
-  box-shadow: 0 22px 60px rgb(15 23 42 / 0.18), 0 3px 10px rgb(29 78 216 / 0.045) !important;
+}
+
+[data-programme-editor-overlay="true"] {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 1000 !important;
+  overflow-y: auto !important;
+  background: rgb(248 250 252) !important;
+}
+
+[data-programme-editor-panel="true"],
+[data-app-dialog-panel="true"] {
+  position: relative;
+  z-index: 1;
+  border: 1px solid rgb(191 219 254 / 0.64) !important;
+  background: linear-gradient(100deg, rgb(219 234 254 / 0.3) 0%, rgb(248 250 252) 40%, rgb(255 255 255) 82%) !important;
+  background-color: rgb(255 255 255) !important;
+  box-shadow: 0 22px 60px rgb(15 23 42 / 0.18), 0 3px 10px rgb(29 78 216 / 0.05) !important;
 }
 
 /* Quick Workout is one clean soft surface, with no outer white strip or double edge. */
@@ -76,10 +100,10 @@ html[data-app-blue-tinge="true"] .min-h-screen {
   isolation: isolate;
   border: 0 !important;
   outline: 0 !important;
-  background: linear-gradient(100deg, rgb(219 234 254 / 0.56) 0%, rgb(239 246 255 / 0.74) 48%, rgb(248 250 252) 100%) !important;
+  background: linear-gradient(100deg, rgb(219 234 254 / 0.62) 0%, rgb(239 246 255 / 0.78) 48%, rgb(248 250 252) 100%) !important;
   background-clip: padding-box !important;
   color: rgb(30 64 175) !important;
-  box-shadow: 0 7px 17px rgb(29 78 216 / 0.06) !important;
+  box-shadow: 0 7px 17px rgb(29 78 216 / 0.065) !important;
 }
 
 [data-quick-workout-action="true"]::before,
@@ -89,7 +113,7 @@ html[data-app-blue-tinge="true"] .min-h-screen {
 }
 
 [data-quick-workout-action="true"]:hover {
-  background: linear-gradient(100deg, rgb(191 219 254 / 0.58) 0%, rgb(219 234 254 / 0.64) 48%, rgb(239 246 255) 100%) !important;
+  background: linear-gradient(100deg, rgb(191 219 254 / 0.62) 0%, rgb(219 234 254 / 0.68) 48%, rgb(239 246 255) 100%) !important;
 }
 
 /* Tabs and filter chips keep their original solid selected/unselected appearance. */
@@ -149,7 +173,7 @@ html[data-app-blue-tinge="true"] .min-h-screen {
   html[data-app-blue-tinge="true"] #root,
   html[data-app-blue-tinge="true"] .min-h-screen {
     background:
-      radial-gradient(circle at top left, rgb(219 234 254 / 0.14), transparent 20rem),
-      linear-gradient(180deg, rgb(248 250 252), rgb(245 247 250 / 0.99) 66%, rgb(239 246 255 / 0.18)) !important;
+      radial-gradient(circle at top left, rgb(219 234 254 / 0.17), transparent 20rem),
+      linear-gradient(180deg, rgb(248 250 252), rgb(245 247 250 / 0.99) 66%, rgb(239 246 255 / 0.2)) !important;
   }
 }

@@ -45,6 +45,20 @@ function removeSessionNotes() {
   });
 }
 
+function openActiveWorkoutDirectly() {
+  const heading = headingWithText("Workout in progress");
+  if (!heading) return;
+
+  const card = closestCard(heading);
+  if (!card) return;
+
+  const continueButton = [...card.querySelectorAll("button")].find((button) => textOf(button) === "Continue Workout");
+  if (!continueButton || continueButton.dataset.autoContinueHandled === "true") return;
+
+  continueButton.dataset.autoContinueHandled = "true";
+  continueButton.click();
+}
+
 function markQuickWorkoutBuilder() {
   document.querySelectorAll("[data-quick-workout-builder]").forEach((element) => element.removeAttribute("data-quick-workout-builder"));
   const heading = headingWithText("Quick Workout");
@@ -96,6 +110,7 @@ function markConsistentSurfaceCards() {
 function apply() {
   removeLeakedProgrammeCards();
   removeSessionNotes();
+  openActiveWorkoutDirectly();
   markQuickWorkoutBuilder();
   markWorkoutStateCard();
   markConsistentSurfaceCards();

@@ -5,6 +5,7 @@ import './index.css'
 import App from './App.jsx'
 import { installUiRuntimeFixes } from './uiRuntimeFixes'
 import { installProgrammeButtonLabels } from './programmeButtonLabels'
+import { installWorkoutFlowUiFixes } from './workoutFlowUiFixes'
 
 const updateSW = registerSW({
   immediate: true,
@@ -15,6 +16,7 @@ const updateSW = registerSW({
 
 installUiRuntimeFixes()
 installProgrammeButtonLabels()
+installWorkoutFlowUiFixes()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

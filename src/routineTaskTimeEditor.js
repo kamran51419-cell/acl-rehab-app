@@ -1,4 +1,5 @@
 const STANDARD = ["anytime", "morning", "afternoon", "evening"];
+const WEEKDAY_DISPLAY_ORDER = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 
 function parseTimes(value) {
   if (typeof value === "string" && value.startsWith("multi:")) {
@@ -118,6 +119,25 @@ function enhanceSelect(select) {
   select.addEventListener("change", () => requestAnimationFrame(() => renderEditor(select, host)));
 }
 
+function orderRoutineWeekdaysMondayFirst() {
+  document.querySelectorAll("fieldset").forEach((fieldset) => {
+    const legend = fieldset.querySelector(":scope > legend");
+    if (legend?.textContent?.trim() !== "Days") return;
+
+    const labels = [...fieldset.querySelectorAll(":scope > div > label")];
+    if (labels.length !== 7) return;
+
+    const byDay = new Map(labels.map((label) => [label.textContent.trim().slice(0, 3).toLowerCase(), label]));
+    if (!WEEKDAY_DISPLAY_ORDER.every((day) => byDay.has(day))) return;
+
+    const container = labels[0].parentElement;
+    if (!container || container.dataset.weekdaysMondayFirst === "true") return;
+
+    WEEKDAY_DISPLAY_ORDER.forEach((day) => container.appendChild(byDay.get(day)));
+    container.dataset.weekdaysMondayFirst = "true";
+  });
+}
+
 function formatEncodedSummaries() {
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   const nodes = [];
@@ -137,6 +157,7 @@ function formatEncodedSummaries() {
 
 function enhance() {
   document.querySelectorAll("select").forEach(enhanceSelect);
+  orderRoutineWeekdaysMondayFirst();
   formatEncodedSummaries();
 }
 

@@ -41,13 +41,25 @@ function labelFor(value) {
 
 function controlledSelectValue(select) {
   if (select.value) return select.value;
+
   const reactPropsKey = Object.keys(select).find((key) => key.startsWith("__reactProps$"));
-  const reactValue = reactPropsKey ? select[reactPropsKey]?.value : null;
-  return typeof reactValue === "string" && reactValue ? reactValue : "anytime";
+  const reactPropsValue = reactPropsKey ? select[reactPropsKey]?.value : null;
+  if (typeof reactPropsValue === "string" && reactPropsValue) return reactPropsValue;
+
+  const reactFiberKey = Object.keys(select).find((key) => key.startsWith("__reactFiber$"));
+  let fiber = reactFiberKey ? select[reactFiberKey] : null;
+  while (fiber) {
+    const value = fiber.memoizedProps?.value ?? fiber.pendingProps?.value;
+    if (typeof value === "string" && value) return value;
+    fiber = fiber.return;
+  }
+
+  return select.dataset.routineTimeValue || "anytime";
 }
 
 function commit(select, selected, customTimes) {
   const value = encodeState(selected, customTimes);
+  select.dataset.routineTimeValue = value;
   if (![...select.options].some((option) => option.value === value)) {
     select.add(new Option(value, value));
   }
@@ -87,7 +99,9 @@ function customTimeBox(time, selected, onToggle, onDelete) {
 }
 
 function renderEditor(select, host) {
-  const { selected, customTimes } = parseState(controlledSelectValue(select));
+  const value = controlledSelectValue(select);
+  select.dataset.routineTimeValue = value;
+  const { selected, customTimes } = parseState(value);
   host.replaceChildren();
 
   const options = document.createElement("div");

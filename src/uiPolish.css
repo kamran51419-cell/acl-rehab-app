@@ -1,4 +1,4 @@
-/* Final visual polish: consistent cards, compact spacing, charts and mobile navigation. */
+/* Final visual polish: consistent cards, compact spacing, charts, navigation and motion. */
 :root {
   --app-card-radius: 1.25rem;
   --app-card-shadow: 0 8px 24px rgb(15 23 42 / 0.06), 0 1px 3px rgb(15 23 42 / 0.08);
@@ -10,6 +10,46 @@
   --app-accent-600: #2563eb;
   --app-accent-700: #1d4ed8;
   --app-accent-800: #1e40af;
+  --app-motion-fast: 140ms;
+  --app-motion-standard: 190ms;
+  --app-motion-slow: 240ms;
+  --app-motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes app-content-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes app-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Screen and tab content changes */
+main > * {
+  animation: app-content-enter var(--app-motion-standard) var(--app-motion-ease) both;
+}
+
+main section > .space-y-3,
+main section > .space-y-4,
+main section > .space-y-5,
+main section > .grid,
+main section > .rounded-2xl,
+main section > .rounded-3xl {
+  animation: app-content-enter var(--app-motion-standard) var(--app-motion-ease) both;
 }
 
 /* Premium but restrained card treatment */
@@ -28,12 +68,46 @@
   min-height: 8.25rem;
   height: 100%;
   border-radius: var(--app-card-radius) !important;
-  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+button,
+a,
+[role="button"],
+.rounded-2xl.border,
+.rounded-3xl.border,
+input,
+select,
+textarea {
+  transition:
+    transform var(--app-motion-fast) var(--app-motion-ease),
+    opacity var(--app-motion-fast) ease,
+    color var(--app-motion-fast) ease,
+    background-color var(--app-motion-fast) ease,
+    border-color var(--app-motion-fast) ease,
+    box-shadow var(--app-motion-standard) var(--app-motion-ease);
+}
+
+button:not(:disabled):active,
+[role="button"]:not([aria-disabled="true"]):active {
+  transform: scale(0.98);
+}
+
+button:disabled {
+  transition-duration: 100ms;
+}
+
+@media (hover: hover) {
+  button.rounded-2xl:hover,
+  button.rounded-3xl:hover,
+  [role="button"].rounded-2xl:hover,
+  [role="button"].rounded-3xl:hover,
+  [data-home-summary-cards] > button:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--app-card-shadow-hover) !important;
+  }
 }
 
 [data-home-summary-cards] > button:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--app-card-shadow-hover) !important;
   border-color: var(--app-accent-200) !important;
 }
 
@@ -87,6 +161,41 @@ textarea:focus {
   text-decoration-color: var(--app-accent-500);
 }
 
+/* Expand/collapse and disclosure polish */
+details > summary {
+  cursor: pointer;
+  transition: color var(--app-motion-fast) ease, background-color var(--app-motion-fast) ease;
+}
+
+details[open] > :not(summary) {
+  animation: app-content-enter var(--app-motion-standard) var(--app-motion-ease) both;
+}
+
+button[aria-expanded] svg,
+summary svg {
+  transition: transform var(--app-motion-standard) var(--app-motion-ease);
+}
+
+button[aria-expanded="true"] svg,
+details[open] > summary svg {
+  transform: rotate(180deg);
+}
+
+/* Workout completion feedback */
+input[type="checkbox"] {
+  transition: transform var(--app-motion-fast) var(--app-motion-ease), accent-color var(--app-motion-fast) ease;
+}
+
+input[type="checkbox"]:checked {
+  animation: app-pop-in var(--app-motion-standard) var(--app-motion-ease) both;
+  accent-color: var(--app-accent-700);
+}
+
+label:has(input[type="checkbox"]:checked),
+.rounded-2xl:has(input[type="checkbox"]:checked) {
+  transition: background-color var(--app-motion-standard) ease, border-color var(--app-motion-standard) ease;
+}
+
 /* Keep spacing comfortable without wasting phone space */
 @media (max-width: 639px) {
   .min-h-screen.bg-slate-50.p-4 {
@@ -118,6 +227,10 @@ textarea:focus {
   overflow: visible;
 }
 
+.recharts-wrapper {
+  animation: app-content-enter var(--app-motion-slow) var(--app-motion-ease) both;
+}
+
 .recharts-cartesian-grid line {
   stroke: #dbe7f5;
   stroke-opacity: 0.75;
@@ -143,10 +256,12 @@ textarea:focus {
   border-radius: 0.875rem !important;
   box-shadow: 0 10px 25px rgb(15 23 42 / 0.12) !important;
   padding: 0.65rem 0.8rem !important;
+  animation: app-pop-in var(--app-motion-fast) var(--app-motion-ease) both;
 }
 
 .recharts-legend-wrapper {
   font-size: 12px;
+  animation: app-content-enter var(--app-motion-slow) var(--app-motion-ease) both;
 }
 
 @media (max-width: 639px) {
@@ -174,7 +289,6 @@ textarea:focus {
   min-height: 3.5rem;
   padding: 0.45rem 0.25rem !important;
   border: 1px solid transparent;
-  transition: background-color 150ms ease, color 150ms ease, transform 150ms ease, border-color 150ms ease;
 }
 
 .fixed.bottom-0.left-0.right-0.z-20.border-t button.bg-slate-100 {
@@ -190,8 +304,8 @@ textarea:focus {
   color: var(--app-accent-700);
 }
 
-.fixed.bottom-0.left-0.right-0.z-20.border-t button:active {
-  transform: scale(0.97);
+.fixed.bottom-0.left-0.right-0.z-20.border-t button svg {
+  transition: transform var(--app-motion-standard) var(--app-motion-ease), color var(--app-motion-fast) ease;
 }
 
 /* Desktop tabs receive the same subtle polish */
@@ -212,4 +326,16 @@ body,
 #root {
   max-width: 100vw;
   overflow-x: hidden;
+}
+
+/* Accessibility: motion is decorative and can be disabled by the OS setting */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

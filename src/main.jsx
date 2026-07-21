@@ -9,6 +9,7 @@ import { installWorkoutFlowUiFixes } from './workoutFlowUiFixes'
 import { installRoutineTaskTimeEditor } from './routineTaskTimeEditor'
 import { installRoutineCustomTimePersistenceFix } from './routineCustomTimePersistenceFix'
 import { installProgrammeScreenNavigation } from './programmeScreenNavigation'
+import { installDuplicateAndPairedExerciseFix } from './duplicateAndPairedExerciseFix'
 
 const updateSW = registerSW({
   immediate: true,
@@ -23,6 +24,7 @@ installWorkoutFlowUiFixes()
 installRoutineCustomTimePersistenceFix()
 installRoutineTaskTimeEditor()
 installProgrammeScreenNavigation()
+installDuplicateAndPairedExerciseFix()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

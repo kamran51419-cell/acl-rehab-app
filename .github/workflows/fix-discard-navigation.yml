@@ -1,0 +1,56 @@
+name: Apply discard navigation fix
+
+on:
+  push:
+    branches:
+      - fix/discard-react-callback
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fix:
+    if: ${{ !contains(github.event.head_commit.message, '[discard-fix-applied]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/discard-react-callback
+      - name: Fix React discard callback and remove workaround
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          app = Path('src/App.jsx')
+          text = app.read_text()
+          old = 'onDiscarded={() => setActiveTab("home")}'
+          new = 'onDiscarded={() => setActiveTab("workout")}'
+          if old not in text:
+              raise SystemExit('Expected Home discard callback was not found')
+          app.write_text(text.replace(old, new, 1))
+
+          fixes = Path('public/programme-creator-fixes.js')
+          if fixes.exists():
+              script = fixes.read_text()
+              script = script.replace('  let keepWorkoutAfterDiscard = false;\n', '', 1)
+              block_start = script.find('  function workoutTabButton() {')
+              block_end = script.find('  window.removeStandardBothLabels', block_start)
+              if block_start != -1 and block_end != -1:
+                  script = script[:block_start] + script[block_end:]
+              listener_start = script.find('  document.addEventListener("click", (event) => {')
+              if listener_start != -1:
+                  listener_end = script.find('  document.addEventListener("change"', listener_start)
+                  if listener_end != -1:
+                      script = script[:listener_start] + script[listener_end:]
+              script = script.replace('      retainWorkoutTabAfterDiscard();\n', '')
+              fixes.write_text(script)
+
+          Path('.github/workflows/fix-discard-navigation.yml').unlink()
+          PY
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.jsx public/programme-creator-fixes.js .github/workflows/fix-discard-navigation.yml
+          git commit -m "Fix discard navigation in React [discard-fix-applied]"
+          git push origin HEAD:fix/discard-react-callback

@@ -68,20 +68,18 @@ function smoothScrollToSelector(event) {
   const session = button.closest('[id^="programme-session-"]');
   if (!session) return;
 
-  const scroll = () => {
+  let frames = 0;
+  const scrollAsSoonAsReady = () => {
     const selector = selectorInSession(session);
-    if (!selector) return false;
-    selector.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
-    return true;
+    if (selector) {
+      selector.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+      return;
+    }
+    frames += 1;
+    if (frames < 30) requestAnimationFrame(scrollAsSoonAsReady);
   };
 
-  if (scroll()) return;
-  const observer = new MutationObserver(() => {
-    if (!scroll()) return;
-    observer.disconnect();
-  });
-  observer.observe(session, { childList: true, subtree: true });
-  window.setTimeout(() => observer.disconnect(), 350);
+  requestAnimationFrame(scrollAsSoonAsReady);
 }
 
 function styleExerciseSaveButtons() {
@@ -118,12 +116,12 @@ export function installFinalRequestedFixes() {
       apply();
     });
   };
-  document.addEventListener("click", smoothScrollToSelector, false);
+  document.addEventListener("click", smoothScrollToSelector, true);
   apply();
   const observer = new MutationObserver(schedule);
   observer.observe(document.body, { childList: true, subtree: true });
   return () => {
     observer.disconnect();
-    document.removeEventListener("click", smoothScrollToSelector, false);
+    document.removeEventListener("click", smoothScrollToSelector, true);
   };
 }

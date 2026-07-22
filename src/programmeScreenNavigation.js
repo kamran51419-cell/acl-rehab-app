@@ -1,4 +1,5 @@
 const VIEW_KEY = "programme-subview";
+const RETURN_KEY = "programme-library-return-session";
 
 function text(element) {
   return (element?.textContent || "").trim();
@@ -12,11 +13,15 @@ function goToTab(label) {
   findTab(label)?.click();
 }
 
+function countLabel(count) {
+  return `${count} ${count === 1 ? "programme" : "programmes"}`;
+}
+
 function makeChevronRow(label, count, onClick) {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left shadow-sm hover:bg-slate-50";
-  button.innerHTML = `<span><span class="block font-semibold text-slate-900">${label}</span>${Number.isFinite(count) ? `<span class="mt-0.5 block text-sm text-slate-500">${count} ${count === 1 ? "programme" : "programmes"}</span>` : ""}</span><span aria-hidden="true" class="text-2xl leading-none text-slate-400">›</span>`;
+  button.innerHTML = `<span><span class="block font-semibold text-slate-900">${label}</span>${Number.isFinite(count) ? `<span data-programme-count class="mt-0.5 block text-sm text-slate-500">${countLabel(count)}</span>` : ""}</span><span aria-hidden="true" class="text-2xl leading-none text-slate-400">›</span>`;
   button.addEventListener("click", onClick);
   return button;
 }
@@ -52,6 +57,61 @@ function sectionByTitle(root, title) {
   });
 }
 
+function countProgrammeCards(section) {
+  const grid = [...section.children].find((child) => child.matches?.(".grid"));
+  if (grid) return grid.children.length;
+  return [...section.querySelectorAll("button")].filter((button) => text(button) === "Open / edit").length;
+}
+
+function updateInactiveCount(root, inactiveSection) {
+  const countElement = root.querySelector('[data-programme-overview-row="inactive"] [data-programme-count]');
+  if (!countElement) return;
+  const next = countLabel(countProgrammeCards(inactiveSection));
+  if (countElement.textContent !== next) countElement.textContent = next;
+}
+
+function captureLibraryReturn(event) {
+  const button = event.target.closest("button");
+  if (!button || text(button) !== "Manage Exercise Library") return;
+  const session = button.closest('[id^="programme-session-"]');
+  if (session?.id) sessionStorage.setItem(RETURN_KEY, JSON.stringify({ sessionId: session.id, phase: "waiting" }));
+  sessionStorage.setItem(VIEW_KEY, "library");
+  sessionStorage.removeItem("programme-editor-return-state-v1");
+}
+
+function restoreLibraryReturn() {
+  if (sessionStorage.getItem(VIEW_KEY)) return;
+  const raw = sessionStorage.getItem(RETURN_KEY);
+  if (!raw) return;
+
+  let state;
+  try {
+    state = JSON.parse(raw);
+  } catch {
+    sessionStorage.removeItem(RETURN_KEY);
+    return;
+  }
+
+  const session = state.sessionId ? document.getElementById(state.sessionId) : null;
+  if (!session) return;
+
+  const picker = [...session.querySelectorAll('[data-exercise-picker], div.rounded-xl.border-dashed')]
+    .find((item) => /Exercise picker|Search exercises|Manage Exercise Library/i.test(text(item)));
+
+  if (picker) {
+    picker.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
+    sessionStorage.removeItem(RETURN_KEY);
+    return;
+  }
+
+  if (state.phase !== "waiting") return;
+  const addExercise = [...session.querySelectorAll("button")].find((item) => text(item) === "Add exercise");
+  if (!addExercise) return;
+  state.phase = "opening";
+  sessionStorage.setItem(RETURN_KEY, JSON.stringify(state));
+  addExercise.click();
+}
+
 function showProgrammeOverview(root) {
   sessionStorage.removeItem(VIEW_KEY);
   root.querySelectorAll("[data-programme-subview-header]").forEach((item) => item.remove());
@@ -64,6 +124,7 @@ function showProgrammeOverview(root) {
 function showInactiveScreen(root, inactiveSection) {
   sessionStorage.setItem(VIEW_KEY, "inactive");
   [...root.children].forEach((child) => { child.hidden = true; });
+  root.querySelectorAll("[data-programme-subview-header]").forEach((item) => item.remove());
   const header = makeBackHeader("Inactive programmes", () => showProgrammeOverview(root));
   root.prepend(header);
   inactiveSection.hidden = false;
@@ -77,23 +138,27 @@ function openExerciseLibrary() {
 
 function enhanceProgramme() {
   const root = programmeRoot();
-  if (!root || root.dataset.programmeNavigationEnhanced === "true") return;
+  if (!root) return;
 
   const activeSection = sectionByTitle(root, "Active");
   const inactiveSection = sectionByTitle(root, "Inactive");
   if (!activeSection || !inactiveSection) return;
 
+  if (root.dataset.programmeNavigationEnhanced === "true") {
+    updateInactiveCount(root, inactiveSection);
+    return;
+  }
+
   root.dataset.programmeNavigationEnhanced = "true";
   inactiveSection.dataset.programmeHiddenSection = "true";
   inactiveSection.hidden = true;
 
-  const inactiveCount = inactiveSection.querySelectorAll(".grid > div").length;
-  const inactiveRow = makeChevronRow("Inactive programmes", inactiveCount, () => showInactiveScreen(root, inactiveSection));
-  inactiveRow.dataset.programmeOverviewRow = "true";
+  const inactiveRow = makeChevronRow("Inactive programmes", countProgrammeCards(inactiveSection), () => showInactiveScreen(root, inactiveSection));
+  inactiveRow.dataset.programmeOverviewRow = "inactive";
   activeSection.insertAdjacentElement("afterend", inactiveRow);
 
   const libraryRow = makeChevronRow("Exercise Library", undefined, openExerciseLibrary);
-  libraryRow.dataset.programmeOverviewRow = "true";
+  libraryRow.dataset.programmeOverviewRow = "library";
   inactiveRow.insertAdjacentElement("afterend", libraryRow);
 
   if (sessionStorage.getItem(VIEW_KEY) === "inactive") showInactiveScreen(root, inactiveSection);
@@ -138,26 +203,31 @@ function restoreNormalHome() {
   [...container.children].forEach((child) => { child.hidden = child === library; });
 }
 
-function captureProgrammeLibraryButton(event) {
-  const button = event.target.closest("button");
-  if (!button || text(button) !== "Manage Exercise Library") return;
-  sessionStorage.setItem(VIEW_KEY, "library");
-}
-
 function enhance() {
   enhanceProgramme();
   enhanceHomeLibrary();
   restoreNormalHome();
+  restoreLibraryReturn();
 }
 
 export function installProgrammeScreenNavigation() {
   if (typeof document === "undefined" || typeof MutationObserver === "undefined") return () => {};
-  document.addEventListener("click", captureProgrammeLibraryButton, true);
+  let scheduled = false;
+  const scheduleEnhance = () => {
+    if (scheduled) return;
+    scheduled = true;
+    requestAnimationFrame(() => {
+      scheduled = false;
+      enhance();
+    });
+  };
+
+  document.addEventListener("click", captureLibraryReturn, true);
   enhance();
-  const observer = new MutationObserver(() => requestAnimationFrame(enhance));
+  const observer = new MutationObserver(scheduleEnhance);
   observer.observe(document.body, { childList: true, subtree: true });
   return () => {
-    document.removeEventListener("click", captureProgrammeLibraryButton, true);
+    document.removeEventListener("click", captureLibraryReturn, true);
     observer.disconnect();
   };
 }

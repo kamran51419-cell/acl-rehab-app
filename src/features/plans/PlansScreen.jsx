@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { GripVertical, Plus, Search, Trash2 } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, GripVertical, Plus, Search, Trash2 } from "lucide-react";
 import { db } from "../../firebase";
 import Button from "../../components/ui/Button";
 import {
@@ -313,6 +313,7 @@ function PlanEditor({
   const [pickerSession, setPickerSession] = useState(null);
   const [replaceTarget, setReplaceTarget] = useState(null);
   const [activeExerciseId, setActiveExerciseId] = useState("");
+  const exerciseRefs = useRef(new Map());
   const [draggingExercise, setDraggingExercise] = useState(null);
   const [draggingSession, setDraggingSession] = useState(null);
   const [removeSessionIndex, setRemoveSessionIndex] = useState(null);
@@ -322,6 +323,17 @@ function PlanEditor({
   const routineValid = routineTasksForPlan(draft).every((task) => task.name?.trim() && task.days?.length);
   const validationMessages = friendlyPlanValidationMessages(validation.errors);
   const filteredExercises = filterExerciseLibrary(exercises, { query: exerciseQuery });
+
+  useEffect(() => {
+    if (!activeExerciseId) return;
+    const frame = requestAnimationFrame(() => {
+      exerciseRefs.current.get(activeExerciseId)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [activeExerciseId, draft.sessions]);
 
   const setSessions = (sessions) => setDraft({ ...draft, sessions });
   const routineTasks = routineTasksForPlan(draft);
@@ -490,12 +502,16 @@ function PlanEditor({
             <div className="space-y-3">
               {session.exercises.map((exercise, exerciseIndex) => (
                 <div
+                  ref={(node) => {
+                    if (node) exerciseRefs.current.set(exercise.id, node);
+                    else exerciseRefs.current.delete(exercise.id);
+                  }}
                   key={exercise.id}
                   onDragOver={(event) => event.preventDefault()}
                   onDrop={() => draggingExercise?.sessionIndex === sessionIndex && moveExercise(sessionIndex, draggingExercise.exerciseIndex, exerciseIndex)}
-                  className={cls("space-y-3 rounded-xl border bg-white p-3", activeExerciseId === exercise.id ? "border-emerald-400 ring-2 ring-emerald-100" : "border-slate-200")}
+                  className={cls("scroll-mt-24 overflow-hidden rounded-xl border bg-white transition-[border-color,box-shadow] duration-200", activeExerciseId === exercise.id ? "border-emerald-400 ring-2 ring-emerald-100" : "border-slate-200")}
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2 p-3">
                     <div className="flex items-start gap-2">
                       <button
                         type="button"
@@ -512,7 +528,16 @@ function PlanEditor({
                         <div className="text-sm text-slate-500">{planPrescriptionSummary(exercise)}</div>
                       </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setActiveExerciseId((current) => current === exercise.id ? "" : exercise.id)}
+                        className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+                        aria-expanded={activeExerciseId === exercise.id}
+                        aria-label={`${activeExerciseId === exercise.id ? "Collapse" : "Expand"} ${exercise.exerciseNameSnapshot}`}
+                      >
+                        <ChevronDown className={cls("h-5 w-5 transition-transform duration-200", activeExerciseId === exercise.id && "rotate-180")} />
+                      </button>
                       <Button size="sm" variant="outline" onClick={() => openPickerForReplace(sessionIndex, exerciseIndex)}>Change exercise</Button>
                       <Button size="sm" variant="outline" onClick={() => updateSession(sessionIndex, { exercises: [...session.exercises, duplicatePlanExercise(exercise, { sortOrder: session.exercises.length })] })}>Duplicate</Button>
                       <Button size="sm" variant="danger" onClick={() => updateSession(sessionIndex, { exercises: session.exercises.filter((_, index) => index !== exerciseIndex).map((item, index) => ({ ...item, sortOrder: index })) })}>
@@ -521,15 +546,26 @@ function PlanEditor({
                     </div>
                   </div>
 
-                  <ExerciseSetupEditor
-                    exercise={exercise}
-                    onChange={(next) => updateSession(sessionIndex, { exercises: session.exercises.map((item, index) => index === exerciseIndex ? next : item) })}
-                    trainingMode={trainingMode}
-                  />
+                  <div
+                    className={cls(
+                      "grid transition-[grid-template-rows,opacity] duration-300 ease-in-out",
+                      activeExerciseId === exercise.id ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+                    )}
+                  >
+                    <div className="min-h-0 overflow-hidden">
+                      <div className="space-y-3 border-t border-slate-100 p-3 pt-4">
+                        <ExerciseSetupEditor
+                          exercise={exercise}
+                          onChange={(next) => updateSession(sessionIndex, { exercises: session.exercises.map((item, index) => index === exerciseIndex ? next : item) })}
+                          trainingMode={trainingMode}
+                        />
 
-                  <Field label="Notes">
-                    <Textarea value={exercise.notes || ""} onChange={(event) => updateSession(sessionIndex, { exercises: session.exercises.map((item, index) => index === exerciseIndex ? { ...item, notes: event.target.value } : item) })} />
-                  </Field>
+                        <Field label="Notes">
+                          <Textarea value={exercise.notes || ""} onChange={(event) => updateSession(sessionIndex, { exercises: session.exercises.map((item, index) => index === exerciseIndex ? { ...item, notes: event.target.value } : item) })} />
+                        </Field>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               ))}
 
@@ -546,14 +582,13 @@ function PlanEditor({
                   </div>
                       <div className="mt-3 max-h-72 space-y-2 overflow-y-auto">
                         {filteredExercises.length ? filteredExercises.map((libraryExercise) => {
-                          const selected = session.exercises.some((item) => item.exerciseId === libraryExercise.id);
                           return (
                           <div key={libraryExercise.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3">
                             <div className="min-w-0">
                               <div className="truncate font-medium">{libraryExercise.name}</div>
                               <div className="text-xs text-slate-500">{exerciseTypeLabel(libraryExercise.exerciseType || libraryExercise.trackingType)}</div>
                             </div>
-                            <Button size="sm" variant={selected && !replaceTarget ? "outline" : "primary"} disabled={selected && !replaceTarget} onClick={() => chooseExercise(sessionIndex, libraryExercise)}>{replaceTarget ? "Use" : selected ? "Selected" : "Add"}</Button>
+                            <Button size="sm" variant="primary" onClick={() => chooseExercise(sessionIndex, libraryExercise)}>{replaceTarget ? "Use" : "Add"}</Button>
                           </div>
                           );
                         }) : <div className="rounded-xl bg-slate-50 p-4 text-center text-sm text-slate-500">No matching exercises.</div>}

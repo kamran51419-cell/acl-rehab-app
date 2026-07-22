@@ -1,4 +1,5 @@
 const VIEW_KEY = "programme-subview";
+const RETURN_KEY = "programme-library-return";
 
 function text(element) {
   return (element?.textContent || "").trim();
@@ -70,6 +71,24 @@ function showInactiveScreen(root, inactiveSection) {
   inactiveSection.querySelector(":scope > h2")?.classList.add("hidden");
 }
 
+function captureProgrammeReturnState(button) {
+  const editor = button.closest('[data-final-programme-editor="true"]') || programmeRoot();
+  const picker = button.closest('div.rounded-xl.border-dashed, [data-exercise-picker]');
+  const disclosures = editor
+    ? [...editor.querySelectorAll('button[aria-expanded]')].map((item, index) => ({
+        index,
+        expanded: item.getAttribute('aria-expanded') === 'true',
+      }))
+    : [];
+
+  sessionStorage.setItem(RETURN_KEY, JSON.stringify({
+    pageScrollY: window.scrollY,
+    editorScrollTop: editor?.scrollTop || 0,
+    pickerSessionId: picker?.closest('[id^="programme-session-"]')?.id || '',
+    disclosures,
+  }));
+}
+
 function openExerciseLibrary() {
   sessionStorage.setItem(VIEW_KEY, "library");
   goToTab("Home");
@@ -87,7 +106,9 @@ function enhanceProgramme() {
   inactiveSection.dataset.programmeHiddenSection = "true";
   inactiveSection.hidden = true;
 
-  const inactiveCount = inactiveSection.querySelectorAll(".grid > div").length;
+  const inactiveCount = [...inactiveSection.querySelectorAll("button")]
+    .filter((button) => text(button) === "Open / edit")
+    .length;
   const inactiveRow = makeChevronRow("Inactive programmes", inactiveCount, () => showInactiveScreen(root, inactiveSection));
   inactiveRow.dataset.programmeOverviewRow = "true";
   activeSection.insertAdjacentElement("afterend", inactiveRow);
@@ -141,13 +162,56 @@ function restoreNormalHome() {
 function captureProgrammeLibraryButton(event) {
   const button = event.target.closest("button");
   if (!button || text(button) !== "Manage Exercise Library") return;
+  captureProgrammeReturnState(button);
   sessionStorage.setItem(VIEW_KEY, "library");
+}
+
+function restoreProgrammeReturnState() {
+  if (sessionStorage.getItem(VIEW_KEY)) return;
+  const raw = sessionStorage.getItem(RETURN_KEY);
+  if (!raw) return;
+
+  let state;
+  try {
+    state = JSON.parse(raw);
+  } catch {
+    sessionStorage.removeItem(RETURN_KEY);
+    return;
+  }
+
+  const root = programmeRoot();
+  if (!root) return;
+  const editor = root.querySelector('[data-final-programme-editor="true"]') || root;
+  const disclosures = [...editor.querySelectorAll('button[aria-expanded]')];
+  if (!disclosures.length && state.disclosures?.length) return;
+
+  state.disclosures?.forEach(({ index, expanded }) => {
+    const button = disclosures[index];
+    if (!button) return;
+    const current = button.getAttribute('aria-expanded') === 'true';
+    if (current !== expanded) button.click();
+  });
+
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (editor) editor.scrollTop = Number(state.editorScrollTop) || 0;
+    window.scrollTo(window.scrollX, Number(state.pageScrollY) || 0);
+
+    const session = state.pickerSessionId ? document.getElementById(state.pickerSessionId) : null;
+    const picker = session
+      ? [...session.querySelectorAll('div.rounded-xl.border-dashed, [data-exercise-picker]')].find((item) => /Exercise picker|Change exercise|Search exercises/i.test(text(item)))
+      : null;
+    if (!picker) return;
+
+    picker.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
+    sessionStorage.removeItem(RETURN_KEY);
+  }));
 }
 
 function enhance() {
   enhanceProgramme();
   enhanceHomeLibrary();
   restoreNormalHome();
+  restoreProgrammeReturnState();
 }
 
 export function installProgrammeScreenNavigation() {

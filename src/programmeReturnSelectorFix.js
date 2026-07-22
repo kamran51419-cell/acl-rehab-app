@@ -1,107 +1,155 @@
-const RETURN_KEY = "programme-library-return-session";
-const VIEW_KEY = "programme-subview";
+const RETURN_STATE_KEY = "programme-return-selector-state-v2";
 const TRANSITION_ID = "programme-return-transition";
 
-let openingSessionKey = "";
+let retryFrame = 0;
 let lastOpenAttempt = 0;
 
 function text(element) {
-  return (element?.textContent || "").trim();
+  return (element?.textContent || "").replace(/\u200b/g, "").trim();
 }
 
-function programmeSessions() {
-  return [...document.querySelectorAll('[id^="programme-session-"]')];
+function programmeEditor() {
+  const heading = [...document.querySelectorAll("h2")].find((item) => text(item) === "Edit programme");
+  return heading?.closest?.('[data-final-programme-editor="true"], .space-y-5.rounded-3xl.border') || heading?.parentElement?.parentElement || null;
+}
+
+function sessionsInEditor(editor) {
+  return [...(editor?.querySelectorAll('[id^="programme-session-"]') || [])];
 }
 
 function selectorInSession(session) {
   return [...(session?.querySelectorAll('[data-exercise-picker], div.rounded-xl.border-dashed') || [])]
-    .find((item) => /Exercise (picker|selector)|Search exercises|Manage Exercise Library/i.test(text(item))) || null;
+    .find((item) => /Exercise (picker|selector)|Search exercises/i.test(text(item))) || null;
 }
 
-function shortenReturnTransition() {
-  const cover = document.getElementById(TRANSITION_ID);
-  if (!cover) return;
-  cover.style.transition = "opacity 60ms ease";
-}
-
-function savedSession(state) {
-  if (state?.sessionId) {
-    const byId = document.getElementById(state.sessionId);
-    if (byId) return byId;
-  }
-  const sessions = programmeSessions();
-  return Number.isInteger(state?.sessionIndex) ? sessions[state.sessionIndex] || null : null;
-}
-
-function restoreReturnedSelector() {
-  shortenReturnTransition();
-  if (sessionStorage.getItem(VIEW_KEY)) return;
-
-  const raw = sessionStorage.getItem(RETURN_KEY);
-  if (!raw) {
-    openingSessionKey = "";
-    lastOpenAttempt = 0;
-    return;
-  }
-
-  let state;
+function readState() {
   try {
-    state = JSON.parse(raw);
+    return JSON.parse(sessionStorage.getItem(RETURN_STATE_KEY) || "null");
   } catch {
-    return;
+    sessionStorage.removeItem(RETURN_STATE_KEY);
+    return null;
+  }
+}
+
+function captureReturnState(event) {
+  const button = event.target?.closest?.("button");
+  if (!button || text(button) !== "Manage Exercise Library") return;
+
+  const editor = programmeEditor();
+  const session = button.closest('[id^="programme-session-"]');
+  if (!editor || !session) return;
+
+  const sessions = sessionsInEditor(editor);
+  sessionStorage.setItem(RETURN_STATE_KEY, JSON.stringify({
+    sessionId: session.id,
+    sessionIndex: Math.max(0, sessions.indexOf(session)),
+    returning: false,
+  }));
+}
+
+function markReturning(event) {
+  const button = event.target?.closest?.("button");
+  if (!button || text(button) !== "← Programme") return;
+
+  const state = readState();
+  if (!state) return;
+  sessionStorage.setItem(RETURN_STATE_KEY, JSON.stringify({ ...state, returning: true }));
+
+  const cover = document.getElementById(TRANSITION_ID);
+  if (cover) {
+    cover.style.transition = "opacity 40ms ease";
+    requestAnimationFrame(() => {
+      cover.style.opacity = "0";
+      window.setTimeout(() => cover.remove(), 50);
+    });
   }
 
-  const session = savedSession(state);
-  if (!session) return;
+  scheduleRestore();
+}
+
+function targetSession(editor, state) {
+  const sessions = sessionsInEditor(editor);
+  return document.getElementById(state.sessionId) || sessions[state.sessionIndex] || null;
+}
+
+function expandTargetSession(session) {
+  const expand = [...session.querySelectorAll('button[aria-expanded="false"]')]
+    .find((button) => /Expand session/i.test(button.getAttribute("aria-label") || ""));
+  if (!expand) return false;
+  expand.click();
+  return true;
+}
+
+function finishRestore(selector) {
+  selector.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+  sessionStorage.removeItem(RETURN_STATE_KEY);
+  lastOpenAttempt = 0;
+}
+
+function restoreSelector() {
+  const state = readState();
+  if (!state?.returning) return false;
+
+  const editor = programmeEditor();
+  if (!editor) return true;
+
+  const session = targetSession(editor, state);
+  if (!session) return true;
 
   const selector = selectorInSession(session);
   if (selector) {
-    openingSessionKey = "";
-    lastOpenAttempt = 0;
-    selector.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
-    sessionStorage.removeItem(RETURN_KEY);
-    return;
+    finishRestore(selector);
+    return false;
   }
 
-  const expandSession = session.querySelector('button[aria-label="Expand session"][aria-expanded="false"]');
-  if (expandSession) {
-    HTMLElement.prototype.click.call(expandSession);
-    openingSessionKey = "";
-    lastOpenAttempt = 0;
-    return;
-  }
+  if (expandTargetSession(session)) return true;
 
   const addExercise = [...session.querySelectorAll("button")].find((button) => text(button) === "Add exercise");
-  if (!addExercise) return;
+  if (!addExercise) return true;
 
-  const key = state.sessionId || String(state.sessionIndex ?? "");
-  const now = Date.now();
-  if (openingSessionKey === key && now - lastOpenAttempt < 80) return;
+  const now = performance.now();
+  if (now - lastOpenAttempt >= 48) {
+    lastOpenAttempt = now;
+    addExercise.click();
+  }
 
-  openingSessionKey = key;
-  lastOpenAttempt = now;
-  HTMLElement.prototype.click.call(addExercise);
+  return true;
+}
+
+function scheduleRestore() {
+  if (retryFrame) return;
+
+  const startedAt = performance.now();
+  const run = () => {
+    retryFrame = 0;
+    const keepTrying = restoreSelector();
+    if (keepTrying && performance.now() - startedAt < 2500) {
+      retryFrame = requestAnimationFrame(run);
+    }
+  };
+
+  retryFrame = requestAnimationFrame(run);
 }
 
 export function installProgrammeReturnSelectorFix() {
   if (typeof document === "undefined" || typeof MutationObserver === "undefined") return () => {};
 
-  let queued = false;
-  const schedule = () => {
-    if (queued) return;
-    queued = true;
-    requestAnimationFrame(() => {
-      queued = false;
-      restoreReturnedSelector();
-    });
-  };
+  window.addEventListener("click", captureReturnState, true);
+  window.addEventListener("click", markReturning, true);
 
-  const retry = window.setInterval(restoreReturnedSelector, 80);
-  restoreReturnedSelector();
-  const observer = new MutationObserver(schedule);
-  observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["style", "hidden", "aria-expanded"] });
+  const observer = new MutationObserver(scheduleRestore);
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["hidden", "aria-expanded"],
+  });
+
+  scheduleRestore();
   return () => {
-    window.clearInterval(retry);
+    if (retryFrame) cancelAnimationFrame(retryFrame);
     observer.disconnect();
+    window.removeEventListener("click", captureReturnState, true);
+    window.removeEventListener("click", markReturning, true);
   };
 }

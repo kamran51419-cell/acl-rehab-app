@@ -22,6 +22,7 @@ import { installFinalTargetedUiFixes } from './finalTargetedUiFix'
 import { installTodayTaskOrderFix } from './todayTaskOrderFix'
 import { installProgrammeCreatorInputFixes } from './programmeCreatorInputFixes'
 import { installBuilderUxEnhancements } from './builderUxEnhancements'
+import { installFinalRequestedFixes } from './finalRequestedFixes'
 
 const updateSW = registerSW({
   immediate: true,
@@ -45,6 +46,7 @@ installFinalTargetedUiFixes()
 installTodayTaskOrderFix()
 installProgrammeCreatorInputFixes()
 installBuilderUxEnhancements()
+installFinalRequestedFixes()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

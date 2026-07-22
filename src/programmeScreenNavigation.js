@@ -1,6 +1,8 @@
 const VIEW_KEY = "programme-subview";
 const RETURN_KEY = "programme-library-return-session";
 const TRANSITION_ID = "programme-library-transition";
+let restoreFrame = 0;
+let addRequestedAt = 0;
 
 function text(element) {
   return (element?.textContent || "").trim();
@@ -20,30 +22,23 @@ function showReturnTransition() {
   const cover = document.createElement("div");
   cover.id = TRANSITION_ID;
   cover.setAttribute("aria-hidden", "true");
-  cover.style.cssText = "position:fixed;inset:0;z-index:2147483646;background:#f8fafc;pointer-events:none;overflow:hidden;opacity:1;transition:opacity 45ms ease";
+  cover.style.cssText = "position:fixed;inset:0;z-index:2147483646;background:#f8fafc;pointer-events:none;overflow:hidden";
 
   const library = document.getElementById("exercise-library");
   const source = library?.parentElement;
   if (source) {
+    const rect = source.getBoundingClientRect();
     const snapshot = source.cloneNode(true);
     snapshot.querySelectorAll("[id]").forEach((item) => item.removeAttribute("id"));
-    snapshot.style.cssText = "height:100%;overflow:hidden;background:#f8fafc";
+    snapshot.style.cssText = `position:absolute;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;margin:0;transform:none;background:#f8fafc`;
     cover.appendChild(snapshot);
   }
 
   document.body.appendChild(cover);
-  window.setTimeout(() => hideReturnTransition(true), 450);
 }
 
-function hideReturnTransition(smooth = false) {
-  const cover = document.getElementById(TRANSITION_ID);
-  if (!cover) return;
-  if (!smooth) {
-    cover.remove();
-    return;
-  }
-  cover.style.opacity = "0";
-  window.setTimeout(() => cover.remove(), 50);
+function hideReturnTransition() {
+  document.getElementById(TRANSITION_ID)?.remove();
 }
 
 function countLabel(count) {
@@ -112,7 +107,6 @@ function captureLibraryReturn(event) {
     sessionStorage.setItem(RETURN_KEY, JSON.stringify({
       sessionId: session.id || "",
       sessionIndex: sessions.indexOf(session),
-      phase: "waiting",
     }));
   }
   sessionStorage.setItem(VIEW_KEY, "library");
@@ -123,10 +117,17 @@ function selectorInSession(session) {
     .find((item) => /Exercise (picker|selector)|Search exercises|Manage Exercise Library/i.test(text(item))) || null;
 }
 
+function stopRestoreLoop() {
+  if (restoreFrame) cancelAnimationFrame(restoreFrame);
+  restoreFrame = 0;
+  addRequestedAt = 0;
+}
+
 function restoreLibraryReturn() {
   if (sessionStorage.getItem(VIEW_KEY)) return;
   const raw = sessionStorage.getItem(RETURN_KEY);
   if (!raw) {
+    stopRestoreLoop();
     hideReturnTransition();
     return;
   }
@@ -136,35 +137,41 @@ function restoreLibraryReturn() {
     state = JSON.parse(raw);
   } catch {
     sessionStorage.removeItem(RETURN_KEY);
+    stopRestoreLoop();
     hideReturnTransition();
     return;
   }
 
-  const sessions = [...document.querySelectorAll('[id^="programme-session-"]')];
-  const session = (state.sessionId ? document.getElementById(state.sessionId) : null)
-    || (Number.isInteger(state.sessionIndex) ? sessions[state.sessionIndex] : null);
-  if (!session) return;
+  const attempt = () => {
+    const sessions = [...document.querySelectorAll('[id^="programme-session-"]')];
+    const session = (state.sessionId ? document.getElementById(state.sessionId) : null)
+      || (Number.isInteger(state.sessionIndex) ? sessions[state.sessionIndex] : null);
 
-  const selector = selectorInSession(session);
-  if (selector) {
-    selector.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
-    sessionStorage.removeItem(RETURN_KEY);
-    hideReturnTransition(true);
-    return;
-  }
+    if (session) {
+      const selector = selectorInSession(session);
+      if (selector) {
+        selector.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
+        sessionStorage.removeItem(RETURN_KEY);
+        stopRestoreLoop();
+        hideReturnTransition();
+        return;
+      }
 
-  const expandSession = session.querySelector('button[aria-label="Expand session"][aria-expanded="false"]');
-  if (expandSession) {
-    HTMLElement.prototype.click.call(expandSession);
-    return;
-  }
+      const expandSession = session.querySelector('button[aria-label="Expand session"][aria-expanded="false"]');
+      if (expandSession) HTMLElement.prototype.click.call(expandSession);
 
-  if (state.phase === "opening") return;
-  const addExercise = [...session.querySelectorAll("button")].find((item) => text(item) === "Add exercise");
-  if (!addExercise) return;
-  state.phase = "opening";
-  sessionStorage.setItem(RETURN_KEY, JSON.stringify(state));
-  HTMLElement.prototype.click.call(addExercise);
+      const addExercise = [...session.querySelectorAll("button")].find((item) => text(item) === "Add exercise");
+      const now = performance.now();
+      if (addExercise && now - addRequestedAt > 120) {
+        addRequestedAt = now;
+        HTMLElement.prototype.click.call(addExercise);
+      }
+    }
+
+    restoreFrame = requestAnimationFrame(attempt);
+  };
+
+  if (!restoreFrame) restoreFrame = requestAnimationFrame(attempt);
 }
 
 function showProgrammeOverview(root) {
@@ -244,6 +251,7 @@ function enhanceHomeLibrary() {
       if (sessionStorage.getItem(RETURN_KEY)) showReturnTransition();
       sessionStorage.removeItem(VIEW_KEY);
       goToTab("Programme");
+      restoreLibraryReturn();
     });
     header.dataset.programmeLibraryHeader = "true";
     homeContainer.prepend(header);
@@ -285,6 +293,7 @@ export function installProgrammeScreenNavigation() {
   return () => {
     document.removeEventListener("click", captureLibraryReturn, true);
     observer.disconnect();
+    stopRestoreLoop();
     hideReturnTransition();
   };
 }

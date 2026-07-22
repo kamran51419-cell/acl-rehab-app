@@ -41,8 +41,13 @@ function makeBackHeader(title, onBack) {
 }
 
 function programmeRoot() {
-  const heading = [...document.querySelectorAll("h1")].find((item) => text(item) === "Programme");
-  return heading?.closest(".space-y-6") || heading?.parentElement?.parentElement || null;
+  const programmeTab = findTab("Programme");
+  if (!programmeTab) return null;
+  const root = [...document.querySelectorAll("main > div, main section, main")].find((element) => {
+    const createButton = [...element.querySelectorAll("button")].find((button) => text(button) === "Create programme");
+    return Boolean(createButton);
+  });
+  return root || programmeTab.closest("main") || null;
 }
 
 function sectionByTitle(root, title) {

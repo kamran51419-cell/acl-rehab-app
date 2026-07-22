@@ -1,6 +1,3 @@
-const PICKER_RETURN_KEY = "programme-picker-return-final-v1";
-let restoreOpening = false;
-
 function text(element) {
   return (element?.textContent || "").trim();
 }
@@ -54,42 +51,37 @@ function collapseEditProgramme() {
   editor.dataset.finalInitialCollapse = "true";
 }
 
-function capturePickerReturn(event) {
-  const button = event.target?.closest?.("button");
-  if (text(button) !== "Manage Exercise Library") return;
-  const session = button.closest('[id^="programme-session-"]');
-  if (session?.id) sessionStorage.setItem(PICKER_RETURN_KEY, session.id);
+function selectorInSession(session) {
+  return [...(session?.querySelectorAll('div.rounded-xl.border-dashed, [data-exercise-picker]') || [])]
+    .find((item) => /Exercise (picker|selector)|Search exercises/i.test(text(item))) || null;
 }
 
-function restorePicker() {
-  if (restoreOpening || sessionStorage.getItem("programme-subview")) return;
-  const sessionId = sessionStorage.getItem(PICKER_RETURN_KEY);
-  if (!sessionId) return;
-  const session = document.getElementById(sessionId);
+function renameExerciseSelector() {
+  [...document.querySelectorAll("strong")].forEach((heading) => {
+    if (text(heading) === "Exercise picker") heading.textContent = "Exercise selector";
+  });
+}
+
+function smoothScrollToSelector(event) {
+  const button = event.target?.closest?.("button");
+  if (!button || !["Add exercise", "Change exercise"].includes(text(button))) return;
+  const session = button.closest('[id^="programme-session-"]');
   if (!session) return;
 
-  const sessionToggle = session.querySelector('button[aria-label="Expand session"][aria-expanded="false"]');
-  sessionToggle?.click();
+  const scroll = () => {
+    const selector = selectorInSession(session);
+    if (!selector) return false;
+    requestAnimationFrame(() => selector.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" }));
+    return true;
+  };
 
-  const picker = [...session.querySelectorAll('div.rounded-xl.border-dashed, [data-exercise-picker]')]
-    .find((item) => /Exercise picker|Search exercises/i.test(text(item)));
-  if (picker) {
-    sessionStorage.removeItem(PICKER_RETURN_KEY);
-    picker.scrollIntoView({ behavior: "auto", block: "center" });
-    return;
-  }
-
-  const addExercise = [...session.querySelectorAll("button")].find((button) => text(button) === "Add exercise");
-  if (!addExercise) return;
-  restoreOpening = true;
-  addExercise.click();
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    const opened = [...session.querySelectorAll('div.rounded-xl.border-dashed, [data-exercise-picker]')]
-      .find((item) => /Exercise picker|Search exercises/i.test(text(item)));
-    opened?.scrollIntoView({ behavior: "auto", block: "center" });
-    sessionStorage.removeItem(PICKER_RETURN_KEY);
-    restoreOpening = false;
-  }));
+  if (scroll()) return;
+  const observer = new MutationObserver(() => {
+    if (!scroll()) return;
+    observer.disconnect();
+  });
+  observer.observe(session, { childList: true, subtree: true });
+  window.setTimeout(() => observer.disconnect(), 500);
 }
 
 function styleExerciseSaveButtons() {
@@ -111,7 +103,7 @@ function apply() {
   const heading = [...document.querySelectorAll("h2")].find((item) => text(item) === "Edit programme");
   const editor = editorFor(heading);
   if (editor) addExerciseCollapseControls(editor);
-  restorePicker();
+  renameExerciseSelector();
   styleExerciseSaveButtons();
 }
 
@@ -126,12 +118,12 @@ export function installFinalRequestedFixes() {
       apply();
     });
   };
-  document.addEventListener("click", capturePickerReturn, true);
+  document.addEventListener("click", smoothScrollToSelector, false);
   apply();
   const observer = new MutationObserver(schedule);
   observer.observe(document.body, { childList: true, subtree: true });
   return () => {
     observer.disconnect();
-    document.removeEventListener("click", capturePickerReturn, true);
+    document.removeEventListener("click", smoothScrollToSelector, false);
   };
 }

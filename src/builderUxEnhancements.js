@@ -173,6 +173,17 @@ export function installBuilderUxEnhancements() {
     const button = event.target?.closest?.('button')
     if (!button) return
     const label = textOf(button)
+
+    if (label === 'Close') {
+      const root = builderRoot()
+      if (!root || !root.contains(button)) return
+      setTimeout(() => {
+        const dialog = [...document.querySelectorAll('[role="dialog"]')].find((item) => /Discard changes/i.test(textOf(item)))
+        if (dialog) dialog.style.display = ''
+      }, 0)
+      return
+    }
+
     if (!['Add exercise', 'Change exercise', 'Add session', 'Add', 'Use'].includes(label)) return
 
     const root = builderRoot()
@@ -211,15 +222,19 @@ export function installBuilderUxEnhancements() {
     }
   }
 
-  const refresh = () => {
+  const handleRender = () => {
     const root = builderRoot()
     if (root) markRoutineTaskCards(root)
   }
 
+  const observer = new MutationObserver(() => requestAnimationFrame(handleRender))
+  observer.observe(document.body, { childList: true, subtree: true })
+
   document.addEventListener('click', handleClick, true)
   document.addEventListener('wheel', forwardWheelFromMargins, { passive: false })
-  refresh()
+  handleRender()
   return () => {
+    observer.disconnect()
     document.removeEventListener('click', handleClick, true)
     document.removeEventListener('wheel', forwardWheelFromMargins)
   }

@@ -71,7 +71,7 @@ function smoothScrollToSelector(event) {
   const scroll = () => {
     const selector = selectorInSession(session);
     if (!selector) return false;
-    requestAnimationFrame(() => selector.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" }));
+    selector.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
     return true;
   };
 
@@ -81,7 +81,7 @@ function smoothScrollToSelector(event) {
     observer.disconnect();
   });
   observer.observe(session, { childList: true, subtree: true });
-  window.setTimeout(() => observer.disconnect(), 500);
+  window.setTimeout(() => observer.disconnect(), 350);
 }
 
 function styleExerciseSaveButtons() {

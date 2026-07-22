@@ -52,34 +52,27 @@ function collapseEditProgramme() {
 }
 
 function selectorInSession(session) {
-  return [...(session?.querySelectorAll('div.rounded-xl.border-dashed, [data-exercise-picker]') || [])]
+  return [...(session?.querySelectorAll('[data-exercise-picker], div.rounded-xl.border-dashed') || [])]
     .find((item) => /Exercise (picker|selector)|Search exercises/i.test(text(item))) || null;
 }
 
-function renameExerciseSelector() {
-  [...document.querySelectorAll("strong")].forEach((heading) => {
-    if (text(heading) === "Exercise picker") heading.textContent = "Exercise selector";
-  });
-}
-
-function smoothScrollToSelector(event) {
+function scrollToSelectorImmediately(event) {
   const button = event.target?.closest?.("button");
   if (!button || !["Add exercise", "Change exercise"].includes(text(button))) return;
   const session = button.closest('[id^="programme-session-"]');
   if (!session) return;
 
   let frames = 0;
-  const scrollAsSoonAsReady = () => {
+  const findAndScroll = () => {
     const selector = selectorInSession(session);
     if (selector) {
       selector.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
       return;
     }
     frames += 1;
-    if (frames < 30) requestAnimationFrame(scrollAsSoonAsReady);
+    if (frames < 30) requestAnimationFrame(findAndScroll);
   };
-
-  requestAnimationFrame(scrollAsSoonAsReady);
+  requestAnimationFrame(findAndScroll);
 }
 
 function styleExerciseSaveButtons() {
@@ -101,7 +94,6 @@ function apply() {
   const heading = [...document.querySelectorAll("h2")].find((item) => text(item) === "Edit programme");
   const editor = editorFor(heading);
   if (editor) addExerciseCollapseControls(editor);
-  renameExerciseSelector();
   styleExerciseSaveButtons();
 }
 
@@ -116,12 +108,12 @@ export function installFinalRequestedFixes() {
       apply();
     });
   };
-  document.addEventListener("click", smoothScrollToSelector, true);
+  document.addEventListener("click", scrollToSelectorImmediately, true);
   apply();
   const observer = new MutationObserver(schedule);
   observer.observe(document.body, { childList: true, subtree: true });
   return () => {
     observer.disconnect();
-    document.removeEventListener("click", smoothScrollToSelector, true);
+    document.removeEventListener("click", scrollToSelectorImmediately, true);
   };
 }

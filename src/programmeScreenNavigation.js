@@ -1,4 +1,5 @@
 const VIEW_KEY = "programme-subview";
+const RETURN_KEY = "programme-library-return-session";
 
 function text(element) {
   return (element?.textContent || "").trim();
@@ -67,6 +68,48 @@ function updateInactiveCount(root, inactiveSection) {
   if (!countElement) return;
   const next = countLabel(countProgrammeCards(inactiveSection));
   if (countElement.textContent !== next) countElement.textContent = next;
+}
+
+function captureLibraryReturn(event) {
+  const button = event.target.closest("button");
+  if (!button || text(button) !== "Manage Exercise Library") return;
+  const session = button.closest('[id^="programme-session-"]');
+  if (session?.id) sessionStorage.setItem(RETURN_KEY, JSON.stringify({ sessionId: session.id, phase: "waiting" }));
+  sessionStorage.setItem(VIEW_KEY, "library");
+  sessionStorage.removeItem("programme-editor-return-state-v1");
+}
+
+function restoreLibraryReturn() {
+  if (sessionStorage.getItem(VIEW_KEY)) return;
+  const raw = sessionStorage.getItem(RETURN_KEY);
+  if (!raw) return;
+
+  let state;
+  try {
+    state = JSON.parse(raw);
+  } catch {
+    sessionStorage.removeItem(RETURN_KEY);
+    return;
+  }
+
+  const session = state.sessionId ? document.getElementById(state.sessionId) : null;
+  if (!session) return;
+
+  const picker = [...session.querySelectorAll('[data-exercise-picker], div.rounded-xl.border-dashed')]
+    .find((item) => /Exercise picker|Search exercises|Manage Exercise Library/i.test(text(item)));
+
+  if (picker) {
+    picker.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
+    sessionStorage.removeItem(RETURN_KEY);
+    return;
+  }
+
+  if (state.phase !== "waiting") return;
+  const addExercise = [...session.querySelectorAll("button")].find((item) => text(item) === "Add exercise");
+  if (!addExercise) return;
+  state.phase = "opening";
+  sessionStorage.setItem(RETURN_KEY, JSON.stringify(state));
+  addExercise.click();
 }
 
 function showProgrammeOverview(root) {
@@ -164,6 +207,7 @@ function enhance() {
   enhanceProgramme();
   enhanceHomeLibrary();
   restoreNormalHome();
+  restoreLibraryReturn();
 }
 
 export function installProgrammeScreenNavigation() {
@@ -178,8 +222,12 @@ export function installProgrammeScreenNavigation() {
     });
   };
 
+  document.addEventListener("click", captureLibraryReturn, true);
   enhance();
   const observer = new MutationObserver(scheduleEnhance);
   observer.observe(document.body, { childList: true, subtree: true });
-  return () => observer.disconnect();
+  return () => {
+    document.removeEventListener("click", captureLibraryReturn, true);
+    observer.disconnect();
+  };
 }

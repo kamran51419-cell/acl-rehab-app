@@ -48,14 +48,33 @@ function captureReturnState(event) {
   }));
 }
 
-function removeReturnCover() {
-  document.getElementById(TRANSITION_ID)?.remove();
+function ensureReturnCover() {
+  let cover = document.getElementById(TRANSITION_ID);
+  if (cover) return cover;
+
+  cover = document.createElement("div");
+  cover.id = TRANSITION_ID;
+  cover.setAttribute("aria-hidden", "true");
+  cover.style.cssText = "position:fixed;inset:0;z-index:2147483646;background:#f8fafc;pointer-events:none;opacity:1;transition:opacity 45ms ease";
+  document.body.appendChild(cover);
+  return cover;
+}
+
+function removeReturnCover(smooth = false) {
+  const cover = document.getElementById(TRANSITION_ID);
+  if (!cover) return;
+  if (!smooth) {
+    cover.remove();
+    return;
+  }
+  cover.style.opacity = "0";
+  window.setTimeout(() => cover.remove(), 55);
 }
 
 function handleProgrammeReturn(event) {
   const button = event.target?.closest?.("button");
-  if (!button || text(button) !== "← Programme") return;
-  removeReturnCover();
+  if (!button || text(button) !== "← Programme" || !readState()) return;
+  ensureReturnCover();
   scheduleRestore();
 }
 
@@ -68,25 +87,26 @@ function expandTargetSession(session) {
   const expand = [...session.querySelectorAll('button[aria-expanded="false"]')]
     .find((button) => /Expand session/i.test(button.getAttribute("aria-label") || ""));
   if (!expand) return false;
-  expand.click();
+  HTMLElement.prototype.click.call(expand);
   return true;
 }
 
 function finishRestore(selector) {
-  selector.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+  selector.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
   sessionStorage.removeItem(RETURN_STATE_KEY);
+  sessionStorage.removeItem("programme-library-return-session");
   lastOpenAttempt = 0;
-  removeReturnCover();
+  requestAnimationFrame(() => removeReturnCover(true));
 }
 
 function restoreSelector() {
   const state = readState();
   if (!state) return false;
 
+  ensureReturnCover();
+
   const editor = programmeEditor();
   if (!editor) return true;
-
-  removeReturnCover();
 
   const session = targetSession(editor, state);
   if (!session) return true;
@@ -105,7 +125,7 @@ function restoreSelector() {
   const now = performance.now();
   if (now - lastOpenAttempt >= 32) {
     lastOpenAttempt = now;
-    addExercise.click();
+    HTMLElement.prototype.click.call(addExercise);
   }
 
   return true;
@@ -118,9 +138,11 @@ function scheduleRestore() {
   const run = () => {
     retryFrame = 0;
     const keepTrying = restoreSelector();
-    if (keepTrying && performance.now() - startedAt < 3000) {
+    if (keepTrying && performance.now() - startedAt < 1800) {
       retryFrame = requestAnimationFrame(run);
+      return;
     }
+    if (keepTrying) removeReturnCover(true);
   };
 
   retryFrame = requestAnimationFrame(run);
@@ -146,5 +168,6 @@ export function installProgrammeReturnSelectorFix() {
     observer.disconnect();
     window.removeEventListener("click", captureReturnState, true);
     window.removeEventListener("click", handleProgrammeReturn, true);
+    removeReturnCover();
   };
 }

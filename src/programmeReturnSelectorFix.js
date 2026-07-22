@@ -3,6 +3,7 @@ const VIEW_KEY = "programme-subview";
 const TRANSITION_ID = "programme-return-transition";
 
 let openingSessionId = "";
+let lastOpenAttempt = 0;
 
 function text(element) {
   return (element?.textContent || "").trim();
@@ -26,6 +27,7 @@ function restoreReturnedSelector() {
   const raw = sessionStorage.getItem(RETURN_KEY);
   if (!raw) {
     openingSessionId = "";
+    lastOpenAttempt = 0;
     return;
   }
 
@@ -42,19 +44,28 @@ function restoreReturnedSelector() {
   const selector = selectorInSession(session);
   if (selector) {
     openingSessionId = "";
+    lastOpenAttempt = 0;
     selector.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
     sessionStorage.removeItem(RETURN_KEY);
     return;
   }
 
   const expandSession = session.querySelector('button[aria-label="Expand session"][aria-expanded="false"]');
-  expandSession?.click();
+  if (expandSession) {
+    expandSession.click();
+    openingSessionId = "";
+    lastOpenAttempt = 0;
+    return;
+  }
 
-  if (openingSessionId === state.sessionId) return;
   const addExercise = [...session.querySelectorAll("button")].find((button) => text(button) === "Add exercise");
   if (!addExercise) return;
 
+  const now = Date.now();
+  if (openingSessionId === state.sessionId && now - lastOpenAttempt < 120) return;
+
   openingSessionId = state.sessionId;
+  lastOpenAttempt = now;
   addExercise.click();
 }
 
@@ -71,8 +82,12 @@ export function installProgrammeReturnSelectorFix() {
     });
   };
 
+  const retry = window.setInterval(restoreReturnedSelector, 120);
   restoreReturnedSelector();
   const observer = new MutationObserver(schedule);
   observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["style", "hidden", "aria-expanded"] });
-  return () => observer.disconnect();
+  return () => {
+    window.clearInterval(retry);
+    observer.disconnect();
+  };
 }

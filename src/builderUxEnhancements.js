@@ -1,5 +1,5 @@
-const COLLAPSE_STORAGE_KEY = 'builder-collapse-state-v3'
 const STYLE_ID = 'builder-ux-enhancement-styles'
+const PROGRAMME_RETURN_STATE_KEY = 'programme-editor-return-state-v1'
 
 function textOf(element) {
   return (element?.textContent || '').trim()
@@ -10,33 +10,35 @@ function builderRoot() {
     /^(Edit programme|Create programme|Quick Workout|Build a Quick Workout)$/i.test(textOf(element)),
   )
   if (!heading) return null
-  return (
-    heading.closest(
-      '[data-final-programme-editor="true"], [data-quick-workout-builder="true"], .space-y-5, .space-y-6',
-    ) || heading.parentElement
-  )
-}
-
-function builderKind(root) {
-  return /programme/i.test(textOf(root.querySelector('h1, h2, h3')))
-    ? 'programme'
-    : 'quick-workout'
-}
-
-function loadCollapseState() {
-  try {
-    return JSON.parse(sessionStorage.getItem(COLLAPSE_STORAGE_KEY) || '{}')
-  } catch {
-    return {}
-  }
-}
-
-function saveCollapseState(state) {
-  sessionStorage.setItem(COLLAPSE_STORAGE_KEY, JSON.stringify(state))
+  return heading.closest('[data-final-programme-editor="true"], [data-quick-workout-builder="true"], .space-y-5, .space-y-6') || heading.parentElement
 }
 
 function programmeSession(element) {
   return element?.closest?.('[id^="programme-session-"]') || null
+}
+
+function sessionDisclosureButton(session) {
+  if (!session) return null
+  const header = session.firstElementChild
+  const direct = header?.querySelector('button[aria-expanded], button[aria-label*="session" i]')
+  if (direct) return direct
+  return [...session.querySelectorAll('button[aria-expanded], button[aria-label*="session" i]')].find((button) =>
+    programmeSession(button) === session,
+  ) || null
+}
+
+function collapseButton(button) {
+  if (!button) return
+  const expanded = button.getAttribute('aria-expanded')
+  const label = button.getAttribute('aria-label') || ''
+  if (expanded === 'true' || /^Collapse session$/i.test(label)) button.click()
+}
+
+function openButton(button) {
+  if (!button) return
+  const expanded = button.getAttribute('aria-expanded')
+  const label = button.getAttribute('aria-label') || ''
+  if (expanded === 'false' || /^Expand session$/i.test(label)) button.click()
 }
 
 function exerciseCardFor(button) {
@@ -47,18 +49,8 @@ function exerciseCardFor(button) {
     button.closest('div.space-y-3.rounded-xl.border.bg-white'),
     button.closest('div.rounded-xl.border'),
     button.closest('section.rounded-xl.border'),
-    button.closest('div.rounded-2xl.border'),
-    button.closest('section.rounded-2xl.border'),
   ].filter(Boolean)
-
   return candidates.find((candidate) => candidate !== session) || null
-}
-
-function sessionDisclosureButton(session) {
-  if (!session) return null
-  return [...session.querySelectorAll('button[aria-expanded]')].find(
-    (button) => programmeSession(button) === session && !exerciseCardFor(button),
-  ) || null
 }
 
 function exerciseDisclosureButtons(root, session = null) {
@@ -67,187 +59,86 @@ function exerciseDisclosureButtons(root, session = null) {
     const card = exerciseCardFor(button)
     if (!card) return false
     if (session && programmeSession(button) !== session) return false
-    const content = textOf(card)
-    return /Change exercise|Track by|Sets|Reps|Weight|Duration|Distance|Remove|Duplicate/i.test(content)
+    return /Change exercise|Track by|Sets|Reps|Weight|Duration|Distance|Remove/i.test(textOf(card))
   })
 }
 
-function disclosureCard(button) {
-  return exerciseCardFor(button) || programmeSession(button) || button.closest('article, section, div.rounded-xl.border, div.rounded-2xl.border')
+function collapseExercises(root, session = null) {
+  exerciseDisclosureButtons(root, session).forEach(collapseButton)
 }
 
-function disclosureKey(button, root) {
-  const card = disclosureCard(button)
-  if (!card) return ''
-  const session = programmeSession(card)
-  const type = exerciseCardFor(button) ? 'exercise' : session === card ? 'session' : 'item'
-  const title = textOf(card.querySelector('h2, h3, .font-semibold, .font-medium, input')) || type
-  const peers = [...root.querySelectorAll('button[aria-expanded]')].filter((candidate) => {
-    const candidateCard = disclosureCard(candidate)
-    if (!candidateCard) return false
-    const candidateType = exerciseCardFor(candidate)
-      ? 'exercise'
-      : programmeSession(candidate) === candidateCard
-        ? 'session'
-        : 'item'
-    const candidateTitle = textOf(
-      candidateCard.querySelector('h2, h3, .font-semibold, .font-medium, input'),
-    ) || candidateType
-    return candidateType === type && candidateTitle === title
-  })
-  return `${builderKind(root)}|${session?.id || 'root'}|${type}|${title}|${Math.max(0, peers.indexOf(button))}`
+function sessionCards(root) {
+  return [...root.querySelectorAll('[id^="programme-session-"]')]
 }
 
-function rememberDisclosure(button, root) {
-  const key = disclosureKey(button, root)
-  if (!key) return
-  const state = loadCollapseState()
-  state[key] = button.getAttribute('aria-expanded') === 'true'
-  saveCollapseState(state)
+function collapseSessions(root) {
+  sessionCards(root).forEach((session) => collapseButton(sessionDisclosureButton(session)))
 }
 
-function restoreDisclosureState(root) {
-  const state = loadCollapseState()
-  root.querySelectorAll('button[aria-expanded]').forEach((button) => {
-    const key = disclosureKey(button, root)
-    if (!(key in state) || button.dataset.collapseRestored === 'true') return
-    button.dataset.collapseRestored = 'true'
-    const shouldBeExpanded = Boolean(state[key])
-    const currentlyExpanded = button.getAttribute('aria-expanded') === 'true'
-    if (shouldBeExpanded !== currentlyExpanded) button.click()
-  })
-}
-
-function collapseExerciseButtons(root, session) {
-  if (!session) return
-  exerciseDisclosureButtons(root, session).forEach((button) => {
-    if (button.getAttribute('aria-expanded') !== 'true') return
-    button.click()
-    requestAnimationFrame(() => rememberDisclosure(button, root))
-  })
-}
-
-function collapseExistingSessions(root) {
-  root.querySelectorAll('[id^="programme-session-"]').forEach((session) => {
-    const button = sessionDisclosureButton(session)
-    if (!button || button.getAttribute('aria-expanded') !== 'true') return
-    button.click()
-    requestAnimationFrame(() => rememberDisclosure(button, root))
-  })
-}
-
-function scrollToAndFocus(element) {
+function scrollOnce(element, block = 'center') {
   if (!element) return
-  element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
-  const control = element.querySelector?.(
-    'input:not([type="checkbox"]):not([type="radio"]), select, textarea, button[aria-expanded]',
-  )
-  if (control instanceof HTMLElement) {
-    setTimeout(() => control.focus({ preventScroll: true }), 320)
-  }
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    element.scrollIntoView({ behavior: 'smooth', block, inline: 'nearest' })
+  }))
 }
 
-function waitForNewElement(getElements, previousElements, onFound) {
-  const previous = new Set(previousElements)
-  let attempts = 0
-
-  const check = () => {
-    attempts += 1
-    const added = getElements().find((element) => !previous.has(element)) || null
-    if (added) {
-      onFound(added)
-      return
+function waitForElement(find, attempts = 30) {
+  return new Promise((resolve) => {
+    let remaining = attempts
+    const check = () => {
+      const result = find()
+      if (result || remaining <= 0) {
+        resolve(result || null)
+        return
+      }
+      remaining -= 1
+      setTimeout(check, 40)
     }
-    if (attempts < 30) setTimeout(check, 50)
-  }
-
-  setTimeout(check, 0)
+    requestAnimationFrame(check)
+  })
 }
 
-function exerciseCards(session) {
-  if (!session) return []
-  return [
-    ...new Set(
-      exerciseDisclosureButtons(session, session)
-        .map(exerciseCardFor)
-        .filter(Boolean),
-    ),
-  ]
+function pickerInSession(session) {
+  if (!session) return null
+  return [...session.querySelectorAll('div.rounded-xl.border-dashed, [data-exercise-picker]')].find((item) =>
+    /Exercise picker|Change exercise|Search exercises/i.test(textOf(item)),
+  ) || null
 }
 
-function handleExercisePickerAdd(root, button) {
-  const picker = button.closest('div.rounded-xl.border-dashed')
-  const pickerHeading = picker?.querySelector('strong')
-  if (!picker || !/Exercise picker|Change exercise/i.test(textOf(pickerHeading))) return false
-
-  const session = programmeSession(picker)
-  if (!session) return false
-
-  const before = exerciseCards(session)
-  collapseExerciseButtons(root, session)
-
-  waitForNewElement(
-    () => exerciseCards(session),
-    before,
-    (card) => {
-      const disclosure = card.querySelector('button[aria-expanded]')
-      if (disclosure && disclosure.getAttribute('aria-expanded') !== 'true') disclosure.click()
-      if (disclosure) requestAnimationFrame(() => rememberDisclosure(disclosure, root))
-      setTimeout(() => scrollToAndFocus(card), 80)
-    },
-  )
-
-  return true
+function exerciseCards(root) {
+  return [...new Set(exerciseDisclosureButtons(root).map(exerciseCardFor).filter(Boolean))]
 }
 
-function handleAddSession(root) {
-  const before = [...root.querySelectorAll('[id^="programme-session-"]')]
-  collapseExistingSessions(root)
-
-  waitForNewElement(
-    () => [...root.querySelectorAll('[id^="programme-session-"]')],
-    before,
-    (session) => {
-      const disclosure = sessionDisclosureButton(session)
-      if (disclosure && disclosure.getAttribute('aria-expanded') !== 'true') disclosure.click()
-      if (disclosure) requestAnimationFrame(() => rememberDisclosure(disclosure, root))
-      setTimeout(() => scrollToAndFocus(session), 80)
-    },
-  )
+function isRoutineDayCheckbox(input) {
+  if (!(input instanceof HTMLInputElement) || input.type !== 'checkbox') return false
+  const fieldset = input.closest('fieldset')
+  return textOf(fieldset?.querySelector(':scope > legend')) === 'Days'
 }
 
-function handleAddTask(root) {
-  const getInputs = () => [
-    ...root.querySelectorAll('input[placeholder*="Ice knee"], input[placeholder*="task" i]'),
-  ]
-  const before = getInputs()
-  waitForNewElement(getInputs, before, (input) =>
-    setTimeout(
-      () => scrollToAndFocus(input.closest('article, .rounded-2xl, .rounded-xl') || input),
-      80,
-    ),
-  )
+function preserveScrollAfterRoutineDayChange(input) {
+  const root = builderRoot()
+  if (!root || !root.contains(input)) return
+  const rootTop = root.scrollTop
+  const pageX = window.scrollX
+  const pageY = window.scrollY
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    root.scrollTop = rootTop
+    window.scrollTo(pageX, pageY)
+  }))
 }
 
-function styleExerciseLibrarySaveButton() {
-  const heading = [...document.querySelectorAll('h1, h2, h3')].find(
-    (element) => textOf(element) === 'Add exercise',
-  )
-  const dialog = heading?.closest('[role="dialog"]')
-  if (!dialog) return
-  const save = [...dialog.querySelectorAll('button')].find((button) =>
-    /^(Add exercise|Save)$/i.test(textOf(button)),
-  )
-  if (!save) return
-  save.textContent = 'Save'
-  save.style.setProperty('background', '#2563eb', 'important')
-  save.style.setProperty('background-image', 'none', 'important')
-  save.style.setProperty('color', '#fff', 'important')
-  save.style.setProperty('border-color', '#2563eb', 'important')
-  save.style.setProperty('box-shadow', '0 4px 10px rgb(37 99 235 / 0.18)', 'important')
+function installStyles() {
+  if (document.getElementById(STYLE_ID)) return
+  const style = document.createElement('style')
+  style.id = STYLE_ID
+  style.textContent = `
+    [data-final-programme-editor="true"] { overflow-y: auto !important; }
+    [data-programme-task-card="true"] { background: #fff !important; background-image: none !important; }
+  `
+  document.head.appendChild(style)
 }
 
-function styleRoutineTaskCards(root) {
+function markRoutineTaskCards(root) {
   const heading = [...root.querySelectorAll('h2, h3')].find((element) =>
     /^(Routine Tasks|Daily & Weekly Tasks)$/i.test(textOf(element)),
   )
@@ -256,130 +147,192 @@ function styleRoutineTaskCards(root) {
   section.querySelectorAll('article, div.rounded-xl.border, div.rounded-2xl.border').forEach((card) => {
     if (![...card.querySelectorAll('button')].some((button) => textOf(button) === 'Edit')) return
     card.dataset.programmeTaskCard = 'true'
-    card.style.setProperty('background', '#fff', 'important')
-    card.style.setProperty('background-image', 'none', 'important')
   })
 }
 
-function installStyles() {
-  if (document.getElementById(STYLE_ID)) return
-  const style = document.createElement('style')
-  style.id = STYLE_ID
-  style.textContent = `
-    [data-final-programme-editor="true"] {
-      overflow-y: scroll !important;
-      scrollbar-gutter: stable both-edges !important;
-    }
-
-    [data-final-programme-editor="true"] > * {
-      min-width: 0;
-    }
-
-    [data-programme-task-card="true"] {
-      background: #fff !important;
-      background-image: none !important;
-    }
-
-    button[aria-expanded] svg {
-      transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1) !important;
-    }
-
-    [id^="programme-session-"] > *:not(:first-child),
-    [data-exercise-card] > *:not(:first-child),
-    [id^="programme-session-"] article > *:not(:first-child),
-    [id^="programme-session-"] .rounded-xl.border > *:not(:first-child) {
-      transition:
-        opacity 220ms ease,
-        transform 240ms cubic-bezier(0.22, 1, 0.36, 1) !important;
-    }
-  `
-  document.head.appendChild(style)
-}
-
-function animateDisclosure(button) {
-  const card = disclosureCard(button)
-  if (!card || typeof card.animate !== 'function') return
-  const before = card.getBoundingClientRect().height
-
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      const after = card.getBoundingClientRect().height
-      if (!before || !after || Math.abs(after - before) < 2) return
-      card.animate(
-        [
-          { height: `${before}px`, opacity: 0.96 },
-          { height: `${after}px`, opacity: 1 },
-        ],
-        {
-          duration: 260,
-          easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
-        },
-      )
-    })
-  })
-}
-
-function applyBuilderUx() {
-  installStyles()
-  styleExerciseLibrarySaveButton()
+function forwardWheelFromMargins(event) {
   const root = builderRoot()
   if (!root) return
-  styleRoutineTaskCards(root)
-  restoreDisclosureState(root)
+  if (root.contains(event.target)) return
+  const rect = root.getBoundingClientRect()
+  if (event.clientY < rect.top || event.clientY > rect.bottom) return
+  root.scrollTop += event.deltaY
+  if (event.deltaY) event.preventDefault()
+}
+
+function inactiveProgrammeCount() {
+  const heading = [...document.querySelectorAll('h1, h2, h3, button')].find((element) =>
+    /^Inactive(?: programmes)?\s*\(\d+\)/i.test(textOf(element)) || /^Inactive$/i.test(textOf(element)),
+  )
+  if (!heading) return
+
+  const container = heading.closest('section, article, div.rounded-2xl, div.rounded-3xl') || heading.parentElement
+  if (!container) return
+
+  const cards = [...container.querySelectorAll('button')].filter((button) => textOf(button) === 'Open / edit')
+  const count = cards.length
+  const current = textOf(heading)
+
+  if (/\(\d+\)/.test(current)) {
+    heading.childNodes.forEach((node) => {
+      if (node.nodeType !== Node.TEXT_NODE) return
+      const value = node.textContent || ''
+      if (/Inactive/i.test(value)) node.textContent = value.replace(/Inactive(?: programmes)?\s*\(\d+\)/i, `Inactive programmes (${count})`)
+    })
+  }
+}
+
+function saveProgrammeReturnState(button) {
+  const root = builderRoot()
+  if (!root || !root.contains(button)) return
+
+  const disclosures = [...root.querySelectorAll('button[aria-expanded]')].map((item, index) => ({
+    index,
+    expanded: item.getAttribute('aria-expanded') === 'true',
+  }))
+
+  const picker = button.closest('div.rounded-xl.border-dashed, [data-exercise-picker]')
+  const pickerSessionId = programmeSession(picker)?.id || ''
+  sessionStorage.setItem(PROGRAMME_RETURN_STATE_KEY, JSON.stringify({
+    rootScrollTop: root.scrollTop,
+    pageScrollY: window.scrollY,
+    disclosures,
+    pickerSessionId,
+  }))
+}
+
+function restoreProgrammeReturnState() {
+  const raw = sessionStorage.getItem(PROGRAMME_RETURN_STATE_KEY)
+  if (!raw) return
+
+  let state
+  try {
+    state = JSON.parse(raw)
+  } catch {
+    sessionStorage.removeItem(PROGRAMME_RETURN_STATE_KEY)
+    return
+  }
+
+  const root = builderRoot()
+  if (!root) return
+
+  const disclosures = [...root.querySelectorAll('button[aria-expanded]')]
+  state.disclosures?.forEach(({ index, expanded }) => {
+    const button = disclosures[index]
+    if (!button) return
+    const current = button.getAttribute('aria-expanded') === 'true'
+    if (current !== expanded) button.click()
+  })
+
+  const finishRestore = (picker = null) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (picker) {
+        picker.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' })
+      } else {
+        root.scrollTop = Number(state.rootScrollTop) || 0
+        window.scrollTo(window.scrollX, Number(state.pageScrollY) || 0)
+      }
+      sessionStorage.removeItem(PROGRAMME_RETURN_STATE_KEY)
+    }))
+  }
+
+  if (state.pickerSessionId) {
+    waitForElement(() => {
+      const session = document.getElementById(state.pickerSessionId)
+      return pickerInSession(session)
+    }, 50).then((picker) => finishRestore(picker))
+    return
+  }
+
+  finishRestore()
 }
 
 export function installBuilderUxEnhancements() {
-  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return () => {}
+  if (typeof document === 'undefined') return () => {}
+  installStyles()
 
   const handleClick = (event) => {
+    const input = event.target?.closest?.('input')
+    if (isRoutineDayCheckbox(input)) {
+      preserveScrollAfterRoutineDayChange(input)
+      return
+    }
+
     const button = event.target?.closest?.('button')
     if (!button) return
-    const root = builderRoot()
-    if (!root) return
     const label = textOf(button)
 
-    if (button.matches('[aria-expanded]')) {
-      animateDisclosure(button)
-      setTimeout(() => rememberDisclosure(button, root), 0)
+    if (label === 'Manage Exercise Library') {
+      saveProgrammeReturnState(button)
       return
     }
+
+    if (label === 'Close') {
+      const root = builderRoot()
+      if (!root || !root.contains(button)) return
+      setTimeout(() => {
+        const dialog = [...document.querySelectorAll('[role="dialog"]')].find((item) => /Discard changes/i.test(textOf(item)))
+        if (dialog) dialog.style.display = ''
+      }, 0)
+      return
+    }
+
+    if (!['Add exercise', 'Change exercise', 'Add session', 'Add', 'Use'].includes(label)) return
+
+    const root = builderRoot()
+    if (!root) return
+    markRoutineTaskCards(root)
 
     if (label === 'Add session') {
-      handleAddSession(root)
+      const before = new Set(sessionCards(root))
+      collapseSessions(root)
+      waitForElement(() => sessionCards(root).find((session) => !before.has(session))).then((session) => {
+        if (!session) return
+        openButton(sessionDisclosureButton(session))
+        scrollOnce(session)
+      })
       return
     }
 
-    if (label === 'Add task') {
-      handleAddTask(root)
+    if (label === 'Add exercise' || label === 'Change exercise') {
+      const session = programmeSession(button)
+      collapseExercises(root, session)
+      waitForElement(() => pickerInSession(session)).then((picker) => {
+        if (picker) scrollOnce(picker)
+      })
       return
     }
 
-    if (label === 'Add') handleExercisePickerAdd(root, button)
+    if (label === 'Add' || label === 'Use') {
+      const session = programmeSession(button)
+      const before = new Set(exerciseCards(session || root))
+      waitForElement(() => exerciseCards(session || root).find((card) => !before.has(card))).then((card) => {
+        if (!card) return
+        const disclosure = card.querySelector('button[aria-expanded]')
+        openButton(disclosure)
+        scrollOnce(card)
+      })
+    }
   }
+
+  const handleRender = () => {
+    const root = builderRoot()
+    if (root) {
+      markRoutineTaskCards(root)
+      inactiveProgrammeCount()
+      restoreProgrammeReturnState()
+    }
+  }
+
+  const observer = new MutationObserver(() => requestAnimationFrame(handleRender))
+  observer.observe(document.body, { childList: true, subtree: true })
 
   document.addEventListener('click', handleClick, true)
-
-  let queued = false
-  const schedule = () => {
-    if (queued) return
-    queued = true
-    requestAnimationFrame(() => {
-      queued = false
-      applyBuilderUx()
-    })
-  }
-
-  applyBuilderUx()
-  const observer = new MutationObserver(schedule)
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ['aria-expanded'],
-  })
-
+  document.addEventListener('wheel', forwardWheelFromMargins, { passive: false })
+  handleRender()
   return () => {
-    document.removeEventListener('click', handleClick, true)
     observer.disconnect()
+    document.removeEventListener('click', handleClick, true)
+    document.removeEventListener('wheel', forwardWheelFromMargins)
   }
 }

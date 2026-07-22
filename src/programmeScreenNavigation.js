@@ -53,6 +53,13 @@ function sectionByTitle(root, title) {
   });
 }
 
+function countProgrammeCards(section) {
+  return [...section.children].reduce((total, child) => {
+    if (child.matches("h2")) return total;
+    return total + [...child.querySelectorAll("button")].filter((button) => text(button) === "Open / edit").length;
+  }, 0);
+}
+
 function showProgrammeOverview(root) {
   sessionStorage.removeItem(VIEW_KEY);
   root.querySelectorAll("[data-programme-subview-header]").forEach((item) => item.remove());
@@ -72,20 +79,12 @@ function showInactiveScreen(root, inactiveSection) {
 }
 
 function captureProgrammeReturnState(button) {
-  const editor = button.closest('[data-final-programme-editor="true"]') || programmeRoot();
   const picker = button.closest('div.rounded-xl.border-dashed, [data-exercise-picker]');
-  const disclosures = editor
-    ? [...editor.querySelectorAll('button[aria-expanded]')].map((item, index) => ({
-        index,
-        expanded: item.getAttribute('aria-expanded') === 'true',
-      }))
-    : [];
+  const session = picker?.closest('[id^="programme-session-"]');
 
   sessionStorage.setItem(RETURN_KEY, JSON.stringify({
     pageScrollY: window.scrollY,
-    editorScrollTop: editor?.scrollTop || 0,
-    pickerSessionId: picker?.closest('[id^="programme-session-"]')?.id || '',
-    disclosures,
+    pickerSessionId: session?.id || "",
   }));
 }
 
@@ -106,9 +105,7 @@ function enhanceProgramme() {
   inactiveSection.dataset.programmeHiddenSection = "true";
   inactiveSection.hidden = true;
 
-  const inactiveCount = [...inactiveSection.querySelectorAll("button")]
-    .filter((button) => text(button) === "Open / edit")
-    .length;
+  const inactiveCount = countProgrammeCards(inactiveSection);
   const inactiveRow = makeChevronRow("Inactive programmes", inactiveCount, () => showInactiveScreen(root, inactiveSection));
   inactiveRow.dataset.programmeOverviewRow = "true";
   activeSection.insertAdjacentElement("afterend", inactiveRow);
@@ -179,30 +176,15 @@ function restoreProgrammeReturnState() {
     return;
   }
 
-  const root = programmeRoot();
-  if (!root) return;
-  const editor = root.querySelector('[data-final-programme-editor="true"]') || root;
-  const disclosures = [...editor.querySelectorAll('button[aria-expanded]')];
-  if (!disclosures.length && state.disclosures?.length) return;
+  const session = state.pickerSessionId ? document.getElementById(state.pickerSessionId) : null;
+  if (!session) return;
 
-  state.disclosures?.forEach(({ index, expanded }) => {
-    const button = disclosures[index];
-    if (!button) return;
-    const current = button.getAttribute('aria-expanded') === 'true';
-    if (current !== expanded) button.click();
-  });
+  const picker = [...session.querySelectorAll('div.rounded-xl.border-dashed, [data-exercise-picker]')]
+    .find((item) => /Exercise picker|Change exercise|Search exercises/i.test(text(item)));
+  if (!picker) return;
 
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    if (editor) editor.scrollTop = Number(state.editorScrollTop) || 0;
-    window.scrollTo(window.scrollX, Number(state.pageScrollY) || 0);
-
-    const session = state.pickerSessionId ? document.getElementById(state.pickerSessionId) : null;
-    const picker = session
-      ? [...session.querySelectorAll('div.rounded-xl.border-dashed, [data-exercise-picker]')].find((item) => /Exercise picker|Change exercise|Search exercises/i.test(text(item)))
-      : null;
-    if (!picker) return;
-
-    picker.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
+    picker.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
     sessionStorage.removeItem(RETURN_KEY);
   }));
 }

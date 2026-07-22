@@ -113,9 +113,9 @@ function TaskSection({ title, tasks, tone, expanded, onToggle, onStatus, complet
   return <div className="space-y-2"><div className="flex items-center justify-between"><h3 className={`text-sm font-semibold ${tone}`}>{title}</h3>{tasks.length > VISIBLE_TASKS ? <button type="button" className="text-sm font-medium text-slate-600" onClick={onToggle}>{expanded ? "Show Less" : "Show All"}</button> : null}</div><div className="space-y-1.5">{visible.map((task) => <TaskRow key={`${task.baseTaskId || task.id}-${task.scheduledDate}-${task.occurrenceTimeKey || ""}`} task={task} overdue={title === "Overdue"} completed={completed} onStatus={onStatus}/>)}</div></div>;
 }
 
-export function TodayRoutine({ groups, expanded = false, onToggle, onStatus }) {
+export function TodayRoutine({ groups, expanded = {}, onToggle, onStatus }) {
   const count = groups.overdue.length + groups.due.length + groups.done.length;
-  return <section aria-labelledby="today-routine-title" className="space-y-4"><h2 id="today-routine-title" className="text-base font-semibold">Routine</h2>{!count ? <p className="text-sm text-slate-500">No routine tasks due today or overdue.</p> : null}<TaskSection title="Overdue" tasks={groups.overdue} tone="text-orange-700" expanded={expanded} onToggle={onToggle} onStatus={onStatus}/><TaskSection title="Due Today" tasks={groups.due} tone="text-slate-700" expanded={expanded} onToggle={onToggle} onStatus={onStatus}/><TaskSection title="Done" tasks={groups.done} tone="text-emerald-700" expanded={expanded} onToggle={onToggle} onStatus={onStatus} completed/></section>;
+  return <section aria-labelledby="today-routine-title" className="space-y-4"><h2 id="today-routine-title" className="text-base font-semibold">Routine</h2>{!count ? <p className="text-sm text-slate-500">No routine tasks due today or overdue.</p> : null}<TaskSection title="Overdue" tasks={groups.overdue} tone="text-orange-700" expanded={Boolean(expanded.overdue)} onToggle={() => onToggle("overdue")} onStatus={onStatus}/><TaskSection title="Due Today" tasks={groups.due} tone="text-slate-700" expanded={Boolean(expanded.due)} onToggle={() => onToggle("due")} onStatus={onStatus}/><TaskSection title="Done" tasks={groups.done} tone="text-emerald-700" expanded={Boolean(expanded.done)} onToggle={() => onToggle("done")} onStatus={onStatus} completed/></section>;
 }
 
 function IncompleteWorkoutCard({ workout, onContinue, onDismiss }) {
@@ -137,7 +137,7 @@ export function HomeDashboard({ programme, unfinishedWorkout, incompleteWorkoutL
 }
 
 export default function HomeScreen({ user, surgeryDate, trainingMode = "gym", onOpenWorkout, fromProgramme = false, onBackToProgramme, repository = defaultRepository }) {
-  const [plans, setPlans] = useState([]); const [workouts, setWorkouts] = useState([]); const [occurrences, setOccurrences] = useState([]); const [showSessions, setShowSessions] = useState(false); const [routineExpanded, setRoutineExpanded] = useState(false); const [incompleteExpanded, setIncompleteExpanded] = useState(false);
+  const [plans, setPlans] = useState([]); const [workouts, setWorkouts] = useState([]); const [occurrences, setOccurrences] = useState([]); const [showSessions, setShowSessions] = useState(false); const [routineExpanded, setRoutineExpanded] = useState({ overdue: false, due: false, done: false }); const [incompleteExpanded, setIncompleteExpanded] = useState(false);
   const today = todayString();
   useEffect(() => repository.subscribePlans(db, user.uid, setPlans, () => {}), [repository, user.uid]);
   useEffect(() => repository.subscribeWorkouts(db, user.uid, setWorkouts, () => {}), [repository, user.uid]);
@@ -147,11 +147,20 @@ export default function HomeScreen({ user, surgeryDate, trainingMode = "gym", on
   const incompleteWorkoutList = useMemo(() => incompleteWorkouts(workouts), [workouts]);
   const groups = useMemo(() => routineGroups(programme, occurrences, today), [programme, occurrences, today]);
   async function setStatus(task, status) {
+    if (!programme) return;
     const taskId = task.baseTaskId || task.id;
-    const saved = await repository.setRoutineOccurrenceStatus(db, user.uid, { id: occurrenceId(programme.id, task.scheduledDate, taskId, task.occurrenceTimeKey), programmeId: programme.id, taskId, occurrenceTimeKey: task.occurrenceTimeKey || "", scheduledDate: task.scheduledDate, status });
-    setOccurrences((current) => [...current.filter((item) => item.id !== saved.id), saved]);
+    const id = occurrenceId(programme.id, task.scheduledDate, taskId, task.occurrenceTimeKey);
+    const optimistic = { id, programmeId: programme.id, taskId, occurrenceTimeKey: task.occurrenceTimeKey || "", scheduledDate: task.scheduledDate, status };
+    setOccurrences((current) => [...current.filter((item) => item.id !== id), optimistic]);
+    try {
+      const saved = await repository.setRoutineOccurrenceStatus(db, user.uid, optimistic);
+      setOccurrences((current) => [...current.filter((item) => item.id !== saved.id), { ...optimistic, ...saved }]);
+    } catch (error) {
+      setOccurrences((current) => current.filter((item) => item.id !== id));
+      console.error("Could not update routine task", error);
+    }
   }
   function continueIncomplete(workout) { onOpenWorkout({ mode: "catch_up", workoutId: workout.id }); }
   async function dismissIncomplete(workout) { await updateDoc(doc(db, "users", user.uid, "workouts", workout.id), { dismissedIncompleteAt: serverTimestamp(), updatedAt: serverTimestamp() }); }
-  return <div className="space-y-8">{fromProgramme ? <Button variant="outline" onClick={onBackToProgramme}>← Back to programme</Button> : null}<HomeDashboard programme={programme} unfinishedWorkout={unfinishedWorkout} incompleteWorkoutList={incompleteWorkoutList} incompleteExpanded={incompleteExpanded} surgeryDate={surgeryDate} trainingMode={trainingMode} today={today} routineGroups={groups} routineExpanded={routineExpanded} onToggleRoutine={() => setRoutineExpanded((value) => !value)} onRoutineStatus={setStatus} showSessions={showSessions} onStart={() => setShowSessions(true)} onContinue={() => onOpenWorkout({ mode: "continue", workoutId: unfinishedWorkout.id })} onContinueIncomplete={continueIncomplete} onDismissIncomplete={dismissIncomplete} onToggleIncomplete={() => setIncompleteExpanded((value) => !value)} onChooseSession={(sessionId) => onOpenWorkout({ mode: "session", sessionId })} onOneOff={() => onOpenWorkout({ mode: "one_off" })}/><section id="exercise-library" className="scroll-mt-6"><PlansScreen user={user} view="exercises" trainingMode={trainingMode}/></section></div>;
+  return <div className="space-y-8">{fromProgramme ? <Button variant="outline" onClick={onBackToProgramme}>← Back to programme</Button> : null}<HomeDashboard programme={programme} unfinishedWorkout={unfinishedWorkout} incompleteWorkoutList={incompleteWorkoutList} incompleteExpanded={incompleteExpanded} surgeryDate={surgeryDate} trainingMode={trainingMode} today={today} routineGroups={groups} routineExpanded={routineExpanded} onToggleRoutine={(section) => setRoutineExpanded((value) => ({ ...value, [section]: !value[section] }))} onRoutineStatus={setStatus} showSessions={showSessions} onStart={() => setShowSessions(true)} onContinue={() => onOpenWorkout({ mode: "continue", workoutId: unfinishedWorkout.id })} onContinueIncomplete={continueIncomplete} onDismissIncomplete={dismissIncomplete} onToggleIncomplete={() => setIncompleteExpanded((value) => !value)} onChooseSession={(sessionId) => onOpenWorkout({ mode: "session", sessionId })} onOneOff={() => onOpenWorkout({ mode: "one_off" })}/><section id="exercise-library" className="scroll-mt-6"><PlansScreen user={user} view="exercises" trainingMode={trainingMode}/></section></div>;
 }

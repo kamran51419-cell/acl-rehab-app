@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { GripVertical, Plus, Search, Trash2 } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, GripVertical, Plus, Search, Trash2 } from "lucide-react";
 import { db } from "../../firebase";
 import Button from "../../components/ui/Button";
 import {
@@ -140,11 +140,7 @@ function zeroIntervalPrescription() {
   };
 }
 
-function ExerciseSetupEditor({
-  exercise,
-  onChange,
-  trainingMode = "gym",
-}) {
+function ExerciseSetupEditor({ exercise, onChange, trainingMode = "gym" }) {
   const updatePrescription = (prescription) => onChange({ ...exercise, prescription });
   const methods = loggingMethodsForExerciseType(exercise.exerciseType);
   const isLegacyCompleted = exercise.loggingMethod === EXERCISE_LOGGING_METHOD.COMPLETED;
@@ -182,16 +178,16 @@ function ExerciseSetupEditor({
             <div className="font-medium">Set-up {index + 1}</div>
             <div className="text-sm text-slate-600">
               {item.side === SIDE.LEFT
-  ? "Left only"
-  : item.side === SIDE.RIGHT
-    ? "Right only"
-    : item.side === SIDE.SEPARATE
-      ? "Left & right"
-      : "Standard"}{" "}
-· {item.targetSets} ×{" "}
-{item.targetReps?.type === REP_TARGET_TYPE.RANGE
-  ? `${item.targetReps.min}–${item.targetReps.max}`
-  : item.targetReps?.value}
+                ? "Left only"
+                : item.side === SIDE.RIGHT
+                  ? "Right only"
+                  : item.side === SIDE.SEPARATE
+                    ? "Left & right"
+                    : "Standard"}{" "}
+              · {item.targetSets} ×{" "}
+              {item.targetReps?.type === REP_TARGET_TYPE.RANGE
+                ? `${item.targetReps.min}–${item.targetReps.max}`
+                : item.targetReps?.value}
             </div>
           </div>
         ))}
@@ -231,14 +227,13 @@ function ExerciseSetupEditor({
             <Field label="Side">
               <Select value={p.side || SIDE.BOTH} onChange={(event) => updatePrescription({ ...p, side: event.target.value })}>
                 <option value={SIDE.BOTH}>Standard</option>
-<option value={SIDE.SEPARATE}>Left & right</option>
-
-{trainingMode === "rehab" && (
-  <>
-    <option value={SIDE.LEFT}>Left only</option>
-    <option value={SIDE.RIGHT}>Right only</option>
-  </>
-)}
+                <option value={SIDE.SEPARATE}>Left & right</option>
+                {trainingMode === "rehab" && (
+                  <>
+                    <option value={SIDE.LEFT}>Left only</option>
+                    <option value={SIDE.RIGHT}>Right only</option>
+                  </>
+                )}
               </Select>
             </Field>
             <Field label="Sets"><Input inputMode="numeric" value={p.targetSets || ""} onChange={(event) => updatePrescription({ ...p, targetSets: Number(event.target.value) })} /></Field>
@@ -313,6 +308,8 @@ function PlanEditor({
   const [pickerSession, setPickerSession] = useState(null);
   const [replaceTarget, setReplaceTarget] = useState(null);
   const [activeExerciseId, setActiveExerciseId] = useState("");
+  const exerciseRefs = useRef(new Map());
+  const pendingScrollExerciseId = useRef("");
   const [draggingExercise, setDraggingExercise] = useState(null);
   const [draggingSession, setDraggingSession] = useState(null);
   const [removeSessionIndex, setRemoveSessionIndex] = useState(null);
@@ -322,6 +319,16 @@ function PlanEditor({
   const routineValid = routineTasksForPlan(draft).every((task) => task.name?.trim() && task.days?.length);
   const validationMessages = friendlyPlanValidationMessages(validation.errors);
   const filteredExercises = filterExerciseLibrary(exercises, { query: exerciseQuery });
+
+  useEffect(() => {
+    const exerciseId = pendingScrollExerciseId.current;
+    if (!exerciseId || activeExerciseId !== exerciseId) return;
+    const timeout = window.setTimeout(() => {
+      exerciseRefs.current.get(exerciseId)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      pendingScrollExerciseId.current = "";
+    }, 180);
+    return () => window.clearTimeout(timeout);
+  }, [activeExerciseId, draft.sessions]);
 
   const setSessions = (sessions) => setDraft({ ...draft, sessions });
   const routineTasks = routineTasksForPlan(draft);
@@ -385,6 +392,7 @@ function PlanEditor({
       updateSession(sessionIndex, {
         exercises: session.exercises.map((item, index) => index === replaceTarget.exerciseIndex ? replacement : item),
       });
+      pendingScrollExerciseId.current = replacement.id;
       setActiveExerciseId(replacement.id);
     } else {
       const planExercise = createPlanExercise({
@@ -396,6 +404,7 @@ function PlanEditor({
         loggingMethod: defaultLoggingMethodForExerciseType(exerciseType),
       });
       updateSession(sessionIndex, { exercises: [...session.exercises, planExercise] });
+      pendingScrollExerciseId.current = planExercise.id;
       setActiveExerciseId(planExercise.id);
     }
 
@@ -488,50 +497,74 @@ function PlanEditor({
             </div>
 
             <div className="space-y-3">
-              {session.exercises.map((exercise, exerciseIndex) => (
-                <div
-                  key={exercise.id}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={() => draggingExercise?.sessionIndex === sessionIndex && moveExercise(sessionIndex, draggingExercise.exerciseIndex, exerciseIndex)}
-                  className={cls("space-y-3 rounded-xl border bg-white p-3", activeExerciseId === exercise.id ? "border-emerald-400 ring-2 ring-emerald-100" : "border-slate-200")}
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-start gap-2">
-                      <button
-                        type="button"
-                        draggable
-                        onDragStart={() => setDraggingExercise({ sessionIndex, exerciseIndex })}
-                        onDragEnd={() => setDraggingExercise(null)}
-                        className="cursor-grab rounded p-1 text-slate-400"
-                        aria-label={`Drag ${exercise.exerciseNameSnapshot}`}
-                      >
-                        <GripVertical className="h-5 w-5" />
-                      </button>
-                      <div>
-                        <div className="font-semibold">{exercise.exerciseNameSnapshot}</div>
-                        <div className="text-sm text-slate-500">{planPrescriptionSummary(exercise)}</div>
+              {session.exercises.map((exercise, exerciseIndex) => {
+                const expanded = activeExerciseId === exercise.id;
+                return (
+                  <div
+                    ref={(node) => {
+                      if (node) exerciseRefs.current.set(exercise.id, node);
+                      else exerciseRefs.current.delete(exercise.id);
+                    }}
+                    data-exercise-card="true"
+                    key={exercise.id}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={() => draggingExercise?.sessionIndex === sessionIndex && moveExercise(sessionIndex, draggingExercise.exerciseIndex, exerciseIndex)}
+                    className={cls("scroll-mt-24 overflow-hidden rounded-xl border bg-white transition-[border-color,box-shadow] duration-150", expanded ? "border-emerald-400 ring-2 ring-emerald-100" : "border-slate-200")}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2 p-3">
+                      <div className="flex items-start gap-2">
+                        <button
+                          type="button"
+                          draggable
+                          onDragStart={() => setDraggingExercise({ sessionIndex, exerciseIndex })}
+                          onDragEnd={() => setDraggingExercise(null)}
+                          className="cursor-grab rounded p-1 text-slate-400"
+                          aria-label={`Drag ${exercise.exerciseNameSnapshot}`}
+                        >
+                          <GripVertical className="h-5 w-5" />
+                        </button>
+                        <div>
+                          <div className="font-semibold">{exercise.exerciseNameSnapshot}</div>
+                          <div className="text-sm text-slate-500">{planPrescriptionSummary(exercise)}</div>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setActiveExerciseId((current) => current === exercise.id ? "" : exercise.id)}
+                          className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+                          aria-expanded={expanded}
+                          aria-label={`${expanded ? "Collapse" : "Expand"} ${exercise.exerciseNameSnapshot}`}
+                        >
+                          <ChevronDown className={cls("h-5 w-5 transition-transform duration-150", expanded && "rotate-180")} />
+                        </button>
+                        <Button size="sm" variant="outline" onClick={() => openPickerForReplace(sessionIndex, exerciseIndex)}>Change exercise</Button>
+                        <Button size="sm" variant="outline" onClick={() => updateSession(sessionIndex, { exercises: [...session.exercises, duplicatePlanExercise(exercise, { sortOrder: session.exercises.length })] })}>Duplicate</Button>
+                        <Button size="sm" variant="danger" onClick={() => {
+                          updateSession(sessionIndex, { exercises: session.exercises.filter((_, index) => index !== exerciseIndex).map((item, index) => ({ ...item, sortOrder: index })) });
+                          if (activeExerciseId === exercise.id) setActiveExerciseId("");
+                        }}>
+                          <Trash2 className="mr-1 h-4 w-4" /> Remove
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Button size="sm" variant="outline" onClick={() => openPickerForReplace(sessionIndex, exerciseIndex)}>Change exercise</Button>
-                      <Button size="sm" variant="outline" onClick={() => updateSession(sessionIndex, { exercises: [...session.exercises, duplicatePlanExercise(exercise, { sortOrder: session.exercises.length })] })}>Duplicate</Button>
-                      <Button size="sm" variant="danger" onClick={() => updateSession(sessionIndex, { exercises: session.exercises.filter((_, index) => index !== exerciseIndex).map((item, index) => ({ ...item, sortOrder: index })) })}>
-                        <Trash2 className="mr-1 h-4 w-4" /> Remove
-                      </Button>
-                    </div>
+
+                    {expanded ? (
+                      <div className="space-y-3 border-t border-slate-100 p-3 pt-4">
+                        <ExerciseSetupEditor
+                          exercise={exercise}
+                          onChange={(next) => updateSession(sessionIndex, { exercises: session.exercises.map((item, index) => index === exerciseIndex ? next : item) })}
+                          trainingMode={trainingMode}
+                        />
+
+                        <Field label="Notes">
+                          <Textarea value={exercise.notes || ""} onChange={(event) => updateSession(sessionIndex, { exercises: session.exercises.map((item, index) => index === exerciseIndex ? { ...item, notes: event.target.value } : item) })} />
+                        </Field>
+                      </div>
+                    ) : null}
                   </div>
-
-                  <ExerciseSetupEditor
-                    exercise={exercise}
-                    onChange={(next) => updateSession(sessionIndex, { exercises: session.exercises.map((item, index) => index === exerciseIndex ? next : item) })}
-                    trainingMode={trainingMode}
-                  />
-
-                  <Field label="Notes">
-                    <Textarea value={exercise.notes || ""} onChange={(event) => updateSession(sessionIndex, { exercises: session.exercises.map((item, index) => index === exerciseIndex ? { ...item, notes: event.target.value } : item) })} />
-                  </Field>
-                </div>
-              ))}
+                );
+              })}
 
               {pickerSession === sessionIndex ? (
                 <div className="rounded-xl border border-dashed border-slate-300 bg-white p-3">
@@ -544,21 +577,18 @@ function PlanEditor({
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                     <Input className="h-12 rounded-xl pl-10 text-base" autoFocus aria-label="Search exercises" value={exerciseQuery} onChange={(event) => setExerciseQuery(event.target.value)} placeholder="Search exercises" />
                   </div>
-                      <div className="mt-3 max-h-72 space-y-2 overflow-y-auto">
-                        {filteredExercises.length ? filteredExercises.map((libraryExercise) => {
-                          const selected = session.exercises.some((item) => item.exerciseId === libraryExercise.id);
-                          return (
-                          <div key={libraryExercise.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3">
-                            <div className="min-w-0">
-                              <div className="truncate font-medium">{libraryExercise.name}</div>
-                              <div className="text-xs text-slate-500">{exerciseTypeLabel(libraryExercise.exerciseType || libraryExercise.trackingType)}</div>
-                            </div>
-                            <Button size="sm" variant={selected && !replaceTarget ? "outline" : "primary"} disabled={selected && !replaceTarget} onClick={() => chooseExercise(sessionIndex, libraryExercise)}>{replaceTarget ? "Use" : selected ? "Selected" : "Add"}</Button>
-                          </div>
-                          );
-                        }) : <div className="rounded-xl bg-slate-50 p-4 text-center text-sm text-slate-500">No matching exercises.</div>}
+                  <div className="mt-3 max-h-72 space-y-2 overflow-y-auto">
+                    {filteredExercises.length ? filteredExercises.map((libraryExercise) => (
+                      <div key={libraryExercise.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3">
+                        <div className="min-w-0">
+                          <div className="truncate font-medium">{libraryExercise.name}</div>
+                          <div className="text-xs text-slate-500">{exerciseTypeLabel(libraryExercise.exerciseType || libraryExercise.trackingType)}</div>
+                        </div>
+                        <Button size="sm" variant="primary" onClick={() => chooseExercise(sessionIndex, libraryExercise)}>{replaceTarget ? "Use" : "Add"}</Button>
                       </div>
-                      <Button className="mt-3 w-full" variant="outline" onClick={onManageExerciseLibrary}>Manage Exercise Library</Button>
+                    )) : <div className="rounded-xl bg-slate-50 p-4 text-center text-sm text-slate-500">No matching exercises.</div>}
+                  </div>
+                  <Button className="mt-3 w-full" variant="outline" onClick={onManageExerciseLibrary}>Manage Exercise Library</Button>
                 </div>
               ) : null}
             </div>
@@ -678,63 +708,47 @@ export function ExerciseLibrary({ user, exercises, onChanged }) {
           </div>
         ) : visibleExercises.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-center text-sm text-slate-500">No exercises match your search.</div>
-        ) : (
-          <div className="space-y-1.5">
-            {visibleExercises.map((exercise) => (
-              <div key={exercise.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium text-slate-900">{exercise.name}</div>
-                  <div className="truncate text-xs text-slate-500">{exerciseTypeLabel(exercise.exerciseType || exercise.trackingType)}</div>
-                </div>
-                <Button className="shrink-0 px-3 py-1.5" size="sm" variant="outline" onClick={() => setEditingExercise({ ...exercise, exerciseType: exercise.exerciseType || exercise.trackingType || EXERCISE_TYPE.STRENGTH })}>Edit</Button>
+        ) : visibleExercises.map((exercise) => (
+          <div key={exercise.id} className="rounded-2xl border border-slate-200 bg-white p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="font-medium text-slate-900">{exercise.name}</div>
+                <div className="text-xs text-slate-500">{exerciseTypeLabel(exercise.exerciseType || exercise.trackingType)}</div>
               </div>
-            ))}
+              <Button size="sm" variant="outline" onClick={() => setEditingExercise({ ...exercise, exerciseType: exercise.exerciseType || exercise.trackingType || EXERCISE_TYPE.STRENGTH })}>Edit</Button>
+            </div>
           </div>
-        )}
+        ))}
       </div>
 
       {addingExercise ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-          <div role="dialog" aria-modal="true" aria-labelledby="add-exercise-title" className="max-h-[calc(100vh-2rem)] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
-            <h3 id="add-exercise-title" className="text-lg font-semibold">Add exercise</h3>
-            <div className="mt-4 space-y-4">
-              <Field label="Exercise name"><Input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="Leg extension" /></Field>
-              <Field label="Exercise type"><Select value={exerciseType} onChange={(event) => setExerciseType(event.target.value)}>{LIBRARY_EXERCISE_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}</Select></Field>
-            </div>
-            <div className="mt-6 flex justify-end gap-2">
-              <Button variant="outline" disabled={saving} onClick={() => { setAddingExercise(false); setName(""); setExerciseType(EXERCISE_TYPE.STRENGTH); }}>Cancel</Button>
-              <Button onClick={saveNewExercise} disabled={saving || !name.trim()}>{saving ? "Saving…" : "Add exercise"}</Button>
-            </div>
+          <div role="dialog" aria-modal="true" className="w-full max-w-md space-y-4 rounded-2xl bg-white p-5 shadow-xl">
+            <h3 className="text-lg font-semibold">Add exercise</h3>
+            <Field label="Exercise name"><Input autoFocus value={name} onChange={(event) => setName(event.target.value)} /></Field>
+            <Field label="Exercise type"><Select value={exerciseType} onChange={(event) => setExerciseType(event.target.value)}>{LIBRARY_EXERCISE_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}</Select></Field>
+            <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setAddingExercise(false)}>Cancel</Button><Button disabled={!name.trim() || saving} onClick={saveNewExercise}>{saving ? "Saving…" : "Save"}</Button></div>
           </div>
         </div>
       ) : null}
 
       {editingExercise ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-          <div role="dialog" aria-modal="true" aria-labelledby="edit-exercise-title" className="max-h-[calc(100vh-2rem)] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
-            <h3 id="edit-exercise-title" className="text-lg font-semibold">Edit exercise</h3>
-            <div className="mt-4 space-y-4">
-              <Field label="Exercise name"><Input autoFocus value={editingExercise.name} onChange={(event) => setEditingExercise({ ...editingExercise, name: event.target.value })} /></Field>
-              <Field label="Exercise type"><Select value={editingExercise.exerciseType || editingExercise.trackingType} onChange={(event) => setEditingExercise({ ...editingExercise, exerciseType: event.target.value })}>{!LIBRARY_EXERCISE_TYPE_OPTIONS.includes(editingExercise.exerciseType) ? <option value={editingExercise.exerciseType}>{exerciseTypeLabel(editingExercise.exerciseType)} (existing)</option> : null}{LIBRARY_EXERCISE_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}</Select></Field>
-            </div>
-            <div className="mt-6 flex flex-wrap justify-end gap-2">
-              <Button variant="danger" onClick={() => setDeleteCandidate(editingExercise)}>Delete</Button>
-              <Button variant="outline" onClick={() => setEditingExercise(null)}>Cancel</Button>
-              <Button onClick={saveEditedExercise} disabled={!editingExercise.name.trim()}>Save</Button>
-            </div>
+          <div role="dialog" aria-modal="true" className="w-full max-w-md space-y-4 rounded-2xl bg-white p-5 shadow-xl">
+            <h3 className="text-lg font-semibold">Edit exercise</h3>
+            <Field label="Exercise name"><Input value={editingExercise.name} onChange={(event) => setEditingExercise({ ...editingExercise, name: event.target.value })} /></Field>
+            <Field label="Exercise type"><Select value={editingExercise.exerciseType} onChange={(event) => setEditingExercise({ ...editingExercise, exerciseType: event.target.value })}>{LIBRARY_EXERCISE_TYPE_OPTIONS.map((type) => <option key={type} value={type}>{exerciseTypeLabel(type)}</option>)}</Select></Field>
+            <div className="flex justify-between gap-2"><Button variant="danger" onClick={() => setDeleteCandidate(editingExercise)}>Delete</Button><div className="flex gap-2"><Button variant="outline" onClick={() => setEditingExercise(null)}>Cancel</Button><Button disabled={!editingExercise.name.trim()} onClick={saveEditedExercise}>Save</Button></div></div>
           </div>
         </div>
       ) : null}
 
       {deleteCandidate ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4">
           <div role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
-            <h3 className="text-lg font-semibold">Delete {deleteCandidate.name} permanently?</h3>
-            <p className="mt-2 text-sm text-slate-600">It will be removed from your Exercise Library. Existing programme and workout records will not be rewritten.</p>
-            <div className="mt-5 flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setDeleteCandidate(null)}>Cancel</Button>
-              <Button variant="danger" onClick={deleteExercise}>Delete permanently</Button>
-            </div>
+            <h3 className="text-lg font-semibold">Delete exercise?</h3>
+            <p className="mt-2 text-sm text-slate-600">This permanently removes {deleteCandidate.name} from your library. Existing programme and workout records will not be changed.</p>
+            <div className="mt-5 flex justify-end gap-2"><Button variant="outline" onClick={() => setDeleteCandidate(null)}>Cancel</Button><Button variant="danger" onClick={deleteExercise}>Delete</Button></div>
           </div>
         </div>
       ) : null}
@@ -742,255 +756,137 @@ export function ExerciseLibrary({ user, exercises, onChanged }) {
   );
 }
 
-export default function PlansScreen({
-  user,
-  view = "programme",
-  onManageExerciseLibrary,
-  trainingMode = "gym",
-}) {
-  console.log("trainingMode:", trainingMode);
+export default function PlansScreen({ user, trainingMode = "gym" }) {
   const [plans, setPlans] = useState([]);
   const [exercises, setExercises] = useState([]);
-  const [plansLoading, setPlansLoading] = useState(view === "programme");
-  const [exercisesLoading, setExercisesLoading] = useState(true);
-  const [plansError, setPlansError] = useState("");
-  const [exercisesError, setExercisesError] = useState("");
   const [draft, setDraft] = useState(null);
   const [original, setOriginal] = useState(null);
-  const [loadedToken, setLoadedToken] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
-  const [programmeNotice, setProgrammeNotice] = useState("");
-  const [deleteProgrammeCandidate, setDeleteProgrammeCandidate] = useState(null);
-  const [discardDraftOpen, setDiscardDraftOpen] = useState(false);
-  const draftStorageKey = `programme-draft:${user.uid}`;
-
-  useEffect(() => {
-    if (view !== "programme") return;
-    const saved = sessionStorage.getItem(draftStorageKey);
-    if (!saved) return;
-    try {
-      const restored = JSON.parse(saved);
-      setDraft(restored.draft);
-      setOriginal(restored.original);
-      setLoadedToken(restored.loadedToken || "");
-    } catch {
-      sessionStorage.removeItem(draftStorageKey);
-    }
-  }, [draftStorageKey, view]);
-
-  useEffect(() => {
-    if (view !== "programme" || !draft) return;
-    sessionStorage.setItem(draftStorageKey, JSON.stringify({ draft, original, loadedToken }));
-  }, [draft, original, loadedToken, draftStorageKey, view]);
+  const [view, setView] = useState("programmes");
 
   useEffect(() => {
     if (!user?.uid) return undefined;
-    setExercisesLoading(true);
-    setExercisesError("");
-    const unsubExercises = subscribeExerciseDefinitions(
-      db,
-      user.uid,
-      (next) => { setExercises(next); setExercisesLoading(false); },
-      (error) => { console.error("Could not load exercise library", error); setExercisesError(friendlyErrorMessage(error, "We could not load your exercise library. Please try again.", "exercise library")); setExercisesLoading(false); },
-    );
-    if (view === "exercises") return unsubExercises;
-
-    setPlansLoading(true);
-    setPlansError("");
-    const unsubPlans = subscribePlans(
-      db,
-      user.uid,
-      (next) => { setPlans(next); setPlansLoading(false); },
-      (error) => { console.error("Could not load programmes", error); setPlansError(friendlyErrorMessage(error, "We could not load your programmes. Please try again.", "programmes")); setPlansLoading(false); },
-    );
-    return () => { unsubPlans(); unsubExercises(); };
-  }, [user?.uid, view]);
+    const unsubscribePlans = subscribePlans(db, user.uid, setPlans);
+    const unsubscribeExercises = subscribeExerciseDefinitions(db, user.uid, setExercises);
+    return () => {
+      unsubscribePlans?.();
+      unsubscribeExercises?.();
+    };
+  }, [user?.uid]);
 
   const activePlans = useMemo(() => sectionPlans(plans, (plan) => plan.isActive), [plans]);
   const inactivePlans = useMemo(() => sectionPlans(plans, (plan) => !plan.isActive), [plans]);
 
-  function openNewPlan() {
+  const beginCreate = () => {
     setOriginal(null);
-    setLoadedToken("");
-    setDraft(createBlankPlan({ userId: user.uid, name: "New programme" }));
+    setDraft(createBlankPlan());
     setSaveMessage("");
-  }
+  };
 
-  function openPlan(plan) {
-    setOriginal(structuredClone(plan));
-    setLoadedToken(plan.updatedAtToken || "");
-    setDraft(structuredClone(plan));
+  const beginEdit = (plan) => {
+    setOriginal(plan);
+    setDraft(JSON.parse(JSON.stringify(plan)));
     setSaveMessage("");
-  }
+  };
 
-  function closeEditor() {
-    if ((draft && original && JSON.stringify(draft) !== JSON.stringify(original)) || (draft && !original)) {
-      setDiscardDraftOpen(true);
-      return;
-    }
-    discardDraft();
-  }
-
-  function discardDraft() {
+  const closeEditor = () => {
     setDraft(null);
     setOriginal(null);
     setSaveMessage("");
-    setDiscardDraftOpen(false);
-    sessionStorage.removeItem(draftStorageKey);
-  }
+  };
 
-  async function saveDraft() {
-    if (!draft || saving) return;
-    const validation = validatePlan(draft);
-    if (!validation.valid) {
-      setSaveMessage(friendlyPlanValidationMessages(validation.errors).join(" "));
-      return;
-    }
+  const saveProgramme = async () => {
+    if (!draft || !user?.uid || saving) return;
     setSaving(true);
     setSaveMessage("");
     try {
-      const saveToken = token();
-      const planToSave = nextPlanForSave(original, draft);
-      const saved = original
-        ? await updatePlan(db, user.uid, original, planToSave, { expectedUpdatedAtToken: loadedToken, updatedAtToken: saveToken })
-        : await createPlan(db, user.uid, planToSave, { updatedAtToken: saveToken });
-      if (saved.isActive) await setPlanActive(db, user.uid, saved, true, { updatedAtToken: saveToken });
-      setOriginal(null);
+      const next = nextPlanForSave(draft, original);
+      if (original) await updatePlan(db, user.uid, original.id, next, { updatedAtToken: token() });
+      else await createPlan(db, user.uid, next, { updatedAtToken: token() });
       setDraft(null);
-      setLoadedToken("");
+      setOriginal(null);
       setSaveMessage("");
-      setProgrammeNotice("Programme saved.");
-      sessionStorage.removeItem(draftStorageKey);
     } catch (error) {
       console.error("Could not save programme", error);
-      setSaveMessage(friendlyErrorMessage(error, "Your changes were not saved. Please try again."));
+      setSaveMessage(friendlyErrorMessage(error, "We could not save that programme. Please try again.", "programmes"));
     } finally {
       setSaving(false);
     }
-  }
+  };
 
-  async function handleDuplicate(plan) {
-    if (saving) return;
-    setSaving(true);
+  const duplicateProgramme = async (plan) => {
     try {
-      await duplicatePlanDocument(db, user.uid, plan, { newPlanId: `plan-${makeId()}`, updatedAtToken: token() });
-      setProgrammeNotice("Programme duplicated.");
+      await duplicatePlanDocument(db, user.uid, plan, { updatedAtToken: token() });
     } catch (error) {
       console.error("Could not duplicate programme", error);
-      setPlansError(friendlyErrorMessage(error, "We could not duplicate that programme. Please try again.", "programmes"));
-    } finally {
-      setSaving(false);
     }
-  }
+  };
 
-  async function handleToggleActive(plan) {
+  const togglePlanActive = async (plan) => {
     try {
-      await setPlanActive(db, user.uid, plan, !plan.isActive, { updatedAtToken: token() });
-      setProgrammeNotice(plan.isActive ? "Programme deactivated." : "Programme activated.");
+      await setPlanActive(db, user.uid, plan.id, !plan.isActive, { updatedAtToken: token() });
     } catch (error) {
       console.error("Could not update programme status", error);
-      setPlansError(friendlyErrorMessage(error, "We could not update that programme. Please try again.", "programmes"));
     }
-  }
+  };
 
-  async function handleDeleteProgramme() {
-    if (!deleteProgrammeCandidate) return;
+  const removeProgramme = async (plan) => {
+    if (!window.confirm(`Delete ${plan.name || "this programme"}?`)) return;
     try {
-      await deletePlan(db, user.uid, deleteProgrammeCandidate.id);
-      setPlans((current) => current.filter((plan) => plan.id !== deleteProgrammeCandidate.id));
-      setDeleteProgrammeCandidate(null);
-      setProgrammeNotice("Programme permanently deleted. Completed workouts were not changed.");
+      await deletePlan(db, user.uid, plan.id);
     } catch (error) {
       console.error("Could not delete programme", error);
-      setPlansError(friendlyErrorMessage(error, "We could not delete that programme. Please try again.", "programmes"));
     }
+  };
+
+  if (draft) {
+    return (
+      <PlanEditor
+        draft={draft}
+        setDraft={setDraft}
+        original={original}
+        exercises={exercises}
+        onSave={saveProgramme}
+        onClose={closeEditor}
+        saving={saving}
+        saveMessage={saveMessage}
+        onManageExerciseLibrary={() => setView("library")}
+        trainingMode={trainingMode}
+      />
+    );
   }
 
-  const renderSection = (title, items, empty) => (
-    <section className="space-y-3">
-      <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-      {items.length === 0
-        ? <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">{empty}</div>
-        : <div className="grid gap-3 lg:grid-cols-2">{items.map((plan) => <PlanCard key={plan.id} plan={plan} onEdit={openPlan} onDuplicate={handleDuplicate} onToggleActive={handleToggleActive} onDelete={setDeleteProgrammeCandidate} />)}</div>}
-    </section>
-  );
-
   return (
-    <div className="space-y-6">
-      {view === "exercises" ? (
-        <>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Manage Exercises</h1>
-            <p className="text-sm text-slate-500">Create, search and manage your reusable exercise library.</p>
-          </div>
-          {exercisesError ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{exercisesError}</div> : null}
-          {exercisesLoading ? <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-500">Loading exercise library…</div> : <ExerciseLibrary user={user} exercises={exercises} />}
-        </>
+    <div className="space-y-5">
+      <div className="flex gap-2">
+        <Button variant={view === "programmes" ? "primary" : "outline"} onClick={() => setView("programmes")}>Programmes</Button>
+        <Button variant={view === "library" ? "primary" : "outline"} onClick={() => setView("library")}>Exercise Library</Button>
+      </div>
+
+      {view === "library" ? (
+        <ExerciseLibrary user={user} exercises={exercises} />
       ) : (
         <>
-          <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight">Programme</h1>
-              <p className="text-sm text-slate-500">Build reusable, named sessions and train them in any order.</p>
+              <h1 className="text-2xl font-bold text-slate-900">Programmes</h1>
+              <p className="text-sm text-slate-500">Build reusable weekly training programmes.</p>
             </div>
-            <Button className="w-fit" onClick={openNewPlan}><Plus className="mr-1 h-4 w-4" /> Create programme</Button>
+            <Button onClick={beginCreate}><Plus className="mr-1 h-4 w-4" /> Create programme</Button>
           </div>
 
-          {programmeNotice ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{programmeNotice}</div> : null}
-          {plansError ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{plansError}</div> : null}
-          {exercisesError ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">The exercise library could not be loaded. Programme exercises already saved remain editable.</div> : null}
-          {plansLoading ? <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-500">Loading programmes…</div> : null}
-          {!plansLoading && plans.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center">
-              <div className="font-semibold text-slate-900">No programmes yet</div>
-              <p className="mt-1 text-sm text-slate-500">Create your first programme and give each workout session a useful name.</p>
-              <Button className="mt-4" onClick={openNewPlan}>Create first programme</Button>
-            </div>
+          {activePlans.length ? (
+            <section className="space-y-3">
+              <h2 className="text-lg font-semibold">Active</h2>
+              {activePlans.map((plan) => <PlanCard key={plan.id} plan={plan} onEdit={beginEdit} onDuplicate={duplicateProgramme} onToggleActive={togglePlanActive} onDelete={removeProgramme} />)}
+            </section>
           ) : null}
 
-      
-  {draft ? (
-  <PlanEditor
-    draft={draft}
-    setDraft={setDraft}
-    original={original}
-    exercises={exercises}
-    onSave={saveDraft}
-    onClose={closeEditor}
-    saving={saving}
-    saveMessage={saveMessage}
-    onManageExerciseLibrary={onManageExerciseLibrary}
-    trainingMode={trainingMode}
-  />
-) : null}
-          {renderSection("Active", activePlans, "Activate any programme when you are ready to use it regularly.")}
-          {renderSection("Inactive", inactivePlans, "Programmes you deactivate will remain here and can be activated later.")}
-
-          {deleteProgrammeCandidate ? (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-              <div role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
-                <h3 className="text-lg font-semibold">Delete "{deleteProgrammeCandidate.name}" permanently?</h3>
-                <p className="mt-2 text-sm text-slate-600">This programme will be removed permanently. Completed workouts will remain untouched.</p>
-                <div className="mt-5 flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => setDeleteProgrammeCandidate(null)}>Cancel</Button>
-                  <Button variant="danger" onClick={handleDeleteProgramme}>Delete permanently</Button>
-                </div>
-              </div>
-            </div>
-          ) : null}
-          {discardDraftOpen ? (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-              <div role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
-                <h3 className="text-lg font-semibold">Discard changes?</h3>
-                <p className="mt-2 text-sm text-slate-600">Your changes have not been saved.</p>
-                <div className="mt-5 flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => setDiscardDraftOpen(false)}>Keep editing</Button>
-                  <Button variant="danger" onClick={discardDraft}>Discard</Button>
-                </div>
-              </div>
-            </div>
-          ) : null}
+          <section className="space-y-3">
+            <h2 className="text-lg font-semibold">Inactive</h2>
+            {inactivePlans.length ? inactivePlans.map((plan) => <PlanCard key={plan.id} plan={plan} onEdit={beginEdit} onDuplicate={duplicateProgramme} onToggleActive={togglePlanActive} onDelete={removeProgramme} />) : <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">No inactive programmes.</div>}
+          </section>
         </>
       )}
     </div>

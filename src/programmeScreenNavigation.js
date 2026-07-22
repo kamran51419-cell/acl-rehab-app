@@ -1,6 +1,6 @@
 const VIEW_KEY = "programme-subview";
-const RETURN_KEY = "programme-library-return-v2";
-const LEGACY_RETURN_KEY = "programme-editor-return-state-v1";
+const RETURN_KEY = "programme-library-return-v3";
+const LEGACY_RETURN_KEYS = ["programme-library-return-v2", "programme-editor-return-state-v1"];
 
 function text(element) {
   return (element?.textContent || "").trim();
@@ -59,14 +59,19 @@ function sectionByTitle(root, title) {
 }
 
 function countProgrammeCards(section) {
+  const grid = [...section.children].find((child) => child.matches?.(".grid"));
+  if (grid) return grid.children.length;
+
+  const badges = [...section.querySelectorAll("span")].filter((item) => text(item) === "Inactive");
+  if (badges.length) return badges.length;
+
   return [...section.querySelectorAll("button")].filter((button) => text(button) === "Open / edit").length;
 }
 
 function updateInactiveCount(root, inactiveSection) {
   const row = root.querySelector('[data-programme-overview-row="inactive"]');
-  const count = countProgrammeCards(inactiveSection);
   const countElement = row?.querySelector("[data-programme-count]");
-  if (countElement) countElement.textContent = countLabel(count);
+  if (countElement) countElement.textContent = countLabel(countProgrammeCards(inactiveSection));
 }
 
 function sessionDisclosureButton(session) {
@@ -74,25 +79,33 @@ function sessionDisclosureButton(session) {
   return header?.querySelector('button[aria-expanded], button[aria-label*="session" i]') || null;
 }
 
+function editorForSession(session) {
+  return session?.closest('[data-final-programme-editor="true"], .space-y-5.rounded-3xl.border') || null;
+}
+
 function captureProgrammeReturnState(button) {
   const picker = button.closest('div.rounded-xl.border-dashed, [data-exercise-picker]');
   const targetSession = picker?.closest('[id^="programme-session-"]');
+  const editor = editorForSession(targetSession);
   const sessions = [...document.querySelectorAll('[id^="programme-session-"]')].map((session) => {
     const sessionDisclosure = sessionDisclosureButton(session);
     const disclosures = [...session.querySelectorAll('button[aria-expanded]')].filter((item) => item !== sessionDisclosure);
     return {
       id: session.id,
-      sessionExpanded: sessionDisclosure?.getAttribute('aria-expanded') === 'true',
-      exerciseExpanded: disclosures.map((item) => item.getAttribute('aria-expanded') === 'true'),
+      sessionExpanded: sessionDisclosure?.getAttribute("aria-expanded") === "true",
+      exerciseExpanded: disclosures.map((item) => item.getAttribute("aria-expanded") === "true"),
     };
   });
 
   sessionStorage.setItem(RETURN_KEY, JSON.stringify({
-    targetSessionId: targetSession?.id || '',
+    targetSessionId: targetSession?.id || "",
+    pageScrollY: window.scrollY,
+    editorScrollTop: editor?.scrollTop || 0,
     sessions,
+    phase: "waiting",
   }));
 
-  setTimeout(() => sessionStorage.removeItem(LEGACY_RETURN_KEY), 0);
+  LEGACY_RETURN_KEYS.forEach((key) => sessionStorage.removeItem(key));
 }
 
 function restoreDisclosureState(state) {
@@ -102,7 +115,7 @@ function restoreDisclosureState(state) {
 
     const sessionDisclosure = sessionDisclosureButton(session);
     if (sessionDisclosure) {
-      const current = sessionDisclosure.getAttribute('aria-expanded') === 'true';
+      const current = sessionDisclosure.getAttribute("aria-expanded") === "true";
       if (current !== savedSession.sessionExpanded) sessionDisclosure.click();
     }
 
@@ -110,10 +123,16 @@ function restoreDisclosureState(state) {
     savedSession.exerciseExpanded?.forEach((expanded, index) => {
       const disclosure = disclosures[index];
       if (!disclosure) return;
-      const current = disclosure.getAttribute('aria-expanded') === 'true';
+      const current = disclosure.getAttribute("aria-expanded") === "true";
       if (current !== expanded) disclosure.click();
     });
   });
+}
+
+function revealRestoredEditor(editor) {
+  if (!editor) return;
+  editor.style.visibility = "";
+  delete editor.dataset.programmeReturnRestoring;
 }
 
 function restoreProgrammeReturnState() {
@@ -130,25 +149,45 @@ function restoreProgrammeReturnState() {
   }
 
   const targetSession = state.targetSessionId ? document.getElementById(state.targetSessionId) : null;
-  if (!targetSession) return;
-  if (!sessionDisclosureButton(targetSession)) return;
+  if (!targetSession || !sessionDisclosureButton(targetSession)) return;
 
-  restoreDisclosureState(state);
+  const editor = editorForSession(targetSession);
+  if (editor && editor.dataset.programmeReturnRestoring !== "true") {
+    editor.dataset.programmeReturnRestoring = "true";
+    editor.style.visibility = "hidden";
+  }
 
-  const picker = [...targetSession.querySelectorAll('div.rounded-xl.border-dashed, [data-exercise-picker]')]
-    .find((item) => /Exercise picker|Change exercise|Search exercises/i.test(text(item)));
+  if (state.phase === "waiting") {
+    restoreDisclosureState(state);
+    const addExercise = [...targetSession.querySelectorAll("button")].find((item) => text(item) === "Add exercise");
+    if (!addExercise) {
+      revealRestoredEditor(editor);
+      return;
+    }
 
-  if (!picker) {
-    const addExercise = [...targetSession.querySelectorAll('button')].find((item) => text(item) === 'Add exercise');
-    if (!addExercise) return;
+    state.phase = "opening";
+    sessionStorage.setItem(RETURN_KEY, JSON.stringify(state));
     addExercise.click();
     return;
   }
 
+  const picker = [...targetSession.querySelectorAll('div.rounded-xl.border-dashed, [data-exercise-picker]')]
+    .find((item) => /Exercise picker|Change exercise|Search exercises/i.test(text(item)));
+  if (!picker) return;
+
+  state.phase = "finishing";
+  sessionStorage.setItem(RETURN_KEY, JSON.stringify(state));
+
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    picker.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
-    sessionStorage.removeItem(RETURN_KEY);
-    sessionStorage.removeItem(LEGACY_RETURN_KEY);
+    picker.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
+    if (editor) editor.scrollTop = Math.max(editor.scrollTop, Number(state.editorScrollTop) || 0);
+
+    setTimeout(() => {
+      picker.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
+      revealRestoredEditor(editor);
+      sessionStorage.removeItem(RETURN_KEY);
+      LEGACY_RETURN_KEYS.forEach((key) => sessionStorage.removeItem(key));
+    }, 220);
   }));
 }
 
@@ -262,8 +301,14 @@ export function installProgrammeScreenNavigation() {
   enhance();
   const observer = new MutationObserver(() => requestAnimationFrame(enhance));
   observer.observe(document.body, { childList: true, subtree: true });
+  const countRefresh = window.setInterval(() => {
+    const root = programmeRoot();
+    const inactiveSection = root ? sectionByTitle(root, "Inactive") : null;
+    if (root && inactiveSection) updateInactiveCount(root, inactiveSection);
+  }, 250);
   return () => {
     document.removeEventListener("click", captureProgrammeLibraryButton, true);
     observer.disconnect();
+    window.clearInterval(countRefresh);
   };
 }

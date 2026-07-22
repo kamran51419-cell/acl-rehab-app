@@ -76,30 +76,54 @@ function selectorInSession(session) {
     .find((item) => /Exercise (picker|selector)|Search exercises/i.test(text(item))) || null;
 }
 
-function scrollSelectorImmediately(button) {
-  const session = button.closest('[id^="programme-session-"]');
-  if (!session) return;
-  let attempts = 0;
-  const scroll = () => {
-    const selector = selectorInSession(session);
-    if (!selector && attempts < 12) {
-      attempts += 1;
-      requestAnimationFrame(scroll);
-      return;
-    }
-    if (!selector) return;
-    const nativeScrollIntoView = selector.scrollIntoView.bind(selector);
-    selector.scrollIntoView = (options = {}) => nativeScrollIntoView({ ...options, behavior: "auto" });
-    selector.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
-    window.setTimeout(() => { delete selector.scrollIntoView; }, 1500);
-  };
-  requestAnimationFrame(scroll);
+function matchingTextNode(button, label) {
+  const walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT);
+  let node = walker.nextNode();
+  while (node) {
+    if ((node.textContent || "").trim() === label) return node;
+    node = walker.nextNode();
+  }
+  return null;
 }
 
-function handleSelectorOpen(event) {
+function prepareSelectorOpen(event) {
+  const button = event.target?.closest?.("button");
+  const label = text(button);
+  if (!button || !["Add exercise", "Change exercise"].includes(label)) return;
+  const node = matchingTextNode(button, label);
+  if (!node) return;
+  button.dataset.selectorOpenLabel = label;
+  button.dataset.selectorOpenText = node.textContent || label;
+  node.textContent = `${label}\u200b`;
+}
+
+function restoreSelectorOpenLabel(event) {
+  const button = event.target?.closest?.("button[data-selector-open-label]");
+  if (!button) return;
+  const altered = matchingTextNode(button, `${button.dataset.selectorOpenLabel}\u200b`);
+  if (altered) altered.textContent = button.dataset.selectorOpenText || button.dataset.selectorOpenLabel;
+}
+
+function smoothScrollToSelector(event) {
   const button = event.target?.closest?.("button");
   if (!button || !["Add exercise", "Change exercise"].includes(text(button))) return;
-  scrollSelectorImmediately(button);
+  const session = button.closest('[id^="programme-session-"]');
+  if (!session) return;
+
+  const existing = selectorInSession(session);
+  if (existing) {
+    existing.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+    return;
+  }
+
+  const observer = new MutationObserver(() => {
+    const selector = selectorInSession(session);
+    if (!selector) return;
+    observer.disconnect();
+    requestAnimationFrame(() => selector.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" }));
+  });
+  observer.observe(session, { childList: true, subtree: true });
+  window.setTimeout(() => observer.disconnect(), 800);
 }
 
 function apply() {
@@ -122,12 +146,16 @@ export function installFinalRequestedFixes() {
       apply();
     });
   };
-  document.addEventListener("click", handleSelectorOpen, true);
+  window.addEventListener("click", prepareSelectorOpen, true);
+  document.addEventListener("click", restoreSelectorOpenLabel, true);
+  document.addEventListener("click", smoothScrollToSelector, false);
   apply();
   const observer = new MutationObserver(schedule);
   observer.observe(document.body, { childList: true, subtree: true });
   return () => {
     observer.disconnect();
-    document.removeEventListener("click", handleSelectorOpen, true);
+    window.removeEventListener("click", prepareSelectorOpen, true);
+    document.removeEventListener("click", restoreSelectorOpenLabel, true);
+    document.removeEventListener("click", smoothScrollToSelector, false);
   };
 }

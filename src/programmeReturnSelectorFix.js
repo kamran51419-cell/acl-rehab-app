@@ -1,4 +1,5 @@
 const RETURN_STATE_KEY = "programme-return-selector-state-v2";
+const VIEW_KEY = "programme-subview";
 const TRANSITION_ID = "programme-return-transition";
 
 let retryFrame = 0;
@@ -102,6 +103,14 @@ function finishRestore(selector) {
 function restoreSelector() {
   const state = readState();
   if (!state) return false;
+
+  // The saved return state is created before navigation to the library. Do not
+  // start restoring, opening the selector, or showing the return cover until
+  // the user has actually left the library and is returning to Programme.
+  if (sessionStorage.getItem(VIEW_KEY) === "library") {
+    removeReturnCover();
+    return false;
+  }
 
   ensureReturnCover();
 

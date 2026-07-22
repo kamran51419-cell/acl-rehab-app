@@ -1,5 +1,6 @@
 const VIEW_KEY = "programme-subview";
 const RETURN_KEY = "programme-library-return-session";
+const TRANSITION_ID = "programme-return-transition";
 
 function text(element) {
   return (element?.textContent || "").trim();
@@ -11,6 +12,19 @@ function findTab(label) {
 
 function goToTab(label) {
   findTab(label)?.click();
+}
+
+function showReturnTransition() {
+  if (document.getElementById(TRANSITION_ID)) return;
+  const cover = document.createElement("div");
+  cover.id = TRANSITION_ID;
+  cover.setAttribute("aria-hidden", "true");
+  cover.style.cssText = "position:fixed;inset:0;z-index:2147483646;background:#f8fafc;pointer-events:none";
+  document.body.appendChild(cover);
+}
+
+function hideReturnTransition() {
+  document.getElementById(TRANSITION_ID)?.remove();
 }
 
 function countLabel(count) {
@@ -82,25 +96,30 @@ function captureLibraryReturn(event) {
 function restoreLibraryReturn() {
   if (sessionStorage.getItem(VIEW_KEY)) return;
   const raw = sessionStorage.getItem(RETURN_KEY);
-  if (!raw) return;
+  if (!raw) {
+    hideReturnTransition();
+    return;
+  }
 
   let state;
   try {
     state = JSON.parse(raw);
   } catch {
     sessionStorage.removeItem(RETURN_KEY);
+    hideReturnTransition();
     return;
   }
 
   const session = state.sessionId ? document.getElementById(state.sessionId) : null;
   if (!session) return;
 
-  const picker = [...session.querySelectorAll('[data-exercise-picker], div.rounded-xl.border-dashed')]
-    .find((item) => /Exercise picker|Search exercises|Manage Exercise Library/i.test(text(item)));
+  const selector = [...session.querySelectorAll('[data-exercise-picker], div.rounded-xl.border-dashed')]
+    .find((item) => /Exercise (picker|selector)|Search exercises|Manage Exercise Library/i.test(text(item)));
 
-  if (picker) {
-    picker.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
+  if (selector) {
+    selector.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
     sessionStorage.removeItem(RETURN_KEY);
+    requestAnimationFrame(hideReturnTransition);
     return;
   }
 
@@ -186,6 +205,7 @@ function enhanceHomeLibrary() {
 
   if (!homeContainer.querySelector("[data-programme-library-header]")) {
     const header = makeBackHeader("Exercise Library", () => {
+      if (sessionStorage.getItem(RETURN_KEY)) showReturnTransition();
       sessionStorage.removeItem(VIEW_KEY);
       goToTab("Programme");
     });
@@ -201,6 +221,15 @@ function restoreNormalHome() {
   if (!container) return;
   container.querySelectorAll("[data-programme-library-header]").forEach((item) => item.remove());
   [...container.children].forEach((child) => { child.hidden = child === library; });
+}
+
+function captureHomeNavigation(event) {
+  const button = event.target.closest("button");
+  if (!button || text(button) !== "Home") return;
+  sessionStorage.removeItem(VIEW_KEY);
+  sessionStorage.removeItem(RETURN_KEY);
+  hideReturnTransition();
+  restoreNormalHome();
 }
 
 function enhance() {
@@ -223,11 +252,14 @@ export function installProgrammeScreenNavigation() {
   };
 
   document.addEventListener("click", captureLibraryReturn, true);
+  document.addEventListener("click", captureHomeNavigation, true);
   enhance();
   const observer = new MutationObserver(scheduleEnhance);
   observer.observe(document.body, { childList: true, subtree: true });
   return () => {
     document.removeEventListener("click", captureLibraryReturn, true);
+    document.removeEventListener("click", captureHomeNavigation, true);
     observer.disconnect();
+    hideReturnTransition();
   };
 }

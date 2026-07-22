@@ -1,5 +1,10 @@
 const VIEW_KEY = "programme-subview";
 const RETURN_KEY = "programme-library-return-session";
+const SNAPSHOT_ID = "programme-return-snapshot";
+
+let programmeSnapshot = null;
+let programmeScrollY = 0;
+let restoreFrame = 0;
 
 function text(element) {
   return (element?.textContent || "").trim();
@@ -71,7 +76,39 @@ function showInactiveScreen(root, inactiveSection) {
   inactiveSection.querySelector(":scope > h2")?.classList.add("hidden");
 }
 
+function captureProgrammeSnapshot() {
+  const root = programmeRoot();
+  if (!root) return;
+  programmeSnapshot = root.cloneNode(true);
+  programmeSnapshot.querySelectorAll("[id]").forEach((item) => item.removeAttribute("id"));
+  programmeSnapshot.querySelectorAll("button, input, select, textarea, a").forEach((item) => {
+    item.tabIndex = -1;
+    item.setAttribute("aria-hidden", "true");
+  });
+  programmeScrollY = window.scrollY;
+}
+
+function showProgrammeSnapshot() {
+  if (!programmeSnapshot || document.getElementById(SNAPSHOT_ID)) return;
+  const cover = document.createElement("div");
+  cover.id = SNAPSHOT_ID;
+  cover.setAttribute("aria-hidden", "true");
+  cover.style.cssText = "position:fixed;inset:0;z-index:2147483646;background:#f8fafc;overflow:auto;pointer-events:none";
+
+  const shell = document.createElement("div");
+  shell.className = "mx-auto w-full max-w-6xl px-4 pb-28 pt-4 md:px-6";
+  shell.appendChild(programmeSnapshot.cloneNode(true));
+  cover.appendChild(shell);
+  document.body.appendChild(cover);
+  cover.scrollTop = programmeScrollY;
+}
+
+function removeProgrammeSnapshot() {
+  document.getElementById(SNAPSHOT_ID)?.remove();
+}
+
 function openExerciseLibrary() {
+  captureProgrammeSnapshot();
   sessionStorage.setItem(VIEW_KEY, "library");
   goToTab("Home");
 }
@@ -122,20 +159,11 @@ function enhanceHomeLibrary() {
 
   if (!homeContainer.querySelector("[data-programme-library-header]")) {
     const header = makeBackHeader("Exercise Library", () => {
+      showProgrammeSnapshot();
       sessionStorage.removeItem(VIEW_KEY);
-      const changeTab = () => {
-        goToTab("Programme");
-        cancelAnimationFrame(restoreFrame);
-        restoreFrame = requestAnimationFrame(() => restoreLibraryReturn());
-      };
-      if (document.startViewTransition) {
-        document.startViewTransition(() => {
-          changeTab();
-          return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-        });
-      } else {
-        changeTab();
-      }
+      goToTab("Programme");
+      cancelAnimationFrame(restoreFrame);
+      restoreFrame = requestAnimationFrame(() => restoreLibraryReturn());
     });
     header.dataset.programmeLibraryHeader = "true";
     homeContainer.prepend(header);
@@ -154,6 +182,7 @@ function restoreNormalHome() {
 function captureProgrammeLibraryButton(event) {
   const button = event.target.closest("button");
   if (!button || text(button) !== "Manage Exercise Library") return;
+  captureProgrammeSnapshot();
   sessionStorage.setItem(VIEW_KEY, "library");
 }
 
@@ -162,17 +191,20 @@ function selectorInSession(session) {
     .find((item) => /Exercise (picker|selector)|Search exercises|Manage Exercise Library/i.test(text(item))) || null;
 }
 
-let restoreFrame = 0;
 function restoreLibraryReturn(attempt = 0) {
   if (sessionStorage.getItem(VIEW_KEY)) return;
   const raw = sessionStorage.getItem(RETURN_KEY);
-  if (!raw) return;
+  if (!raw) {
+    if (programmeRoot()) removeProgrammeSnapshot();
+    return;
+  }
 
   let state;
   try {
     state = JSON.parse(raw);
   } catch {
     sessionStorage.removeItem(RETURN_KEY);
+    removeProgrammeSnapshot();
     return;
   }
 
@@ -185,6 +217,7 @@ function restoreLibraryReturn(attempt = 0) {
     if (selector) {
       selector.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
       sessionStorage.removeItem(RETURN_KEY);
+      removeProgrammeSnapshot();
       restoreFrame = 0;
       return;
     }
@@ -197,7 +230,8 @@ function restoreLibraryReturn(attempt = 0) {
     }
   }
 
-  if (attempt < 60) restoreFrame = requestAnimationFrame(() => restoreLibraryReturn(attempt + 1));
+  if (attempt < 240) restoreFrame = requestAnimationFrame(() => restoreLibraryReturn(attempt + 1));
+  else removeProgrammeSnapshot();
 }
 
 function captureLibraryReturn(event) {
@@ -231,6 +265,7 @@ export function installProgrammeScreenNavigation() {
     document.removeEventListener("click", captureProgrammeLibraryButton, true);
     document.removeEventListener("click", captureLibraryReturn, true);
     cancelAnimationFrame(restoreFrame);
+    removeProgrammeSnapshot();
     observer.disconnect();
   };
 }

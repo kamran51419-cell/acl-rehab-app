@@ -16,12 +16,23 @@ function goToTab(label) {
 
 function showReturnTransition() {
   if (document.getElementById(TRANSITION_ID)) return;
+
   const cover = document.createElement("div");
   cover.id = TRANSITION_ID;
   cover.setAttribute("aria-hidden", "true");
-  cover.style.cssText = "position:fixed;inset:0;z-index:2147483646;background:#f8fafc;pointer-events:none;opacity:1;transition:opacity 70ms ease";
+  cover.style.cssText = "position:fixed;inset:0;z-index:2147483646;background:#f8fafc;pointer-events:none;overflow:hidden;opacity:1;transition:opacity 45ms ease";
+
+  const library = document.getElementById("exercise-library");
+  const source = library?.parentElement;
+  if (source) {
+    const snapshot = source.cloneNode(true);
+    snapshot.querySelectorAll("[id]").forEach((item) => item.removeAttribute("id"));
+    snapshot.style.cssText = "height:100%;overflow:hidden;background:#f8fafc";
+    cover.appendChild(snapshot);
+  }
+
   document.body.appendChild(cover);
-  window.setTimeout(() => hideReturnTransition(true), 700);
+  window.setTimeout(() => hideReturnTransition(true), 450);
 }
 
 function hideReturnTransition(smooth = false) {
@@ -32,7 +43,7 @@ function hideReturnTransition(smooth = false) {
     return;
   }
   cover.style.opacity = "0";
-  window.setTimeout(() => cover.remove(), 80);
+  window.setTimeout(() => cover.remove(), 50);
 }
 
 function countLabel(count) {
@@ -138,7 +149,7 @@ function restoreLibraryReturn() {
   if (selector) {
     selector.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
     sessionStorage.removeItem(RETURN_KEY);
-    requestAnimationFrame(() => hideReturnTransition(true));
+    hideReturnTransition(true);
     return;
   }
 

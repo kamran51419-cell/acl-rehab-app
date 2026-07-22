@@ -63,7 +63,6 @@ function applyTodayTaskOrder() {
 
   ;[due, overdue, done].filter(Boolean).forEach((section) => {
     compactTaskSection(section)
-    routine.appendChild(section)
   })
 }
 

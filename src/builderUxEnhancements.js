@@ -1,4 +1,5 @@
 const STYLE_ID = 'builder-ux-enhancement-styles'
+const PROGRAMME_RETURN_STATE_KEY = 'programme-editor-return-state-v1'
 
 function textOf(element) {
   return (element?.textContent || '').trim()
@@ -159,6 +160,86 @@ function forwardWheelFromMargins(event) {
   if (event.deltaY) event.preventDefault()
 }
 
+function inactiveProgrammeCount() {
+  const heading = [...document.querySelectorAll('h1, h2, h3, button')].find((element) =>
+    /^Inactive programmes/i.test(textOf(element)),
+  )
+  if (!heading) return
+
+  const container = heading.closest('section, article, div.rounded-2xl, div.rounded-3xl') || heading.parentElement
+  if (!container) return
+
+  const cards = [...container.querySelectorAll('button')].filter((button) => textOf(button) === 'Open / edit')
+  const count = cards.length
+
+  const current = textOf(heading)
+  if (/\(\d+\)/.test(current)) {
+    heading.childNodes.forEach((node) => {
+      if (node.nodeType === Node.TEXT_NODE && /Inactive programmes/.test(node.textContent || '')) {
+        node.textContent = (node.textContent || '').replace(/Inactive programmes\s*\(\d+\)/, `Inactive programmes (${count})`)
+      }
+    })
+  }
+}
+
+function saveProgrammeReturnState(button) {
+  const root = builderRoot()
+  if (!root || !root.contains(button)) return
+
+  const disclosures = [...root.querySelectorAll('button[aria-expanded]')].map((item, index) => ({
+    index,
+    expanded: item.getAttribute('aria-expanded') === 'true',
+  }))
+
+  const picker = button.closest('div.rounded-xl.border-dashed, [data-exercise-picker]')
+  const pickerSessionId = programmeSession(picker)?.id || ''
+  const state = {
+    rootScrollTop: root.scrollTop,
+    pageScrollY: window.scrollY,
+    disclosures,
+    pickerSessionId,
+  }
+
+  sessionStorage.setItem(PROGRAMME_RETURN_STATE_KEY, JSON.stringify(state))
+}
+
+function restoreProgrammeReturnState() {
+  const raw = sessionStorage.getItem(PROGRAMME_RETURN_STATE_KEY)
+  if (!raw) return
+
+  let state
+  try {
+    state = JSON.parse(raw)
+  } catch {
+    sessionStorage.removeItem(PROGRAMME_RETURN_STATE_KEY)
+    return
+  }
+
+  const root = builderRoot()
+  if (!root) return
+
+  const disclosures = [...root.querySelectorAll('button[aria-expanded]')]
+  state.disclosures?.forEach(({ index, expanded }) => {
+    const button = disclosures[index]
+    if (!button) return
+    const current = button.getAttribute('aria-expanded') === 'true'
+    if (current !== expanded) button.click()
+  })
+
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    root.scrollTop = Number(state.rootScrollTop) || 0
+    window.scrollTo(window.scrollX, Number(state.pageScrollY) || 0)
+
+    if (state.pickerSessionId) {
+      const session = document.getElementById(state.pickerSessionId)
+      const picker = pickerInSession(session)
+      if (picker) picker.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' })
+    }
+
+    sessionStorage.removeItem(PROGRAMME_RETURN_STATE_KEY)
+  }))
+}
+
 export function installBuilderUxEnhancements() {
   if (typeof document === 'undefined') return () => {}
   installStyles()
@@ -173,6 +254,11 @@ export function installBuilderUxEnhancements() {
     const button = event.target?.closest?.('button')
     if (!button) return
     const label = textOf(button)
+
+    if (label === 'Manage Exercise Library') {
+      saveProgrammeReturnState(button)
+      return
+    }
 
     if (label === 'Close') {
       const root = builderRoot()
@@ -224,7 +310,11 @@ export function installBuilderUxEnhancements() {
 
   const handleRender = () => {
     const root = builderRoot()
-    if (root) markRoutineTaskCards(root)
+    if (root) {
+      markRoutineTaskCards(root)
+      inactiveProgrammeCount()
+      restoreProgrammeReturnState()
+    }
   }
 
   const observer = new MutationObserver(() => requestAnimationFrame(handleRender))

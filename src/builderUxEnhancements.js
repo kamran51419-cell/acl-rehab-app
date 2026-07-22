@@ -1,4 +1,4 @@
-const COLLAPSE_STORAGE_KEY = 'builder-collapse-state-v1'
+const COLLAPSE_STORAGE_KEY = 'builder-collapse-state-v2'
 
 function textOf(element) {
   return (element?.textContent || '').trim()
@@ -28,22 +28,53 @@ function saveCollapseState(state) {
   sessionStorage.setItem(COLLAPSE_STORAGE_KEY, JSON.stringify(state))
 }
 
-function cardForDisclosure(button) {
-  return button.closest('[data-exercise-card], article, section, div.rounded-xl.border, div.rounded-2xl.border')
+function programmeSession(element) {
+  return element?.closest?.('[id^="programme-session-"]') || null
+}
+
+function exerciseCardFor(button) {
+  const session = programmeSession(button)
+  const card = button.closest('[data-exercise-card], div.space-y-3.rounded-xl.border.bg-white, section.rounded-2xl.border.bg-white')
+  if (!card || card === session) return null
+  return card
+}
+
+function sessionDisclosureButton(session) {
+  if (!session) return null
+  return [...session.querySelectorAll('button[aria-expanded]')].find((button) => {
+    const closestSession = programmeSession(button)
+    return closestSession === session && !exerciseCardFor(button)
+  }) || null
+}
+
+function exerciseDisclosureButtons(root, session = null) {
+  const scope = session || root
+  return [...scope.querySelectorAll('button[aria-expanded]')].filter((button) => {
+    const card = exerciseCardFor(button)
+    if (!card) return false
+    const content = textOf(card)
+    return /Change exercise|Track by|Sets|Reps|Weight|Duration|Remove|Duplicate/i.test(content)
+  })
+}
+
+function disclosureCard(button) {
+  return exerciseCardFor(button) || programmeSession(button) || button.closest('article, section, div.rounded-xl.border, div.rounded-2xl.border')
 }
 
 function disclosureKey(button, root) {
-  const card = cardForDisclosure(button)
+  const card = disclosureCard(button)
   if (!card) return ''
-  const session = card.closest('[id^="programme-session-"]')
-  const title = textOf(card.querySelector('h2, h3, .font-semibold, .font-medium')) || 'item'
+  const session = programmeSession(card)
+  const type = exerciseCardFor(button) ? 'exercise' : session === card ? 'session' : 'item'
+  const title = textOf(card.querySelector('h2, h3, .font-semibold, .font-medium, input')) || type
   const peers = [...root.querySelectorAll('button[aria-expanded]')].filter((candidate) => {
-    const candidateCard = cardForDisclosure(candidate)
-    const candidateTitle = textOf(candidateCard?.querySelector('h2, h3, .font-semibold, .font-medium')) || 'item'
-    return candidateTitle === title
+    const candidateCard = disclosureCard(candidate)
+    if (!candidateCard) return false
+    const candidateType = exerciseCardFor(candidate) ? 'exercise' : programmeSession(candidate) === candidateCard ? 'session' : 'item'
+    const candidateTitle = textOf(candidateCard.querySelector('h2, h3, .font-semibold, .font-medium, input')) || candidateType
+    return candidateType === type && candidateTitle === title
   })
-  const occurrence = Math.max(0, peers.indexOf(button))
-  return `${builderKind(root)}|${session?.id || 'root'}|${title}|${occurrence}`
+  return `${builderKind(root)}|${session?.id || 'root'}|${type}|${title}|${Math.max(0, peers.indexOf(button))}`
 }
 
 function rememberDisclosure(button, root) {
@@ -59,82 +90,58 @@ function restoreDisclosureState(root) {
   root.querySelectorAll('button[aria-expanded]').forEach((button) => {
     const key = disclosureKey(button, root)
     if (!(key in state) || button.dataset.collapseRestored === 'true') return
+    button.dataset.collapseRestored = 'true'
     const shouldBeExpanded = Boolean(state[key])
     const currentlyExpanded = button.getAttribute('aria-expanded') === 'true'
-    button.dataset.collapseRestored = 'true'
     if (shouldBeExpanded !== currentlyExpanded) button.click()
   })
 }
 
-function exerciseDisclosureButtons(root) {
-  return [...root.querySelectorAll('button[aria-expanded]')].filter((button) => {
-    const card = cardForDisclosure(button)
-    if (!card) return false
-    const text = textOf(card)
-    return /Change exercise|Track by|Sets|Reps|Weight|Duration|Remove/i.test(text)
-  })
-}
-
-function collapseExistingExercises(root) {
-  exerciseDisclosureButtons(root).forEach((button) => {
+function collapseExerciseButtons(root, session) {
+  exerciseDisclosureButtons(root, session).forEach((button) => {
     if (button.getAttribute('aria-expanded') !== 'true') return
     button.click()
     requestAnimationFrame(() => rememberDisclosure(button, root))
   })
 }
 
-function newestRelevantItem(root, action) {
-  if (action === 'Add task') {
-    const taskInputs = [...root.querySelectorAll('input[placeholder*="Ice knee"], input[placeholder*="task" i]')]
-    return taskInputs.at(-1)?.closest('article, .rounded-2xl, .rounded-xl') || taskInputs.at(-1)
-  }
-
-  if (action === 'Add session') {
-    const sessions = [...root.querySelectorAll('[id^="programme-session-"]')]
-    return sessions.at(-1) || null
-  }
-
-  const exerciseButtons = exerciseDisclosureButtons(root)
-  return cardForDisclosure(exerciseButtons.at(-1)) || [...root.querySelectorAll('div.rounded-xl.border.bg-white, section.rounded-2xl.border')].at(-1) || null
+function collapseExistingSessions(root) {
+  root.querySelectorAll('[id^="programme-session-"]').forEach((session) => {
+    const button = sessionDisclosureButton(session)
+    if (!button || button.getAttribute('aria-expanded') !== 'true') return
+    button.click()
+    requestAnimationFrame(() => rememberDisclosure(button, root))
+  })
 }
 
 function scrollToAndFocus(element) {
   if (!element) return
   element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  const input = element.querySelector?.('input:not([type="checkbox"]):not([type="radio"]), select, textarea, button[aria-expanded]')
-  if (input instanceof HTMLElement) {
-    setTimeout(() => input.focus({ preventScroll: true }), 250)
-  }
+  const control = element.querySelector?.('input:not([type="checkbox"]):not([type="radio"]), select, textarea, button[aria-expanded]')
+  if (control instanceof HTMLElement) setTimeout(() => control.focus({ preventScroll: true }), 250)
 }
 
-function queueScrollToNewItem(root, action) {
+function waitForNewItem(findItem, previousCount, onFound) {
   let attempts = 0
-  const find = () => {
+  const check = () => {
     attempts += 1
-    const item = newestRelevantItem(root, action)
-    if (item) {
-      if (action === 'Add exercise') {
-        const button = item.querySelector?.('button[aria-expanded]')
-        if (button && button.getAttribute('aria-expanded') !== 'true') button.click()
-        if (button) requestAnimationFrame(() => rememberDisclosure(button, root))
-      }
-      scrollToAndFocus(item)
+    const items = findItem()
+    if (items.length > previousCount) {
+      onFound(items.at(-1))
       return
     }
-    if (attempts < 12) setTimeout(find, 50)
+    if (attempts < 20) setTimeout(check, 50)
   }
-  setTimeout(find, 0)
+  setTimeout(check, 0)
 }
 
 function styleExerciseLibrarySaveButton() {
   const heading = [...document.querySelectorAll('h1, h2, h3')].find((element) => textOf(element) === 'Add exercise')
   const dialog = heading?.closest('[role="dialog"]')
   if (!dialog) return
-  const buttons = [...dialog.querySelectorAll('button')]
-  const save = buttons.find((button) => /^(Add exercise|Save)$/i.test(textOf(button)))
+  const save = [...dialog.querySelectorAll('button')].find((button) => /^(Add exercise|Save)$/i.test(textOf(button)))
   if (!save) return
   save.textContent = 'Save'
-  save.dataset.exerciseLibrarySave = 'true'
   save.style.setProperty('background', '#2563eb', 'important')
   save.style.setProperty('background-image', 'none', 'important')
   save.style.setProperty('color', '#fff', 'important')
@@ -142,10 +149,22 @@ function styleExerciseLibrarySaveButton() {
   save.style.setProperty('box-shadow', '0 4px 10px rgb(37 99 235 / 0.18)', 'important')
 }
 
+function styleRoutineTaskCards(root) {
+  const heading = [...root.querySelectorAll('h2, h3')].find((element) => /^(Routine Tasks|Daily & Weekly Tasks)$/i.test(textOf(element)))
+  const section = heading?.closest('section')
+  if (!section) return
+  section.querySelectorAll(':scope article, :scope > div > article').forEach((card) => {
+    card.style.setProperty('background', '#fff', 'important')
+    card.style.setProperty('background-image', 'none', 'important')
+  })
+}
+
 function applyBuilderUx() {
   styleExerciseLibrarySaveButton()
   const root = builderRoot()
-  if (root) restoreDisclosureState(root)
+  if (!root) return
+  styleRoutineTaskCards(root)
+  restoreDisclosureState(root)
 }
 
 export function installBuilderUxEnhancements() {
@@ -154,17 +173,51 @@ export function installBuilderUxEnhancements() {
   const handleClick = (event) => {
     const button = event.target?.closest?.('button')
     if (!button) return
-    const label = textOf(button)
     const root = builderRoot()
+    if (!root) return
+    const label = textOf(button)
 
-    if (root && button.matches('[aria-expanded]')) {
+    if (button.matches('[aria-expanded]')) {
       setTimeout(() => rememberDisclosure(button, root), 0)
       return
     }
 
-    if (!root || !['Add exercise', 'Add session', 'Add task'].includes(label)) return
-    if (label === 'Add exercise') collapseExistingExercises(root)
-    queueScrollToNewItem(root, label)
+    if (label === 'Add session') {
+      const before = root.querySelectorAll('[id^="programme-session-"]').length
+      collapseExistingSessions(root)
+      waitForNewItem(
+        () => [...root.querySelectorAll('[id^="programme-session-"]')],
+        before,
+        (session) => {
+          const disclosure = sessionDisclosureButton(session)
+          if (disclosure && disclosure.getAttribute('aria-expanded') !== 'true') disclosure.click()
+          scrollToAndFocus(session)
+        },
+      )
+      return
+    }
+
+    if (label === 'Add task') {
+      const findTasks = () => [...root.querySelectorAll('input[placeholder*="Ice knee"], input[placeholder*="task" i]')]
+      const before = findTasks().length
+      waitForNewItem(findTasks, before, (input) => scrollToAndFocus(input.closest('article, .rounded-2xl, .rounded-xl') || input))
+      return
+    }
+
+    const picker = button.closest('div.rounded-xl.border-dashed')
+    const pickerHeading = picker?.querySelector('strong')
+    if (label === 'Add' && picker && /Exercise picker/i.test(textOf(pickerHeading))) {
+      const session = programmeSession(picker)
+      const findCards = () => exerciseDisclosureButtons(root, session).map(exerciseCardFor).filter(Boolean)
+      const before = findCards().length
+      collapseExerciseButtons(root, session)
+      waitForNewItem(findCards, before, (card) => {
+        const disclosure = card.querySelector('button[aria-expanded]')
+        if (disclosure && disclosure.getAttribute('aria-expanded') !== 'true') disclosure.click()
+        if (disclosure) requestAnimationFrame(() => rememberDisclosure(disclosure, root))
+        scrollToAndFocus(card)
+      })
+    }
   }
 
   document.addEventListener('click', handleClick, true)

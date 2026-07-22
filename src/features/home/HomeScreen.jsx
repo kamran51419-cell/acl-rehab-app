@@ -100,23 +100,54 @@ function incompleteWorkouts(workouts) {
     .sort((a, b) => String(b.completedAt || b.updatedAt || b.date || "").localeCompare(String(a.completedAt || a.updatedAt || a.date || "")));
 }
 
-function TaskRow({ task, overdue = false, completed = false, onStatus }) {
-  return <article className={`flex min-h-14 items-center gap-3 rounded-xl border px-3 py-2 ${overdue ? "border-orange-200 bg-orange-50" : completed ? "border-emerald-100 bg-slate-50" : "border-slate-200 bg-white"}`}>
-    {completed ? <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 font-bold text-emerald-700">✓</span> : <button type="button" aria-label={`Complete ${task.name}`} className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold text-transparent hover:text-emerald-600 ${overdue ? "border-orange-400 hover:border-emerald-600" : "border-slate-300 hover:border-emerald-600"}`} onClick={() => onStatus(task, ROUTINE_STATUS.COMPLETED)}>✓</button>}
-    <div className="min-w-0 flex-1"><div className={`font-medium ${completed ? "text-slate-500 line-through" : ""}`}>{task.name}</div><div className={`flex min-w-0 gap-2 text-xs ${overdue ? "text-orange-700" : completed ? "text-slate-400" : "text-slate-500"}`}>{overdue && task.scheduledDate !== todayString() ? <span>{task.scheduledDate}</span> : <span>{task.timeLabel || task.timeOfDay}</span>}{task.notes ? <span className="truncate">· {task.notes}</span> : null}</div></div>
+function taskKey(task) {
+  return `${task.baseTaskId || task.id}-${task.scheduledDate}-${task.occurrenceTimeKey || ""}`;
+}
+
+function TaskRow({ task, overdue = false, onStatus }) {
+  const [completing, setCompleting] = useState(false);
+
+  async function completeTask() {
+    if (completing) return;
+    setCompleting(true);
+    await new Promise((resolve) => window.setTimeout(resolve, 420));
+    try {
+      await onStatus(task, ROUTINE_STATUS.COMPLETED);
+    } catch {
+      setCompleting(false);
+    }
+  }
+
+  return <article className={`flex min-h-14 items-center gap-3 overflow-hidden rounded-xl border px-3 py-2 transition-all duration-300 ${overdue ? "border-orange-200 bg-orange-50" : "border-slate-200 bg-white"} ${completing ? "max-h-0 min-h-0 -translate-y-1 scale-[0.98] border-transparent py-0 opacity-0" : "max-h-24 opacity-100"}`}>
+    <button type="button" aria-label={`Complete ${task.name}`} disabled={completing} className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold transition-all duration-200 ${completing ? "scale-110 border-emerald-600 bg-emerald-600 text-white" : overdue ? "border-orange-400 text-transparent hover:border-emerald-600 hover:text-emerald-600" : "border-slate-300 text-transparent hover:border-emerald-600 hover:text-emerald-600"}`} onClick={completeTask}>✓</button>
+    <div className="min-w-0 flex-1"><div className="font-medium">{task.name}</div><div className={`flex min-w-0 gap-2 text-xs ${overdue ? "text-orange-700" : "text-slate-500"}`}>{overdue && task.scheduledDate !== todayString() ? <span>{task.scheduledDate}</span> : <span>{task.timeLabel || task.timeOfDay}</span>}{task.notes ? <span className="truncate">· {task.notes}</span> : null}</div></div>
   </article>;
 }
 
-function TaskSection({ title, tasks, tone, onStatus, completed = false }) {
+function TaskSection({ title, tasks, tone, onStatus }) {
   const [expanded, setExpanded] = useState(false);
   if (!tasks.length) return null;
   const visible = expanded ? tasks : tasks.slice(0, VISIBLE_TASKS);
-  return <div className="space-y-2"><div className="flex items-center justify-between"><h3 className={`text-sm font-semibold ${tone}`}>{title}</h3>{tasks.length > VISIBLE_TASKS ? <button type="button" className="text-sm font-medium text-slate-600" onClick={() => setExpanded((value) => !value)}>{expanded ? "Show Less" : "Show All"}</button> : null}</div><div className="space-y-1.5">{visible.map((task) => <TaskRow key={`${task.baseTaskId || task.id}-${task.scheduledDate}-${task.occurrenceTimeKey || ""}`} task={task} overdue={title === "Overdue"} completed={completed} onStatus={onStatus}/>)}</div></div>;
+  return <div className="space-y-2"><div className="flex items-center justify-between"><h3 className={`text-sm font-semibold ${tone}`}>{title}</h3>{tasks.length > VISIBLE_TASKS ? <button type="button" className="text-sm font-medium text-slate-600" onClick={() => setExpanded((value) => !value)}>{expanded ? "Show Less" : "Show All"}</button> : null}</div><div className="space-y-1.5">{visible.map((task) => <TaskRow key={taskKey(task)} task={task} overdue={title === "Overdue"} onStatus={onStatus}/>)}</div></div>;
+}
+
+function CompletedTasks({ tasks }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!tasks.length) return null;
+  const names = tasks.map((task) => task.name);
+  const summary = names.length <= 2 ? names.join(", ") : `${names.slice(0, 2).join(", ")} and ${names.length - 2} more`;
+  return <div className="rounded-xl border border-emerald-100 bg-emerald-50/60">
+    <button type="button" className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left" onClick={() => setExpanded((value) => !value)} aria-expanded={expanded}>
+      <span className="min-w-0"><span className="block text-sm font-semibold text-emerald-700">Completed</span><span className="block truncate text-xs text-emerald-700/80">{summary}</span></span>
+      <span className="shrink-0 text-sm font-medium text-emerald-700">{expanded ? "Hide" : "View"}</span>
+    </button>
+    {expanded ? <div className="border-t border-emerald-100 px-3 py-2"><div className="space-y-1">{tasks.map((task) => <div key={taskKey(task)} className="flex items-center gap-2 text-sm text-slate-600"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700">✓</span><span className="truncate">{task.name}</span></div>)}</div></div> : null}
+  </div>;
 }
 
 export function TodayRoutine({ groups, onStatus }) {
   const count = groups.overdue.length + groups.due.length + groups.done.length;
-  return <section aria-labelledby="today-routine-title" className="space-y-4"><h2 id="today-routine-title" className="text-base font-semibold">Routine</h2>{!count ? <p className="text-sm text-slate-500">No routine tasks due today or overdue.</p> : null}<TaskSection title="Overdue" tasks={groups.overdue} tone="text-orange-700" onStatus={onStatus}/><TaskSection title="Due Today" tasks={groups.due} tone="text-slate-700" onStatus={onStatus}/><TaskSection title="Done" tasks={groups.done} tone="text-emerald-700" onStatus={onStatus} completed/></section>;
+  return <section aria-labelledby="today-routine-title" className="space-y-4"><h2 id="today-routine-title" className="text-base font-semibold">Routine</h2>{!count ? <p className="text-sm text-slate-500">No routine tasks due today or overdue.</p> : null}<TaskSection title="Due Today" tasks={groups.due} tone="text-slate-700" onStatus={onStatus}/><TaskSection title="Overdue" tasks={groups.overdue} tone="text-orange-700" onStatus={onStatus}/><CompletedTasks tasks={groups.done}/></section>;
 }
 
 function IncompleteWorkoutCard({ workout, onContinue, onDismiss }) {
@@ -161,6 +192,7 @@ export default function HomeScreen({ user, surgeryDate, trainingMode = "gym", on
     } catch (error) {
       setOccurrences((current) => current.filter((item) => item.id !== id));
       console.error("Could not update routine task", error);
+      throw error;
     }
   }
   function continueIncomplete(workout) { onOpenWorkout({ mode: "catch_up", workoutId: workout.id }); }

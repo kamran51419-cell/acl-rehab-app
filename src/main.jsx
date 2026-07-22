@@ -21,7 +21,6 @@ import { installWorkoutFlowConsistencyFix } from './workoutFlowConsistencyFix'
 import { installFinalTargetedUiFixes } from './finalTargetedUiFix'
 import { installTodayTaskOrderFix } from './todayTaskOrderFix'
 import { installProgrammeCreatorInputFixes } from './programmeCreatorInputFixes'
-import { installBuilderUxEnhancements } from './builderUxEnhancements'
 
 const updateSW = registerSW({
   immediate: true,
@@ -44,7 +43,6 @@ installWorkoutFlowConsistencyFix()
 installFinalTargetedUiFixes()
 installTodayTaskOrderFix()
 installProgrammeCreatorInputFixes()
-installBuilderUxEnhancements()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

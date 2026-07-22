@@ -131,7 +131,7 @@ function smoothScrollToSelector(event) {
     const selector = selectorInSession(session);
     if (!selector) return;
     observer.disconnect();
-    requestAnimationFrame(() => selector.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" }));
+    selector.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
   });
   observer.observe(session, { childList: true, subtree: true });
   window.setTimeout(() => observer.disconnect(), 800);

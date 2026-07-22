@@ -1,3 +1,6 @@
+const VIEW_KEY = "programme-subview";
+const RETURN_KEY = "programme-library-return-session";
+
 function text(element) {
   return (element?.textContent || "").trim();
 }
@@ -86,22 +89,30 @@ function matchingTextNode(button, label) {
   return null;
 }
 
-function prepareSelectorOpen(event) {
+function prepareManagedClick(event) {
   const button = event.target?.closest?.("button");
   const label = text(button);
-  if (!button || !["Add exercise", "Change exercise"].includes(label)) return;
+  if (!button || !["Add exercise", "Change exercise", "Manage Exercise Library"].includes(label)) return;
+
+  if (label === "Manage Exercise Library") {
+    const session = button.closest('[id^="programme-session-"]');
+    if (session?.id) sessionStorage.setItem(RETURN_KEY, JSON.stringify({ sessionId: session.id, phase: "waiting" }));
+    sessionStorage.setItem(VIEW_KEY, "library");
+    sessionStorage.removeItem("programme-editor-return-state-v1");
+  }
+
   const node = matchingTextNode(button, label);
   if (!node) return;
-  button.dataset.selectorOpenLabel = label;
-  button.dataset.selectorOpenText = node.textContent || label;
+  button.dataset.managedClickLabel = label;
+  button.dataset.managedClickText = node.textContent || label;
   node.textContent = `${label}\u200b`;
 }
 
-function restoreSelectorOpenLabel(event) {
-  const button = event.target?.closest?.("button[data-selector-open-label]");
+function restoreManagedClickLabel(event) {
+  const button = event.target?.closest?.("button[data-managed-click-label]");
   if (!button) return;
-  const altered = matchingTextNode(button, `${button.dataset.selectorOpenLabel}\u200b`);
-  if (altered) altered.textContent = button.dataset.selectorOpenText || button.dataset.selectorOpenLabel;
+  const altered = matchingTextNode(button, `${button.dataset.managedClickLabel}\u200b`);
+  if (altered) altered.textContent = button.dataset.managedClickText || button.dataset.managedClickLabel;
 }
 
 function smoothScrollToSelector(event) {
@@ -146,16 +157,16 @@ export function installFinalRequestedFixes() {
       apply();
     });
   };
-  window.addEventListener("click", prepareSelectorOpen, true);
-  document.addEventListener("click", restoreSelectorOpenLabel, true);
+  window.addEventListener("click", prepareManagedClick, true);
+  document.addEventListener("click", restoreManagedClickLabel, true);
   document.addEventListener("click", smoothScrollToSelector, false);
   apply();
   const observer = new MutationObserver(schedule);
   observer.observe(document.body, { childList: true, subtree: true });
   return () => {
     observer.disconnect();
-    window.removeEventListener("click", prepareSelectorOpen, true);
-    document.removeEventListener("click", restoreSelectorOpenLabel, true);
+    window.removeEventListener("click", prepareManagedClick, true);
+    document.removeEventListener("click", restoreManagedClickLabel, true);
     document.removeEventListener("click", smoothScrollToSelector, false);
   };
 }

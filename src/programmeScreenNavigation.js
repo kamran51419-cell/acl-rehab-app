@@ -1,5 +1,6 @@
 const VIEW_KEY = "programme-subview";
 const RETURN_KEY = "programme-library-return-session";
+const TRANSITION_ID = "programme-library-transition";
 
 function text(element) {
   return (element?.textContent || "").trim();
@@ -11,6 +12,27 @@ function findTab(label) {
 
 function goToTab(label) {
   findTab(label)?.click();
+}
+
+function showReturnTransition() {
+  if (document.getElementById(TRANSITION_ID)) return;
+  const cover = document.createElement("div");
+  cover.id = TRANSITION_ID;
+  cover.setAttribute("aria-hidden", "true");
+  cover.style.cssText = "position:fixed;inset:0;z-index:2147483646;background:#f8fafc;pointer-events:none;opacity:1;transition:opacity 70ms ease";
+  document.body.appendChild(cover);
+  window.setTimeout(() => hideReturnTransition(true), 700);
+}
+
+function hideReturnTransition(smooth = false) {
+  const cover = document.getElementById(TRANSITION_ID);
+  if (!cover) return;
+  if (!smooth) {
+    cover.remove();
+    return;
+  }
+  cover.style.opacity = "0";
+  window.setTimeout(() => cover.remove(), 80);
 }
 
 function countLabel(count) {
@@ -74,42 +96,64 @@ function captureLibraryReturn(event) {
   const button = event.target.closest("button");
   if (!button || text(button) !== "Manage Exercise Library") return;
   const session = button.closest('[id^="programme-session-"]');
-  if (session?.id) sessionStorage.setItem(RETURN_KEY, JSON.stringify({ sessionId: session.id, phase: "waiting" }));
+  const sessions = [...document.querySelectorAll('[id^="programme-session-"]')];
+  if (session) {
+    sessionStorage.setItem(RETURN_KEY, JSON.stringify({
+      sessionId: session.id || "",
+      sessionIndex: sessions.indexOf(session),
+      phase: "waiting",
+    }));
+  }
   sessionStorage.setItem(VIEW_KEY, "library");
-  sessionStorage.removeItem("programme-editor-return-state-v1");
+}
+
+function selectorInSession(session) {
+  return [...session.querySelectorAll('[data-exercise-picker], div.rounded-xl.border-dashed')]
+    .find((item) => /Exercise (picker|selector)|Search exercises|Manage Exercise Library/i.test(text(item))) || null;
 }
 
 function restoreLibraryReturn() {
   if (sessionStorage.getItem(VIEW_KEY)) return;
   const raw = sessionStorage.getItem(RETURN_KEY);
-  if (!raw) return;
+  if (!raw) {
+    hideReturnTransition();
+    return;
+  }
 
   let state;
   try {
     state = JSON.parse(raw);
   } catch {
     sessionStorage.removeItem(RETURN_KEY);
+    hideReturnTransition();
     return;
   }
 
-  const session = state.sessionId ? document.getElementById(state.sessionId) : null;
+  const sessions = [...document.querySelectorAll('[id^="programme-session-"]')];
+  const session = (state.sessionId ? document.getElementById(state.sessionId) : null)
+    || (Number.isInteger(state.sessionIndex) ? sessions[state.sessionIndex] : null);
   if (!session) return;
 
-  const picker = [...session.querySelectorAll('[data-exercise-picker], div.rounded-xl.border-dashed')]
-    .find((item) => /Exercise picker|Search exercises|Manage Exercise Library/i.test(text(item)));
-
-  if (picker) {
-    picker.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
+  const selector = selectorInSession(session);
+  if (selector) {
+    selector.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
     sessionStorage.removeItem(RETURN_KEY);
+    requestAnimationFrame(() => hideReturnTransition(true));
     return;
   }
 
-  if (state.phase !== "waiting") return;
+  const expandSession = session.querySelector('button[aria-label="Expand session"][aria-expanded="false"]');
+  if (expandSession) {
+    HTMLElement.prototype.click.call(expandSession);
+    return;
+  }
+
+  if (state.phase === "opening") return;
   const addExercise = [...session.querySelectorAll("button")].find((item) => text(item) === "Add exercise");
   if (!addExercise) return;
   state.phase = "opening";
   sessionStorage.setItem(RETURN_KEY, JSON.stringify(state));
-  addExercise.click();
+  HTMLElement.prototype.click.call(addExercise);
 }
 
 function showProgrammeOverview(root) {
@@ -186,6 +230,7 @@ function enhanceHomeLibrary() {
 
   if (!homeContainer.querySelector("[data-programme-library-header]")) {
     const header = makeBackHeader("Exercise Library", () => {
+      if (sessionStorage.getItem(RETURN_KEY)) showReturnTransition();
       sessionStorage.removeItem(VIEW_KEY);
       goToTab("Programme");
     });
@@ -229,5 +274,6 @@ export function installProgrammeScreenNavigation() {
   return () => {
     document.removeEventListener("click", captureLibraryReturn, true);
     observer.disconnect();
+    hideReturnTransition();
   };
 }

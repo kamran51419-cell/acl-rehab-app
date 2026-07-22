@@ -81,7 +81,7 @@ function scrollOnce(element, block = 'center') {
   }))
 }
 
-function waitForElement(find, attempts = 18) {
+function waitForElement(find, attempts = 30) {
   return new Promise((resolve) => {
     let remaining = attempts
     const check = () => {
@@ -130,8 +130,33 @@ function installStyles() {
   if (document.getElementById(STYLE_ID)) return
   const style = document.createElement('style')
   style.id = STYLE_ID
-  style.textContent = '[data-final-programme-editor="true"] { overflow-y: auto !important; }'
+  style.textContent = `
+    [data-final-programme-editor="true"] { overflow-y: auto !important; }
+    [data-programme-task-card="true"] { background: #fff !important; background-image: none !important; }
+  `
   document.head.appendChild(style)
+}
+
+function markRoutineTaskCards(root) {
+  const heading = [...root.querySelectorAll('h2, h3')].find((element) =>
+    /^(Routine Tasks|Daily & Weekly Tasks)$/i.test(textOf(element)),
+  )
+  const section = heading?.closest('section')
+  if (!section) return
+  section.querySelectorAll('article, div.rounded-xl.border, div.rounded-2xl.border').forEach((card) => {
+    if (![...card.querySelectorAll('button')].some((button) => textOf(button) === 'Edit')) return
+    card.dataset.programmeTaskCard = 'true'
+  })
+}
+
+function forwardWheelFromMargins(event) {
+  const root = builderRoot()
+  if (!root) return
+  if (root.contains(event.target)) return
+  const rect = root.getBoundingClientRect()
+  if (event.clientY < rect.top || event.clientY > rect.bottom) return
+  root.scrollTop += event.deltaY
+  if (event.deltaY) event.preventDefault()
 }
 
 export function installBuilderUxEnhancements() {
@@ -152,6 +177,7 @@ export function installBuilderUxEnhancements() {
 
     const root = builderRoot()
     if (!root) return
+    markRoutineTaskCards(root)
 
     if (label === 'Add session') {
       const before = new Set(sessionCards(root))
@@ -167,8 +193,9 @@ export function installBuilderUxEnhancements() {
     if (label === 'Add exercise' || label === 'Change exercise') {
       const session = programmeSession(button)
       collapseExercises(root, session)
-      const picker = pickerInSession(session)
-      if (picker) scrollOnce(picker)
+      waitForElement(() => pickerInSession(session)).then((picker) => {
+        if (picker) scrollOnce(picker)
+      })
       return
     }
 
@@ -184,6 +211,16 @@ export function installBuilderUxEnhancements() {
     }
   }
 
+  const refresh = () => {
+    const root = builderRoot()
+    if (root) markRoutineTaskCards(root)
+  }
+
   document.addEventListener('click', handleClick, true)
-  return () => document.removeEventListener('click', handleClick, true)
+  document.addEventListener('wheel', forwardWheelFromMargins, { passive: false })
+  refresh()
+  return () => {
+    document.removeEventListener('click', handleClick, true)
+    document.removeEventListener('wheel', forwardWheelFromMargins)
+  }
 }

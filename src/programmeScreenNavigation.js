@@ -19,7 +19,7 @@ function showReturnTransition() {
   const cover = document.createElement("div");
   cover.id = TRANSITION_ID;
   cover.setAttribute("aria-hidden", "true");
-  cover.style.cssText = "position:fixed;inset:0;z-index:2147483646;background:#f8fafc;pointer-events:none;opacity:1;transition:opacity 160ms ease";
+  cover.style.cssText = "position:fixed;inset:0;z-index:2147483646;background:#f8fafc;pointer-events:none;opacity:1;transition:opacity 60ms ease";
   document.body.appendChild(cover);
 }
 
@@ -31,7 +31,7 @@ function hideReturnTransition(smooth = false) {
     return;
   }
   cover.style.opacity = "0";
-  window.setTimeout(() => cover.remove(), 180);
+  window.setTimeout(() => cover.remove(), 75);
 }
 
 function countLabel(count) {
@@ -95,7 +95,15 @@ function captureLibraryReturn(event) {
   const button = event.target.closest("button");
   if (!button || text(button) !== "Manage Exercise Library") return;
   const session = button.closest('[id^="programme-session-"]');
-  if (session?.id) sessionStorage.setItem(RETURN_KEY, JSON.stringify({ sessionId: session.id, phase: "waiting" }));
+  const sessions = [...document.querySelectorAll('[id^="programme-session-"]')];
+  const sessionIndex = session ? sessions.indexOf(session) : -1;
+  if (session) {
+    sessionStorage.setItem(RETURN_KEY, JSON.stringify({
+      sessionId: session.id || "",
+      sessionIndex,
+      phase: "waiting",
+    }));
+  }
   sessionStorage.setItem(VIEW_KEY, "library");
   sessionStorage.removeItem("programme-editor-return-state-v1");
 }
@@ -117,7 +125,9 @@ function restoreLibraryReturn() {
     return;
   }
 
-  const session = state.sessionId ? document.getElementById(state.sessionId) : null;
+  const sessions = [...document.querySelectorAll('[id^="programme-session-"]')];
+  const session = (state.sessionId ? document.getElementById(state.sessionId) : null)
+    || (Number.isInteger(state.sessionIndex) ? sessions[state.sessionIndex] : null);
   if (!session) return;
 
   hideReturnTransition(true);
@@ -131,12 +141,19 @@ function restoreLibraryReturn() {
     return;
   }
 
-  if (state.phase !== "waiting") return;
+  const expandSession = session.querySelector('button[aria-label="Expand session"][aria-expanded="false"]');
+  if (expandSession) {
+    HTMLElement.prototype.click.call(expandSession);
+    state.phase = "waiting";
+    sessionStorage.setItem(RETURN_KEY, JSON.stringify(state));
+    return;
+  }
+
   const addExercise = [...session.querySelectorAll("button")].find((item) => text(item) === "Add exercise");
   if (!addExercise) return;
   state.phase = "opening";
   sessionStorage.setItem(RETURN_KEY, JSON.stringify(state));
-  addExercise.click();
+  HTMLElement.prototype.click.call(addExercise);
 }
 
 function showProgrammeOverview(root) {

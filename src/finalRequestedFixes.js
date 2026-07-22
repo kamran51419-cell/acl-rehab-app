@@ -56,23 +56,26 @@ function selectorInSession(session) {
     .find((item) => /Exercise (picker|selector)|Search exercises/i.test(text(item))) || null;
 }
 
-function scrollToSelectorImmediately(event) {
+function jumpToSelector(event) {
   const button = event.target?.closest?.("button");
   if (!button || !["Add exercise", "Change exercise"].includes(text(button))) return;
   const session = button.closest('[id^="programme-session-"]');
   if (!session) return;
 
-  let frames = 0;
-  const findAndScroll = () => {
+  const findAndJump = () => {
     const selector = selectorInSession(session);
     if (selector) {
-      selector.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
-      return;
+      selector.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
+      return true;
     }
-    frames += 1;
-    if (frames < 30) requestAnimationFrame(findAndScroll);
+    return false;
   };
-  requestAnimationFrame(findAndScroll);
+
+  if (findAndJump()) return;
+  requestAnimationFrame(() => {
+    if (findAndJump()) return;
+    requestAnimationFrame(findAndJump);
+  });
 }
 
 function styleExerciseSaveButtons() {
@@ -108,12 +111,12 @@ export function installFinalRequestedFixes() {
       apply();
     });
   };
-  document.addEventListener("click", scrollToSelectorImmediately, true);
+  document.addEventListener("click", jumpToSelector, true);
   apply();
   const observer = new MutationObserver(schedule);
   observer.observe(document.body, { childList: true, subtree: true });
   return () => {
     observer.disconnect();
-    document.removeEventListener("click", scrollToSelectorImmediately, true);
+    document.removeEventListener("click", jumpToSelector, true);
   };
 }

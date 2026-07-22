@@ -9,7 +9,9 @@ function text(element) {
 }
 
 function programmeEditor() {
-  const heading = [...document.querySelectorAll("h2")].find((item) => text(item) === "Edit programme");
+  const heading = [...document.querySelectorAll("h2")].find((item) =>
+    ["Edit programme", "Create programme"].includes(text(item)),
+  );
   return heading?.closest?.('[data-final-programme-editor="true"], .space-y-5.rounded-3xl.border') || heading?.parentElement?.parentElement || null;
 }
 
@@ -43,27 +45,17 @@ function captureReturnState(event) {
   sessionStorage.setItem(RETURN_STATE_KEY, JSON.stringify({
     sessionId: session.id,
     sessionIndex: Math.max(0, sessions.indexOf(session)),
-    returning: false,
   }));
 }
 
-function markReturning(event) {
+function removeReturnCover() {
+  document.getElementById(TRANSITION_ID)?.remove();
+}
+
+function handleProgrammeReturn(event) {
   const button = event.target?.closest?.("button");
   if (!button || text(button) !== "← Programme") return;
-
-  const state = readState();
-  if (!state) return;
-  sessionStorage.setItem(RETURN_STATE_KEY, JSON.stringify({ ...state, returning: true }));
-
-  const cover = document.getElementById(TRANSITION_ID);
-  if (cover) {
-    cover.style.transition = "opacity 40ms ease";
-    requestAnimationFrame(() => {
-      cover.style.opacity = "0";
-      window.setTimeout(() => cover.remove(), 50);
-    });
-  }
-
+  removeReturnCover();
   scheduleRestore();
 }
 
@@ -84,14 +76,17 @@ function finishRestore(selector) {
   selector.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
   sessionStorage.removeItem(RETURN_STATE_KEY);
   lastOpenAttempt = 0;
+  removeReturnCover();
 }
 
 function restoreSelector() {
   const state = readState();
-  if (!state?.returning) return false;
+  if (!state) return false;
 
   const editor = programmeEditor();
   if (!editor) return true;
+
+  removeReturnCover();
 
   const session = targetSession(editor, state);
   if (!session) return true;
@@ -108,7 +103,7 @@ function restoreSelector() {
   if (!addExercise) return true;
 
   const now = performance.now();
-  if (now - lastOpenAttempt >= 48) {
+  if (now - lastOpenAttempt >= 32) {
     lastOpenAttempt = now;
     addExercise.click();
   }
@@ -123,7 +118,7 @@ function scheduleRestore() {
   const run = () => {
     retryFrame = 0;
     const keepTrying = restoreSelector();
-    if (keepTrying && performance.now() - startedAt < 2500) {
+    if (keepTrying && performance.now() - startedAt < 3000) {
       retryFrame = requestAnimationFrame(run);
     }
   };
@@ -135,7 +130,7 @@ export function installProgrammeReturnSelectorFix() {
   if (typeof document === "undefined" || typeof MutationObserver === "undefined") return () => {};
 
   window.addEventListener("click", captureReturnState, true);
-  window.addEventListener("click", markReturning, true);
+  window.addEventListener("click", handleProgrammeReturn, true);
 
   const observer = new MutationObserver(scheduleRestore);
   observer.observe(document.body, {
@@ -150,6 +145,6 @@ export function installProgrammeReturnSelectorFix() {
     if (retryFrame) cancelAnimationFrame(retryFrame);
     observer.disconnect();
     window.removeEventListener("click", captureReturnState, true);
-    window.removeEventListener("click", markReturning, true);
+    window.removeEventListener("click", handleProgrammeReturn, true);
   };
 }

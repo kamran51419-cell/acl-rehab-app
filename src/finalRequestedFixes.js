@@ -92,12 +92,27 @@ function restorePicker() {
   }));
 }
 
+function styleExerciseSaveButtons() {
+  [...document.querySelectorAll('[role="dialog"]')].forEach((dialog) => {
+    const heading = [...dialog.querySelectorAll("h1, h2, h3")].find((item) => ["Add exercise", "Edit exercise"].includes(text(item)));
+    if (!heading) return;
+    [...dialog.querySelectorAll("button")].forEach((button) => {
+      if (!["Add exercise", "Save", "Saving…"].includes(text(button))) return;
+      button.style.setProperty("background", "#2563eb", "important");
+      button.style.setProperty("background-image", "none", "important");
+      button.style.setProperty("color", "#ffffff", "important");
+      button.style.setProperty("border-color", "#2563eb", "important");
+    });
+  });
+}
+
 function apply() {
   collapseEditProgramme();
   const heading = [...document.querySelectorAll("h2")].find((item) => text(item) === "Edit programme");
   const editor = editorFor(heading);
   if (editor) addExerciseCollapseControls(editor);
   restorePicker();
+  styleExerciseSaveButtons();
 }
 
 export function installFinalRequestedFixes() {

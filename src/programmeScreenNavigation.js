@@ -19,12 +19,19 @@ function showReturnTransition() {
   const cover = document.createElement("div");
   cover.id = TRANSITION_ID;
   cover.setAttribute("aria-hidden", "true");
-  cover.style.cssText = "position:fixed;inset:0;z-index:2147483646;background:#f8fafc;pointer-events:none";
+  cover.style.cssText = "position:fixed;inset:0;z-index:2147483646;background:#f8fafc;pointer-events:none;opacity:1;transition:opacity 160ms ease";
   document.body.appendChild(cover);
 }
 
-function hideReturnTransition() {
-  document.getElementById(TRANSITION_ID)?.remove();
+function hideReturnTransition(smooth = false) {
+  const cover = document.getElementById(TRANSITION_ID);
+  if (!cover) return;
+  if (!smooth) {
+    cover.remove();
+    return;
+  }
+  cover.style.opacity = "0";
+  window.setTimeout(() => cover.remove(), 180);
 }
 
 function countLabel(count) {
@@ -113,13 +120,14 @@ function restoreLibraryReturn() {
   const session = state.sessionId ? document.getElementById(state.sessionId) : null;
   if (!session) return;
 
+  hideReturnTransition(true);
+
   const selector = [...session.querySelectorAll('[data-exercise-picker], div.rounded-xl.border-dashed')]
     .find((item) => /Exercise (picker|selector)|Search exercises|Manage Exercise Library/i.test(text(item)));
 
   if (selector) {
-    selector.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
+    selector.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
     sessionStorage.removeItem(RETURN_KEY);
-    requestAnimationFrame(hideReturnTransition);
     return;
   }
 

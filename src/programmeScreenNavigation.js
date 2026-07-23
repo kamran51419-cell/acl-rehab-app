@@ -5,12 +5,21 @@ import { auth } from "./firebase";
 
 const VIEW_KEY = "programme-subview";
 const LIBRARY_OVERLAY_ID = "programme-exercise-library-overlay";
+const HOME_LIBRARY_STYLE_ID = "hide-home-exercise-library";
 
 let libraryRoot = null;
 let homeCloseFrame = 0;
 
 function text(element) {
   return (element?.textContent || "").trim();
+}
+
+function installHomeLibraryStyle() {
+  if (document.getElementById(HOME_LIBRARY_STYLE_ID)) return;
+  const style = document.createElement("style");
+  style.id = HOME_LIBRARY_STYLE_ID;
+  style.textContent = "#exercise-library{display:none!important}";
+  document.head.appendChild(style);
 }
 
 function makeChevronRow(label, count, onClick) {
@@ -188,6 +197,7 @@ function enhance() {
 export function installProgrammeScreenNavigation() {
   if (typeof document === "undefined" || typeof MutationObserver === "undefined") return () => {};
 
+  installHomeLibraryStyle();
   document.addEventListener("click", handleNavigation, true);
   enhance();
 

@@ -24,6 +24,7 @@ import { installProgrammeCreatorInputFixes } from './programmeCreatorInputFixes'
 import { installBuilderUxEnhancements } from './builderUxEnhancements'
 import { installFinalRequestedFixes } from './finalRequestedFixes'
 import { installWorkoutExerciseCardStyleFix } from './workoutExerciseCardStyleFix'
+import { installNewProgrammeExerciseExpandFix } from './newProgrammeExerciseExpandFix'
 
 const updateSW = registerSW({
   immediate: true,
@@ -49,6 +50,7 @@ installProgrammeCreatorInputFixes()
 installBuilderUxEnhancements()
 installFinalRequestedFixes()
 installWorkoutExerciseCardStyleFix()
+installNewProgrammeExerciseExpandFix()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

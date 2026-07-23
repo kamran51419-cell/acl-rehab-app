@@ -7,6 +7,7 @@ const VIEW_KEY = "programme-subview";
 const LIBRARY_OVERLAY_ID = "programme-exercise-library-overlay";
 
 let libraryRoot = null;
+let homeCloseFrame = 0;
 
 function text(element) {
   return (element?.textContent || "").trim();
@@ -67,10 +68,26 @@ function showInactiveScreen(root, inactiveSection) {
 }
 
 function closeExerciseLibrary() {
+  cancelAnimationFrame(homeCloseFrame);
+  homeCloseFrame = 0;
   libraryRoot?.unmount();
   libraryRoot = null;
   document.getElementById(LIBRARY_OVERLAY_ID)?.remove();
   document.body.style.overflow = "";
+}
+
+function closeExerciseLibraryAfterHomeRender(attempt = 0) {
+  if (!document.getElementById(LIBRARY_OVERLAY_ID)) return;
+
+  const homeButton = [...document.querySelectorAll("button")].find((button) => text(button) === "Home");
+  const homeIsActive = homeButton?.className?.includes("bg-slate-100") || !programmeRoot();
+
+  if (homeIsActive || attempt >= 60) {
+    closeExerciseLibrary();
+    return;
+  }
+
+  homeCloseFrame = requestAnimationFrame(() => closeExerciseLibraryAfterHomeRender(attempt + 1));
 }
 
 function ExerciseLibraryOverlay() {
@@ -147,7 +164,10 @@ function handleNavigation(event) {
     return;
   }
 
-  if (label === "Home") closeExerciseLibrary();
+  if (label === "Home" && document.getElementById(LIBRARY_OVERLAY_ID)) {
+    cancelAnimationFrame(homeCloseFrame);
+    homeCloseFrame = requestAnimationFrame(() => closeExerciseLibraryAfterHomeRender());
+  }
 }
 
 function renamePicker() {

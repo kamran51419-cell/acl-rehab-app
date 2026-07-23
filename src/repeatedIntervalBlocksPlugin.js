@@ -167,7 +167,7 @@ function transformPlansScreen(code, id) {
           ))}
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => updateGroups([...repeatedGroups, { id: \`interval-group-${'${makeId()}'}\`, repeatCount: 5, sortOrder: repeatedGroups.length, stages: [createIntervalStage({ phase: INTERVAL_PHASE.WORK, durationSeconds: 30, durationUnit: "seconds", sortOrder: 0 }), createIntervalStage({ phase: INTERVAL_PHASE.REST, durationSeconds: 30, durationUnit: "seconds", sortOrder: 1 })] }])}>Add repeated block</Button>
-            <Button variant="outline" onClick={() => updateGroups([...repeatedGroups, { id: \`interval-group-${'${makeId()}'}\`, repeatCount: 1, sortOrder: repeatedGroups.length, stages: [createIntervalStage({ phase: INTERVAL_PHASE.REST, durationSeconds: 60, durationUnit: "seconds", label: "Recovery", sortOrder: 0 })] }])}>Add single interval</Button>
+            <Button variant="outline" onClick={() => updateGroups([...repeatedGroups, { id: \`interval-group-${'${makeId()}'}\`, repeatCount: 1, sortOrder: repeatedGroups.length, stages: [createIntervalStage({ phase: INTERVAL_PHASE.WORK, durationSeconds: 60, durationUnit: "seconds", sortOrder: 0 })] }])}>Add single interval</Button>
           </div>
         </>}
       </div>

@@ -66,3 +66,11 @@
   content: none !important;
   display: none !important;
 }
+
+/* Match the Workout programme/session card to the existing summary-card gradient. */
+main .space-y-5 > button.w-full + section.rounded-3xl {
+  border-color: rgb(147 197 253 / 0.68) !important;
+  background:
+    linear-gradient(100deg, rgb(191 219 254 / 0.48) 0%, rgb(219 234 254 / 0.36) 31%, rgb(255 255 255) 78%) !important;
+  box-shadow: 0 10px 24px rgb(29 78 216 / 0.06), 0 2px 6px rgb(15 23 42 / 0.03) !important;
+}

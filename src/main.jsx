@@ -25,6 +25,7 @@ import { installBuilderUxEnhancements } from './builderUxEnhancements'
 import { installFinalRequestedFixes } from './finalRequestedFixes'
 import { installWorkoutExerciseCardStyleFix } from './workoutExerciseCardStyleFix'
 import { installInactiveProgrammeCountFix } from './inactiveProgrammeCountFix'
+import { installProgrammeSaveTransitionFix } from './programmeSaveTransitionFix'
 
 const updateSW = registerSW({
   immediate: true,
@@ -51,6 +52,7 @@ installBuilderUxEnhancements()
 installFinalRequestedFixes()
 installWorkoutExerciseCardStyleFix()
 installInactiveProgrammeCountFix()
+installProgrammeSaveTransitionFix()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

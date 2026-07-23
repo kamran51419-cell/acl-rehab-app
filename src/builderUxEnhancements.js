@@ -299,7 +299,10 @@ export function installBuilderUxEnhancements() {
       collapseExercises(root, session)
       if (!window.matchMedia('(max-width: 767px)').matches) {
         waitForElement(() => pickerInSession(session)).then((picker) => {
-          if (picker) scrollOnce(picker)
+          if (!picker) return
+          const search = picker.querySelector('input[aria-label="Search exercises"]')
+          if (search === document.activeElement) search.blur()
+          picker.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' })
         })
       }
       return

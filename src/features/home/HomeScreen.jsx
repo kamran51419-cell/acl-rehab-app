@@ -170,23 +170,23 @@ export function HomeDashboard({ programme, unfinishedWorkout, incompleteWorkoutL
 
 export default function HomeScreen({ user, surgeryDate, trainingMode = "gym", onOpenWorkout, fromProgramme = false, onBackToProgramme, repository = defaultRepository }) {
   const [plans, setPlans] = useState([]); const [workouts, setWorkouts] = useState([]); const [occurrences, setOccurrences] = useState([]); const [showSessions, setShowSessions] = useState(false); const [incompleteExpanded, setIncompleteExpanded] = useState(false);
-  const [plansLoaded, setPlansLoaded] = useState(false); const [workoutsLoaded, setWorkoutsLoaded] = useState(false); const [occurrencesLoaded, setOccurrencesLoaded] = useState(false);
+  const [plansLoaded, setPlansLoaded] = useState(false); const [workoutsLoaded, setWorkoutsLoaded] = useState(false); const [occurrencesProgrammeId, setOccurrencesProgrammeId] = useState(null);
   const today = todayString();
   useEffect(() => repository.subscribePlans(db, user.uid, (items) => { setPlans(items); setPlansLoaded(true); }, () => setPlansLoaded(true)), [repository, user.uid]);
   useEffect(() => repository.subscribeWorkouts(db, user.uid, (items) => { setWorkouts(items); setWorkoutsLoaded(true); }, () => setWorkoutsLoaded(true)), [repository, user.uid]);
   const programme = useMemo(() => plans.filter((plan) => plan.isActive && !plan.isArchived).sort((a, b) => String(b.updatedAtToken || b.id).localeCompare(String(a.updatedAtToken || a.id)))[0] || null, [plans]);
   useEffect(() => {
-    setOccurrencesLoaded(false);
-    if (!programme) { setOccurrences([]); setOccurrencesLoaded(true); return undefined; }
+    setOccurrencesProgrammeId(null);
+    if (!programme) { setOccurrences([]); return undefined; }
     return onSnapshot(collection(db, "users", user.uid, "routineTaskOccurrences"), (snapshot) => {
       setOccurrences(snapshot.docs.map((item) => item.data()).filter((item) => item.programmeId === programme.id));
-      setOccurrencesLoaded(true);
-    }, () => setOccurrencesLoaded(true));
+      setOccurrencesProgrammeId(programme.id);
+    }, () => setOccurrencesProgrammeId(programme.id));
   }, [programme, user.uid]);
   const unfinishedWorkout = useMemo(() => workouts.find((item) => item.status === "in_progress") || null, [workouts]);
   const incompleteWorkoutList = useMemo(() => incompleteWorkouts(workouts), [workouts]);
   const groups = useMemo(() => routineGroups(programme, occurrences, today), [programme, occurrences, today]);
-  const homeReady = plansLoaded && workoutsLoaded && occurrencesLoaded;
+  const homeReady = plansLoaded && workoutsLoaded && (!programme || occurrencesProgrammeId === programme.id);
   async function setStatus(task, status) {
     if (!programme) return;
     const taskId = task.baseTaskId || task.id;

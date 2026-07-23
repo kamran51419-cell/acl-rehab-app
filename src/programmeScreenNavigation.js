@@ -139,7 +139,8 @@ function openExerciseLibrary() {
 function hideLibraryAfterHomeRender(attempt = 0) {
   const homeButton = [...document.querySelectorAll("button")].find((button) => text(button) === "Home");
   const homeIsActive = homeButton?.className?.includes("bg-slate-100") || homeButton?.className?.includes("bg-slate-900");
-  if (homeIsActive || attempt >= 30) {
+  const homeIsReady = document.querySelector('[data-home-dashboard-ready="true"]');
+  if ((homeIsActive && homeIsReady) || attempt >= 180) {
     hideExerciseLibrary();
     homeFrame = 0;
     return;

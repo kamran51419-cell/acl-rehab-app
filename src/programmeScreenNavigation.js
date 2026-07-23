@@ -6,10 +6,11 @@ import { auth } from "./firebase";
 const VIEW_KEY = "programme-subview";
 const LIBRARY_OVERLAY_ID = "programme-exercise-library-overlay";
 const HOME_LIBRARY_STYLE_ID = "hide-home-exercise-library";
-const TRANSITION_COVER_ID = "programme-navigation-transition-cover";
 
 let libraryRoot = null;
-let transitionFrame = 0;
+let libraryVisible = false;
+let homeFrame = 0;
+let authUnsubscribe = null;
 
 function text(element) {
   return (element?.textContent || "").trim();
@@ -21,20 +22,6 @@ function installHomeLibraryStyle() {
   style.id = HOME_LIBRARY_STYLE_ID;
   style.textContent = "#exercise-library{display:none!important}";
   document.head.appendChild(style);
-}
-
-function showTransitionCover() {
-  if (document.getElementById(TRANSITION_COVER_ID)) return;
-  const cover = document.createElement("div");
-  cover.id = TRANSITION_COVER_ID;
-  cover.style.cssText = "position:fixed;inset:0;z-index:2147483647;background:#f8fafc;pointer-events:none";
-  document.body.appendChild(cover);
-}
-
-function hideTransitionCover() {
-  cancelAnimationFrame(transitionFrame);
-  transitionFrame = 0;
-  document.getElementById(TRANSITION_COVER_ID)?.remove();
 }
 
 function makeChevronRow(label, count, onClick) {
@@ -91,10 +78,11 @@ function showInactiveScreen(root, inactiveSection) {
   inactiveSection.querySelector(":scope > h2")?.classList.add("hidden");
 }
 
-function closeExerciseLibrary() {
-  libraryRoot?.unmount();
-  libraryRoot = null;
-  document.getElementById(LIBRARY_OVERLAY_ID)?.remove();
+function hideExerciseLibrary() {
+  const host = document.getElementById(LIBRARY_OVERLAY_ID);
+  if (!host) return;
+  host.hidden = true;
+  libraryVisible = false;
   document.body.style.overflow = "";
 }
 
@@ -109,7 +97,7 @@ function ExerciseLibraryOverlay() {
         "button",
         {
           type: "button",
-          onClick: closeExerciseLibrary,
+          onClick: hideExerciseLibrary,
           className: "text-sm font-medium text-slate-600 hover:text-slate-900",
         },
         "← Programme"
@@ -122,39 +110,41 @@ function ExerciseLibraryOverlay() {
   );
 }
 
-function waitForExerciseLibrary(attempt = 0) {
-  const overlay = document.getElementById(LIBRARY_OVERLAY_ID);
-  const libraryReady = overlay?.querySelector("h1, h2, input, button");
-  if (libraryReady || attempt >= 60) {
-    hideTransitionCover();
-    return;
-  }
-  transitionFrame = requestAnimationFrame(() => waitForExerciseLibrary(attempt + 1));
-}
-
-function openExerciseLibrary() {
+function ensureExerciseLibrary() {
   if (document.getElementById(LIBRARY_OVERLAY_ID) || !auth.currentUser) return;
 
-  showTransitionCover();
   const host = document.createElement("div");
   host.id = LIBRARY_OVERLAY_ID;
+  host.hidden = true;
   host.style.cssText = "position:fixed;inset:0;z-index:2147483646;overflow:auto;background:#f8fafc";
   document.body.appendChild(host);
-  document.body.style.overflow = "hidden";
 
   libraryRoot = createRoot(host);
   libraryRoot.render(React.createElement(ExerciseLibraryOverlay));
-  transitionFrame = requestAnimationFrame(() => waitForExerciseLibrary());
 }
 
-function waitForHome(attempt = 0) {
+function openExerciseLibrary() {
+  ensureExerciseLibrary();
+  const host = document.getElementById(LIBRARY_OVERLAY_ID);
+  if (!host) return;
+
+  cancelAnimationFrame(homeFrame);
+  homeFrame = 0;
+  host.hidden = false;
+  host.scrollTop = 0;
+  libraryVisible = true;
+  document.body.style.overflow = "hidden";
+}
+
+function hideLibraryAfterHomeRender(attempt = 0) {
   const homeButton = [...document.querySelectorAll("button")].find((button) => text(button) === "Home");
   const homeIsActive = homeButton?.className?.includes("bg-slate-100") || !programmeRoot();
-  if (homeIsActive || attempt >= 60) {
-    hideTransitionCover();
+  if (homeIsActive || attempt >= 30) {
+    hideExerciseLibrary();
+    homeFrame = 0;
     return;
   }
-  transitionFrame = requestAnimationFrame(() => waitForHome(attempt + 1));
+  homeFrame = requestAnimationFrame(() => hideLibraryAfterHomeRender(attempt + 1));
 }
 
 function enhanceProgramme() {
@@ -188,10 +178,15 @@ function scrollExerciseSelectorToTop(sessionCard) {
     const selector = selectorHeading?.closest(".rounded-xl.border-dashed");
     if (!selector) return;
 
+    if (text(selectorHeading) === "Exercise picker") selectorHeading.textContent = "Exercise selector";
     const results = selector.querySelector(".overflow-y-auto");
     if (results) results.scrollTop = 0;
     selector.scrollIntoView({ behavior: "smooth", block: "start" });
   }));
+}
+
+function scheduleProgrammeEnhancement() {
+  requestAnimationFrame(() => requestAnimationFrame(enhanceProgramme));
 }
 
 function handleNavigation(event) {
@@ -207,10 +202,14 @@ function handleNavigation(event) {
     return;
   }
 
-  if (label === "Home" && document.getElementById(LIBRARY_OVERLAY_ID)) {
-    showTransitionCover();
-    closeExerciseLibrary();
-    transitionFrame = requestAnimationFrame(() => waitForHome());
+  if (label === "Home" && libraryVisible) {
+    cancelAnimationFrame(homeFrame);
+    homeFrame = requestAnimationFrame(() => hideLibraryAfterHomeRender());
+    return;
+  }
+
+  if (label === "Programme") {
+    scheduleProgrammeEnhancement();
     return;
   }
 
@@ -220,31 +219,27 @@ function handleNavigation(event) {
   }
 }
 
-function renamePicker() {
-  [...document.querySelectorAll("strong")].forEach((heading) => {
-    if (text(heading) === "Exercise picker") heading.textContent = "Exercise selector";
-  });
-}
-
-function enhance() {
-  renamePicker();
-  enhanceProgramme();
-}
-
 export function installProgrammeScreenNavigation() {
-  if (typeof document === "undefined" || typeof MutationObserver === "undefined") return () => {};
+  if (typeof document === "undefined") return () => {};
 
   installHomeLibraryStyle();
   document.addEventListener("click", handleNavigation, true);
-  enhance();
+  scheduleProgrammeEnhancement();
 
-  const observer = new MutationObserver(() => requestAnimationFrame(enhance));
-  observer.observe(document.body, { childList: true, subtree: true });
+  authUnsubscribe = auth.onAuthStateChanged((user) => {
+    if (!user) return;
+    ensureExerciseLibrary();
+    scheduleProgrammeEnhancement();
+  });
 
   return () => {
     document.removeEventListener("click", handleNavigation, true);
-    hideTransitionCover();
-    closeExerciseLibrary();
-    observer.disconnect();
+    cancelAnimationFrame(homeFrame);
+    authUnsubscribe?.();
+    authUnsubscribe = null;
+    libraryRoot?.unmount();
+    libraryRoot = null;
+    document.getElementById(LIBRARY_OVERLAY_ID)?.remove();
+    document.body.style.overflow = "";
   };
 }

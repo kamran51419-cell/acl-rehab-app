@@ -1,0 +1,198 @@
+name: Apply programme navigation fix
+
+on:
+  push:
+    branches:
+      - agent/fix-programme-navigation-glitches
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/fix-programme-navigation-glitches
+          fetch-depth: 0
+
+      - name: Apply focused source changes
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          app = Path('src/App.jsx')
+          source = app.read_text()
+
+          source = source.replace(
+              '  const [weekManuallyEdited, setWeekManuallyEdited] = useState(false);\n\n  const [user, setUser] = useState(null);',
+              '  const [weekManuallyEdited, setWeekManuallyEdited] = useState(false);\n\n  useEffect(() => {\n    const openLibrary = () => {\n      setLibraryFromProgramme(true);\n      setActiveTab("programme");\n    };\n    window.addEventListener("open-programme-exercise-library", openLibrary);\n    return () => window.removeEventListener("open-programme-exercise-library", openLibrary);\n  }, []);\n\n  const [user, setUser] = useState(null);'
+          )
+
+          source = source.replace(
+              'onClick={() => setActiveTab("home")}>Home</TabButton>',
+              'onClick={() => { setLibraryFromProgramme(false); setActiveTab("home"); }}>Home</TabButton>'
+          )
+          source = source.replace(
+              'onClick={() => setActiveTab("programme")}>Programme</TabButton>',
+              'onClick={() => { setLibraryFromProgramme(false); setActiveTab("programme"); }}>Programme</TabButton>'
+          )
+
+          old_home = '{activeTab === "home" && <HomeScreen user={user} surgeryDate={surgeryDate} trainingMode={trainingMode} fromProgramme={libraryFromProgramme} onBackToProgramme={() => { setLibraryFromProgramme(false); setActiveTab("programme"); }} onOpenWorkout={(intent) => { setWorkoutIntent({ ...intent, token: Date.now() }); setActiveTab("workout"); }} />}'
+          new_home = '{activeTab === "home" && <HomeScreen user={user} surgeryDate={surgeryDate} trainingMode={trainingMode} onOpenWorkout={(intent) => { setWorkoutIntent({ ...intent, token: Date.now() }); setActiveTab("workout"); }} />}'
+          if old_home not in source:
+              raise SystemExit('Home render target not found')
+          source = source.replace(old_home, new_home)
+
+          old_programme = '{activeTab === "programme" && <PlansScreen user={user} onManageExerciseLibrary={() => { setLibraryFromProgramme(true); setActiveTab("home"); requestAnimationFrame(() => document.getElementById("exercise-library")?.scrollIntoView({ behavior: "smooth" })); }} />}'
+          new_programme = '''{activeTab === "programme" && (
+          <>
+            <div hidden={libraryFromProgramme}>
+              <PlansScreen user={user} onManageExerciseLibrary={() => setLibraryFromProgramme(true)} />
+            </div>
+            {libraryFromProgramme ? (
+              <HomeScreen
+                user={user}
+                surgeryDate={surgeryDate}
+                trainingMode={trainingMode}
+                fromProgramme
+                onBackToProgramme={() => setLibraryFromProgramme(false)}
+                onOpenWorkout={(intent) => { setWorkoutIntent({ ...intent, token: Date.now() }); setActiveTab("workout"); }}
+              />
+            ) : null}
+          </>
+        )}'''
+          if old_programme not in source:
+              raise SystemExit('Programme render target not found')
+          source = source.replace(old_programme, new_programme)
+
+          source = source.replace(
+              'onClick={() => setActiveTab("home")}\n',
+              'onClick={() => { setLibraryFromProgramme(false); setActiveTab("home"); }}\n'
+          )
+          source = source.replace(
+              'onClick={() => setActiveTab("programme")}\n',
+              'onClick={() => { setLibraryFromProgramme(false); setActiveTab("programme"); }}\n'
+          )
+          app.write_text(source)
+
+          home = Path('src/features/home/HomeScreen.jsx')
+          source = home.read_text()
+          old_return = 'return <div className="space-y-8">{fromProgramme ? <Button variant="outline" onClick={onBackToProgramme}>← Back to programme</Button> : null}<HomeDashboard programme={programme} unfinishedWorkout={unfinishedWorkout} incompleteWorkoutList={incompleteWorkoutList} incompleteExpanded={incompleteExpanded} surgeryDate={surgeryDate} trainingMode={trainingMode} today={today} routineGroups={groups} routineExpanded={routineExpanded} onToggleRoutine={() => setRoutineExpanded((value) => !value)} onRoutineStatus={setStatus} showSessions={showSessions} onStart={() => setShowSessions(true)} onContinue={() => onOpenWorkout({ mode: "continue", workoutId: unfinishedWorkout.id })} onContinueIncomplete={continueIncomplete} onDismissIncomplete={dismissIncomplete} onToggleIncomplete={() => setIncompleteExpanded((value) => !value)} onChooseSession={(sessionId) => onOpenWorkout({ mode: "session", sessionId })} onOneOff={() => onOpenWorkout({ mode: "one_off" })}/><section id="exercise-library" className="scroll-mt-6"><PlansScreen user={user} view="exercises" trainingMode={trainingMode}/></section></div>;'
+          new_return = '''if (fromProgramme) {
+    return <div className="space-y-6"><Button variant="outline" onClick={onBackToProgramme}>← Back to programme</Button><section id="exercise-library"><PlansScreen user={user} view="exercises" trainingMode={trainingMode}/></section></div>;
+  }
+  return <div className="space-y-8"><HomeDashboard programme={programme} unfinishedWorkout={unfinishedWorkout} incompleteWorkoutList={incompleteWorkoutList} incompleteExpanded={incompleteExpanded} surgeryDate={surgeryDate} trainingMode={trainingMode} today={today} routineGroups={groups} routineExpanded={routineExpanded} onToggleRoutine={() => setRoutineExpanded((value) => !value)} onRoutineStatus={setStatus} showSessions={showSessions} onStart={() => setShowSessions(true)} onContinue={() => onOpenWorkout({ mode: "continue", workoutId: unfinishedWorkout.id })} onContinueIncomplete={continueIncomplete} onDismissIncomplete={dismissIncomplete} onToggleIncomplete={() => setIncompleteExpanded((value) => !value)} onChooseSession={(sessionId) => onOpenWorkout({ mode: "session", sessionId })} onOneOff={() => onOpenWorkout({ mode: "one_off" })}/></div>;'''
+          if old_return not in source:
+              raise SystemExit('HomeScreen return target not found')
+          home.write_text(source.replace(old_return, new_return))
+
+          navigation = Path('src/programmeScreenNavigation.js')
+          navigation.write_text(r'''const VIEW_KEY = "programme-subview";
+
+function text(element) {
+  return (element?.textContent || "").trim();
+}
+
+function makeChevronRow(label, count, onClick) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left shadow-sm hover:bg-slate-50";
+  button.innerHTML = `<span><span class="block font-semibold text-slate-900">${label}</span>${Number.isFinite(count) ? `<span class="mt-0.5 block text-sm text-slate-500">${count} ${count === 1 ? "programme" : "programmes"}</span>` : ""}</span><span aria-hidden="true" class="text-2xl leading-none text-slate-400">›</span>`;
+  button.addEventListener("click", onClick);
+  return button;
+}
+
+function makeBackHeader(title, onBack) {
+  const header = document.createElement("div");
+  header.dataset.programmeSubviewHeader = "true";
+  header.className = "space-y-3";
+  const back = document.createElement("button");
+  back.type = "button";
+  back.className = "text-sm font-medium text-slate-600 hover:text-slate-900";
+  back.textContent = "← Programme";
+  back.addEventListener("click", onBack);
+  const heading = document.createElement("h1");
+  heading.className = "text-2xl font-semibold tracking-tight";
+  heading.textContent = title;
+  header.append(back, heading);
+  return header;
+}
+
+function programmeRoot() {
+  const heading = [...document.querySelectorAll("h1")].find((item) => text(item) === "Programme");
+  return heading?.closest(".space-y-6") || heading?.parentElement?.parentElement || null;
+}
+
+function sectionByTitle(root, title) {
+  return [...root.querySelectorAll("section")].find((section) => text(section.querySelector(":scope > h2")) === title);
+}
+
+function showProgrammeOverview(root) {
+  sessionStorage.removeItem(VIEW_KEY);
+  root.querySelectorAll("[data-programme-subview-header]").forEach((item) => item.remove());
+  [...root.children].forEach((child) => { child.hidden = child.dataset.programmeHiddenSection === "true"; });
+  root.querySelectorAll("[data-programme-overview-row]").forEach((row) => { row.hidden = false; });
+}
+
+function showInactiveScreen(root, inactiveSection) {
+  sessionStorage.setItem(VIEW_KEY, "inactive");
+  [...root.children].forEach((child) => { child.hidden = true; });
+  root.prepend(makeBackHeader("Inactive programmes", () => showProgrammeOverview(root)));
+  inactiveSection.hidden = false;
+  inactiveSection.querySelector(":scope > h2")?.classList.add("hidden");
+}
+
+function openExerciseLibrary() {
+  window.dispatchEvent(new CustomEvent("open-programme-exercise-library"));
+}
+
+function enhanceProgramme() {
+  const root = programmeRoot();
+  if (!root || root.dataset.programmeNavigationEnhanced === "true") return;
+  const activeSection = sectionByTitle(root, "Active");
+  const inactiveSection = sectionByTitle(root, "Inactive");
+  if (!activeSection || !inactiveSection) return;
+  root.dataset.programmeNavigationEnhanced = "true";
+  inactiveSection.dataset.programmeHiddenSection = "true";
+  inactiveSection.hidden = true;
+  const inactiveCount = inactiveSection.querySelectorAll(".grid > div").length;
+  const inactiveRow = makeChevronRow("Inactive programmes", inactiveCount, () => showInactiveScreen(root, inactiveSection));
+  inactiveRow.dataset.programmeOverviewRow = "true";
+  activeSection.insertAdjacentElement("afterend", inactiveRow);
+  const libraryRow = makeChevronRow("Exercise Library", undefined, openExerciseLibrary);
+  libraryRow.dataset.programmeOverviewRow = "true";
+  inactiveRow.insertAdjacentElement("afterend", libraryRow);
+  if (sessionStorage.getItem(VIEW_KEY) === "inactive") showInactiveScreen(root, inactiveSection);
+}
+
+function renamePicker() {
+  [...document.querySelectorAll("strong")].forEach((heading) => {
+    if (text(heading) === "Exercise picker") heading.textContent = "Exercise selector";
+  });
+}
+
+function enhance() {
+  renamePicker();
+  enhanceProgramme();
+}
+
+export function installProgrammeScreenNavigation() {
+  if (typeof document === "undefined" || typeof MutationObserver === "undefined") return () => {};
+  enhance();
+  const observer = new MutationObserver(() => requestAnimationFrame(enhance));
+  observer.observe(document.body, { childList: true, subtree: true });
+  return () => observer.disconnect();
+}
+''')
+          PY
+
+          rm .github/workflows/apply-programme-navigation-fix.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.jsx src/features/home/HomeScreen.jsx src/programmeScreenNavigation.js .github/workflows/apply-programme-navigation-fix.yml
+          git commit -m "Fix programme library and Home transitions"
+          git push origin HEAD:agent/fix-programme-navigation-glitches

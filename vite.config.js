@@ -3,10 +3,12 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { timeWeightTrackingBuildPlugin } from './src/timeWeightTrackingBuildPlugin.js'
+import { verticalIntervalWorkoutDisplayPlugin } from './src/verticalIntervalWorkoutDisplayPlugin.js'
 
 export default defineConfig({
   plugins: [
     timeWeightTrackingBuildPlugin(),
+    verticalIntervalWorkoutDisplayPlugin(),
     react(),
     tailwindcss(),
     VitePWA({

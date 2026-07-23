@@ -297,9 +297,11 @@ export function installBuilderUxEnhancements() {
     if (label === 'Add exercise' || label === 'Change exercise') {
       const session = programmeSession(button)
       collapseExercises(root, session)
-      waitForElement(() => pickerInSession(session)).then((picker) => {
-        if (picker) scrollOnce(picker)
-      })
+      if (!window.matchMedia('(max-width: 767px)').matches) {
+        waitForElement(() => pickerInSession(session)).then((picker) => {
+          if (picker) scrollOnce(picker)
+        })
+      }
       return
     }
 

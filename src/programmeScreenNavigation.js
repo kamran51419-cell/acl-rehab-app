@@ -165,8 +165,7 @@ function handleNavigation(event) {
   }
 
   if (label === "Home" && document.getElementById(LIBRARY_OVERLAY_ID)) {
-    cancelAnimationFrame(homeCloseFrame);
-    homeCloseFrame = requestAnimationFrame(() => closeExerciseLibraryAfterHomeRender());
+    closeExerciseLibrary();
   }
 }
 

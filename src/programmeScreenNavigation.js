@@ -76,20 +76,6 @@ function closeExerciseLibrary() {
   document.body.style.overflow = "";
 }
 
-function closeExerciseLibraryAfterHomeRender(attempt = 0) {
-  if (!document.getElementById(LIBRARY_OVERLAY_ID)) return;
-
-  const homeButton = [...document.querySelectorAll("button")].find((button) => text(button) === "Home");
-  const homeIsActive = homeButton?.className?.includes("bg-slate-100") || !programmeRoot();
-
-  if (homeIsActive || attempt >= 60) {
-    closeExerciseLibrary();
-    return;
-  }
-
-  homeCloseFrame = requestAnimationFrame(() => closeExerciseLibraryAfterHomeRender(attempt + 1));
-}
-
 function ExerciseLibraryOverlay() {
   return React.createElement(
     "div",
@@ -151,6 +137,19 @@ function enhanceProgramme() {
   if (sessionStorage.getItem(VIEW_KEY) === "inactive") showInactiveScreen(root, inactiveSection);
 }
 
+function scrollExerciseSelectorToTop(sessionCard) {
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const selectorHeading = [...sessionCard.querySelectorAll("strong")]
+      .find((heading) => ["Exercise picker", "Exercise selector"].includes(text(heading)));
+    const selector = selectorHeading?.closest(".rounded-xl.border-dashed");
+    if (!selector) return;
+
+    const results = selector.querySelector(".overflow-y-auto");
+    if (results) results.scrollTop = 0;
+    selector.scrollIntoView({ behavior: "smooth", block: "start" });
+  }));
+}
+
 function handleNavigation(event) {
   const button = event.target.closest("button");
   if (!button) return;
@@ -165,8 +164,13 @@ function handleNavigation(event) {
   }
 
   if (label === "Home" && document.getElementById(LIBRARY_OVERLAY_ID)) {
-    cancelAnimationFrame(homeCloseFrame);
-    homeCloseFrame = requestAnimationFrame(() => closeExerciseLibraryAfterHomeRender());
+    closeExerciseLibrary();
+    return;
+  }
+
+  if (label === "Add exercise") {
+    const sessionCard = button.closest('[id^="programme-session-"]');
+    if (sessionCard) scrollExerciseSelectorToTop(sessionCard);
   }
 }
 

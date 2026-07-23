@@ -110,6 +110,19 @@ function addProgrammeSessionCollapseControls() {
   });
 }
 
+function removeRightExerciseCollapseControls() {
+  document.querySelectorAll('[id^="programme-session-"]').forEach((sessionCard) => {
+    const exerciseList = directChildren(sessionCard)[1];
+    if (!exerciseList) return;
+
+    directChildren(exerciseList).forEach((exerciseCard) => {
+      const collapseButtons = Array.from(exerciseCard.querySelectorAll('button[aria-expanded]'))
+        .filter((button) => /exercise/i.test(button.getAttribute("aria-label") || ""));
+      if (collapseButtons.length > 1) collapseButtons.at(-1)?.remove();
+    });
+  });
+}
+
 function removeRedundantExerciseLibraryCopy() {
   document.querySelectorAll("h1").forEach((heading) => {
     if (heading.textContent?.trim() !== "Manage Exercises") return;
@@ -201,6 +214,7 @@ function removeProgrammePageHeading() {
 
 function applyFixes() {
   addProgrammeSessionCollapseControls();
+  removeRightExerciseCollapseControls();
   removeProgrammePageHeading();
   removeRedundantExerciseLibraryCopy();
   installExerciseCategoryFilters();

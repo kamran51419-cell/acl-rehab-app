@@ -1,0 +1,173 @@
+name: Apply time and weight tracking changes
+
+on:
+  push:
+    branches:
+      - agent/add-strength-time-weight-tracking
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/add-strength-time-weight-tracking
+          fetch-depth: 0
+
+      - name: Apply focused changes
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace(path, old, new):
+              file = Path(path)
+              text = file.read_text()
+              if old not in text:
+                  raise SystemExit(f"Expected text not found in {path}: {old[:100]!r}")
+              file.write_text(text.replace(old, new, 1))
+
+          plans = "src/lib/domain/plans.js"
+          replace(plans,
+          '  TIME: "time",\n  DISTANCE: "distance",',
+          '  TIME: "time",\n  TIME_WEIGHT: "time_weight",\n  DISTANCE: "distance",')
+          replace(plans,
+          '  if (exerciseType === EXERCISE_TYPE.STRENGTH) return [EXERCISE_LOGGING_METHOD.REPS, EXERCISE_LOGGING_METHOD.REPS_WEIGHT];',
+          '  if (exerciseType === EXERCISE_TYPE.STRENGTH) return [EXERCISE_LOGGING_METHOD.REPS, EXERCISE_LOGGING_METHOD.REPS_WEIGHT, EXERCISE_LOGGING_METHOD.TIME, EXERCISE_LOGGING_METHOD.TIME_WEIGHT];')
+          replace(plans,
+          '  if ([EXERCISE_LOGGING_METHOD.REPS, EXERCISE_LOGGING_METHOD.REPS_WEIGHT].includes(loggingMethod)) return createStrengthPrescription();\n  if (loggingMethod === EXERCISE_LOGGING_METHOD.INTERVALS) return createIntervalPrescription();',
+          '  if ([EXERCISE_LOGGING_METHOD.REPS, EXERCISE_LOGGING_METHOD.REPS_WEIGHT].includes(loggingMethod)) return createStrengthPrescription();\n  if (loggingMethod === EXERCISE_LOGGING_METHOD.TIME_WEIGHT) return createTimedHoldPrescription();\n  if (loggingMethod === EXERCISE_LOGGING_METHOD.INTERVALS) return createIntervalPrescription();')
+          replace(plans,
+          '  if (loggingMethod === EXERCISE_LOGGING_METHOD.TIME && exerciseType === EXERCISE_TYPE.CARDIO) return createCardioPrescription();',
+          '  if (loggingMethod === EXERCISE_LOGGING_METHOD.TIME && exerciseType === EXERCISE_TYPE.STRENGTH) return createTimedHoldPrescription();\n  if (loggingMethod === EXERCISE_LOGGING_METHOD.TIME && exerciseType === EXERCISE_TYPE.OTHER) return { targetSets: 3, targetDurationSeconds: 60, durationUnit: "seconds" };\n  if (loggingMethod === EXERCISE_LOGGING_METHOD.TIME && exerciseType === EXERCISE_TYPE.CARDIO) return createCardioPrescription();')
+          replace(plans,
+          'function validateCardio(exercise, path, errors) {',
+          'function validateSetDuration(exercise, path, errors, { requireSide = false } = {}) {\n  const prescription = exercise.prescription || {};\n  if (requireSide && ![SIDE.BOTH, SIDE.SEPARATE, SIDE.LEFT, SIDE.RIGHT].includes(prescription.side)) errors.push(`${path} has an invalid side.`);\n  if (!positiveInt(prescription.targetSets)) errors.push(`${path} must have at least one set.`);\n  if (!positiveInt(prescription.targetDurationSeconds)) errors.push(`${path} duration must be a positive whole number of seconds.`);\n}\n\nfunction validateCardio(exercise, path, errors) {')
+          replace(plans,
+          '      if (exercise.exerciseType === EXERCISE_TYPE.STRENGTH) validateStrength(exercise, path, errors);',
+          '      if (exercise.exerciseType === EXERCISE_TYPE.STRENGTH) {\n        if ([EXERCISE_LOGGING_METHOD.TIME, EXERCISE_LOGGING_METHOD.TIME_WEIGHT].includes(method)) validateSetDuration(exercise, path, errors, { requireSide: true });\n        else validateStrength(exercise, path, errors);\n      }')
+          replace(plans,
+          '      else if (exercise.exerciseType === EXERCISE_TYPE.OTHER && [EXERCISE_LOGGING_METHOD.TIME, EXERCISE_LOGGING_METHOD.DISTANCE, EXERCISE_LOGGING_METHOD.INTERVALS].includes(method)) validateCardio(exercise, path, errors);',
+          '      else if (exercise.exerciseType === EXERCISE_TYPE.OTHER && method === EXERCISE_LOGGING_METHOD.TIME) validateSetDuration(exercise, path, errors);\n      else if (exercise.exerciseType === EXERCISE_TYPE.OTHER && [EXERCISE_LOGGING_METHOD.DISTANCE, EXERCISE_LOGGING_METHOD.INTERVALS].includes(method)) validateCardio(exercise, path, errors);')
+          replace(plans,
+          '  if (type === EXERCISE_TYPE.STRENGTH || type === EXERCISE_TYPE.PLYOMETRIC) {\n    const prescriptions = exercise.prescription?.blocks ? sortByOrder(exercise.prescription.blocks) : [exercise.prescription || {}];',
+          '  if (type === EXERCISE_TYPE.STRENGTH && [EXERCISE_LOGGING_METHOD.TIME, EXERCISE_LOGGING_METHOD.TIME_WEIGHT].includes(exercise.loggingMethod)) {\n    const side = exercise.prescription?.side === SIDE.LEFT ? "left" : exercise.prescription?.side === SIDE.RIGHT ? "right" : "both";\n    return `${exercise.prescription?.targetSets || 0} × ${durationSummary(exercise.prescription?.targetDurationSeconds, exercise.prescription?.durationUnit)} ${side}`;\n  }\n  if (type === EXERCISE_TYPE.STRENGTH || type === EXERCISE_TYPE.PLYOMETRIC) {\n    const prescriptions = exercise.prescription?.blocks ? sortByOrder(exercise.prescription.blocks) : [exercise.prescription || {}];')
+          replace(plans,
+          '    if (exercise.loggingMethod === EXERCISE_LOGGING_METHOD.TIME) return durationSummary(exercise.prescription?.targetDurationSeconds, exercise.prescription?.durationUnit);',
+          '    if (exercise.loggingMethod === EXERCISE_LOGGING_METHOD.TIME) return `${exercise.prescription?.targetSets || 0} × ${durationSummary(exercise.prescription?.targetDurationSeconds, exercise.prescription?.durationUnit)}`;')
+
+          screen = "src/features/plans/PlansScreen.jsx"
+          replace(screen,
+          '  [EXERCISE_LOGGING_METHOD.TIME]: "Time",\n  [EXERCISE_LOGGING_METHOD.DISTANCE]: "Distance",',
+          '  [EXERCISE_LOGGING_METHOD.TIME]: "Time",\n  [EXERCISE_LOGGING_METHOD.TIME_WEIGHT]: "Time + Weight",\n  [EXERCISE_LOGGING_METHOD.DISTANCE]: "Distance",')
+          old_time = '''  if (selectedMethod === EXERCISE_LOGGING_METHOD.TIME) {
+    const p = exercise.prescription || {};
+    const duration = (
+      <DurationInput
+        seconds={p.targetDurationSeconds}
+        durationUnit={p.durationUnit}
+        onChange={({ seconds, unit }) => updatePrescription({ ...p, targetDurationSeconds: seconds, durationUnit: unit })}
+      />
+    );
+    if (exercise.exerciseType === EXERCISE_TYPE.BALANCE || exercise.exerciseType === EXERCISE_TYPE.TIMED_HOLD) {
+      return (
+        <div className="space-y-3">
+          <div className="max-w-xs">{methodField}</div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <Field label="Side">
+              <Select value={p.side || SIDE.BOTH} onChange={(event) => updatePrescription({ ...p, side: event.target.value })}>
+                <option value={SIDE.BOTH}>Standard</option>
+<option value={SIDE.SEPARATE}>Left & right</option>
+
+{trainingMode === "rehab" && (
+  <>
+    <option value={SIDE.LEFT}>Left only</option>
+    <option value={SIDE.RIGHT}>Right only</option>
+  </>
+)}
+              </Select>
+            </Field>
+            <Field label="Sets"><Input inputMode="numeric" value={p.targetSets || ""} onChange={(event) => updatePrescription({ ...p, targetSets: Number(event.target.value) })} /></Field>
+            {duration}
+          </div>
+        </div>
+      );
+    }
+    return <div className="space-y-3"><div className="max-w-xs">{methodField}</div>{duration}</div>;
+  }
+'''
+          new_time = '''  if ([EXERCISE_LOGGING_METHOD.TIME, EXERCISE_LOGGING_METHOD.TIME_WEIGHT].includes(selectedMethod)) {
+    const p = exercise.prescription || {};
+    const duration = (
+      <DurationInput
+        seconds={p.targetDurationSeconds}
+        durationUnit={p.durationUnit}
+        onChange={({ seconds, unit }) => updatePrescription({ ...p, targetDurationSeconds: seconds, durationUnit: unit })}
+      />
+    );
+    if ([EXERCISE_TYPE.STRENGTH, EXERCISE_TYPE.BALANCE, EXERCISE_TYPE.TIMED_HOLD].includes(exercise.exerciseType)) {
+      return (
+        <div className="space-y-3">
+          <div className="max-w-xs">{methodField}</div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <Field label="Side">
+              <Select value={p.side || SIDE.BOTH} onChange={(event) => updatePrescription({ ...p, side: event.target.value })}>
+                <option value={SIDE.BOTH}>Standard</option>
+<option value={SIDE.SEPARATE}>Left & right</option>
+
+{trainingMode === "rehab" && (
+  <>
+    <option value={SIDE.LEFT}>Left only</option>
+    <option value={SIDE.RIGHT}>Right only</option>
+  </>
+)}
+              </Select>
+            </Field>
+            <Field label="Sets"><Input inputMode="numeric" value={p.targetSets || ""} onChange={(event) => updatePrescription({ ...p, targetSets: Number(event.target.value) })} /></Field>
+            {duration}
+          </div>
+        </div>
+      );
+    }
+    if (exercise.exerciseType === EXERCISE_TYPE.OTHER) {
+      return <div className="space-y-3"><div className="max-w-xs">{methodField}</div><div className="grid gap-3 md:grid-cols-2"><Field label="Sets"><Input inputMode="numeric" value={p.targetSets || ""} onChange={(event) => updatePrescription({ ...p, targetSets: Number(event.target.value) })} /></Field>{duration}</div></div>;
+    }
+    return <div className="space-y-3"><div className="max-w-xs">{methodField}</div>{duration}</div>;
+  }
+'''
+          replace(screen, old_time, new_time)
+
+          workout = "src/features/workout/WorkoutScreen.jsx"
+          replace(workout,
+          'if (exercise?.loggingMethod === EXERCISE_LOGGING_METHOD.REPS_WEIGHT) return sets.some(hasWeight);',
+          'if ([EXERCISE_LOGGING_METHOD.REPS_WEIGHT, EXERCISE_LOGGING_METHOD.TIME_WEIGHT].includes(exercise?.loggingMethod)) return sets.some(hasWeight);')
+          replace(workout,
+          'function fieldsFor(method) { return { reps: [EXERCISE_LOGGING_METHOD.REPS, EXERCISE_LOGGING_METHOD.REPS_WEIGHT].includes(method), weight: method === EXERCISE_LOGGING_METHOD.REPS_WEIGHT, time: [EXERCISE_LOGGING_METHOD.TIME, EXERCISE_LOGGING_METHOD.TIME_DISTANCE].includes(method), distance: [EXERCISE_LOGGING_METHOD.DISTANCE, EXERCISE_LOGGING_METHOD.TIME_DISTANCE].includes(method) }; }',
+          'function fieldsFor(method) { return { reps: [EXERCISE_LOGGING_METHOD.REPS, EXERCISE_LOGGING_METHOD.REPS_WEIGHT].includes(method), weight: [EXERCISE_LOGGING_METHOD.REPS_WEIGHT, EXERCISE_LOGGING_METHOD.TIME_WEIGHT].includes(method), time: [EXERCISE_LOGGING_METHOD.TIME, EXERCISE_LOGGING_METHOD.TIME_WEIGHT, EXERCISE_LOGGING_METHOD.TIME_DISTANCE].includes(method), distance: [EXERCISE_LOGGING_METHOD.DISTANCE, EXERCISE_LOGGING_METHOD.TIME_DISTANCE].includes(method) }; }')
+          replace(workout,
+          '{fields.reps ? <label className="text-xs font-medium">Reps<RepsInput exercise={exercise} set={set} onChange={onChange}/></label> : null}{isWeighted ? <label className="text-xs font-medium">Weight (kg)<input inputMode="decimal" className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3" value={set.rawWeight ?? set.weight ?? ""} onFocus={(event) => event.currentTarget.select()} onChange={(event) => onChange(exercise.id, set.id, "weight", event.target.value)}/></label> : null}',
+          '{fields.reps ? <label className="text-xs font-medium">Reps<RepsInput exercise={exercise} set={set} onChange={onChange}/></label> : fields.time ? <label className="text-xs font-medium">Time<div className="mt-1 flex h-10 items-center rounded-lg border border-slate-200 bg-slate-100 px-3 text-sm">{prescribedDuration}</div></label> : null}{isWeighted ? <label className="text-xs font-medium">Weight (kg)<input inputMode="decimal" className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3" value={set.rawWeight ?? set.weight ?? ""} onFocus={(event) => event.currentTarget.select()} onChange={(event) => onChange(exercise.id, set.id, "weight", event.target.value)}/></label> : null}')
+
+          session = "src/lib/domain/workoutSession.js"
+          replace(session,
+          '    EXERCISE_LOGGING_METHOD.TIME,\n    EXERCISE_LOGGING_METHOD.DISTANCE,',
+          '    EXERCISE_LOGGING_METHOD.TIME,\n    EXERCISE_LOGGING_METHOD.TIME_WEIGHT,\n    EXERCISE_LOGGING_METHOD.DISTANCE,')
+          replace(session,
+          '      weight: exercise.loggingMethod === EXERCISE_LOGGING_METHOD.REPS_WEIGHT ? previousWeights[index + 1] ?? "" : "",',
+          '      weight: [EXERCISE_LOGGING_METHOD.REPS_WEIGHT, EXERCISE_LOGGING_METHOD.TIME_WEIGHT].includes(exercise.loggingMethod) ? previousWeights[index + 1] ?? "" : "",')
+
+          Path(".github/workflows/apply-time-weight-tracking.yml").unlink()
+
+      - name: Build
+        run: npm ci && npm run build
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/domain/plans.js src/features/plans/PlansScreen.jsx src/features/workout/WorkoutScreen.jsx src/lib/domain/workoutSession.js .github/workflows/apply-time-weight-tracking.yml
+          git commit -m "Add strength time and weight tracking"
+          git push origin HEAD:agent/add-strength-time-weight-tracking

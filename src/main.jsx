@@ -24,7 +24,6 @@ import { installProgrammeCreatorInputFixes } from './programmeCreatorInputFixes'
 import { installBuilderUxEnhancements } from './builderUxEnhancements'
 import { installFinalRequestedFixes } from './finalRequestedFixes'
 import { installWorkoutExerciseCardStyleFix } from './workoutExerciseCardStyleFix'
-import { installProgrammeNavigationGlitchFix } from './programmeNavigationGlitchFix'
 
 const updateSW = registerSW({
   immediate: true,
@@ -50,7 +49,6 @@ installProgrammeCreatorInputFixes()
 installBuilderUxEnhancements()
 installFinalRequestedFixes()
 installWorkoutExerciseCardStyleFix()
-installProgrammeNavigationGlitchFix()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

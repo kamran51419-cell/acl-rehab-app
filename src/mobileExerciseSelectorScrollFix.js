@@ -40,8 +40,6 @@ export function installMobileExerciseSelectorScrollFix() {
 
   const timers = new Set()
   let pending = null
-  let desktopSession = null
-  let restoreScrollIntoView = null
 
   const later = (callback, delay) => {
     const timer = window.setTimeout(() => {
@@ -64,46 +62,13 @@ export function installMobileExerciseSelectorScrollFix() {
     window.scrollTo(pending.pageX, pending.pageY)
   }
 
-  const restoreDesktopScroll = () => {
-    if (!restoreScrollIntoView) return
-    Element.prototype.scrollIntoView = restoreScrollIntoView
-    restoreScrollIntoView = null
-    desktopSession = null
-  }
-
-  const makeDesktopSelectorScrollImmediate = (session) => {
-    restoreDesktopScroll()
-    desktopSession = session
-    const original = Element.prototype.scrollIntoView
-    restoreScrollIntoView = original
-
-    Element.prototype.scrollIntoView = function scrollIntoViewWithoutSelectorAnimation(options) {
-      const selector = selectorInSession(desktopSession)
-      if (selector && this === selector && options && typeof options === 'object') {
-        original.call(this, { ...options, behavior: 'auto' })
-        restoreDesktopScroll()
-        return
-      }
-      original.call(this, options)
-    }
-
-    later(restoreDesktopScroll, 2000)
-  }
-
   const handleClick = (event) => {
     const button = event.target?.closest?.('button')
-    if (!button) return
+    if (!button || !isPhoneViewport()) return
 
     const label = text(button)
     const root = programmeEditorRoot(button)
     if (!root) return
-
-    if (!isPhoneViewport()) {
-      if (label === 'Add exercise' || label === 'Change exercise') {
-        makeDesktopSelectorScrollImmediate(button.closest('[id^="programme-session-"]'))
-      }
-      return
-    }
 
     if (label === 'Add exercise' || label === 'Change exercise') {
       pending = {
@@ -131,7 +96,6 @@ export function installMobileExerciseSelectorScrollFix() {
     document.removeEventListener('click', handleClick, true)
     timers.forEach((timer) => window.clearTimeout(timer))
     timers.clear()
-    restoreDesktopScroll()
     pending = null
     document.getElementById(style.id)?.remove()
     document.querySelectorAll('[data-mobile-exercise-selector-open="true"]').forEach((root) => {

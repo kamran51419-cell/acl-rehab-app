@@ -6,9 +6,10 @@ import { auth } from "./firebase";
 const VIEW_KEY = "programme-subview";
 const LIBRARY_OVERLAY_ID = "programme-exercise-library-overlay";
 const HOME_LIBRARY_STYLE_ID = "hide-home-exercise-library";
+const TRANSITION_COVER_ID = "programme-navigation-transition-cover";
 
 let libraryRoot = null;
-let homeCloseFrame = 0;
+let transitionFrame = 0;
 
 function text(element) {
   return (element?.textContent || "").trim();
@@ -20,6 +21,20 @@ function installHomeLibraryStyle() {
   style.id = HOME_LIBRARY_STYLE_ID;
   style.textContent = "#exercise-library{display:none!important}";
   document.head.appendChild(style);
+}
+
+function showTransitionCover() {
+  if (document.getElementById(TRANSITION_COVER_ID)) return;
+  const cover = document.createElement("div");
+  cover.id = TRANSITION_COVER_ID;
+  cover.style.cssText = "position:fixed;inset:0;z-index:2147483647;background:#f8fafc;pointer-events:none";
+  document.body.appendChild(cover);
+}
+
+function hideTransitionCover() {
+  cancelAnimationFrame(transitionFrame);
+  transitionFrame = 0;
+  document.getElementById(TRANSITION_COVER_ID)?.remove();
 }
 
 function makeChevronRow(label, count, onClick) {
@@ -77,8 +92,6 @@ function showInactiveScreen(root, inactiveSection) {
 }
 
 function closeExerciseLibrary() {
-  cancelAnimationFrame(homeCloseFrame);
-  homeCloseFrame = 0;
   libraryRoot?.unmount();
   libraryRoot = null;
   document.getElementById(LIBRARY_OVERLAY_ID)?.remove();
@@ -109,9 +122,20 @@ function ExerciseLibraryOverlay() {
   );
 }
 
+function waitForExerciseLibrary(attempt = 0) {
+  const overlay = document.getElementById(LIBRARY_OVERLAY_ID);
+  const libraryReady = overlay?.querySelector("h1, h2, input, button");
+  if (libraryReady || attempt >= 60) {
+    hideTransitionCover();
+    return;
+  }
+  transitionFrame = requestAnimationFrame(() => waitForExerciseLibrary(attempt + 1));
+}
+
 function openExerciseLibrary() {
   if (document.getElementById(LIBRARY_OVERLAY_ID) || !auth.currentUser) return;
 
+  showTransitionCover();
   const host = document.createElement("div");
   host.id = LIBRARY_OVERLAY_ID;
   host.style.cssText = "position:fixed;inset:0;z-index:2147483646;overflow:auto;background:#f8fafc";
@@ -120,6 +144,17 @@ function openExerciseLibrary() {
 
   libraryRoot = createRoot(host);
   libraryRoot.render(React.createElement(ExerciseLibraryOverlay));
+  transitionFrame = requestAnimationFrame(() => waitForExerciseLibrary());
+}
+
+function waitForHome(attempt = 0) {
+  const homeButton = [...document.querySelectorAll("button")].find((button) => text(button) === "Home");
+  const homeIsActive = homeButton?.className?.includes("bg-slate-100") || !programmeRoot();
+  if (homeIsActive || attempt >= 60) {
+    hideTransitionCover();
+    return;
+  }
+  transitionFrame = requestAnimationFrame(() => waitForHome(attempt + 1));
 }
 
 function enhanceProgramme() {
@@ -173,7 +208,9 @@ function handleNavigation(event) {
   }
 
   if (label === "Home" && document.getElementById(LIBRARY_OVERLAY_ID)) {
+    showTransitionCover();
     closeExerciseLibrary();
+    transitionFrame = requestAnimationFrame(() => waitForHome());
     return;
   }
 
@@ -206,6 +243,7 @@ export function installProgrammeScreenNavigation() {
 
   return () => {
     document.removeEventListener("click", handleNavigation, true);
+    hideTransitionCover();
     closeExerciseLibrary();
     observer.disconnect();
   };

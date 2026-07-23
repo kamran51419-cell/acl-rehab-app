@@ -170,14 +170,23 @@ export function HomeDashboard({ programme, unfinishedWorkout, incompleteWorkoutL
 
 export default function HomeScreen({ user, surgeryDate, trainingMode = "gym", onOpenWorkout, fromProgramme = false, onBackToProgramme, repository = defaultRepository }) {
   const [plans, setPlans] = useState([]); const [workouts, setWorkouts] = useState([]); const [occurrences, setOccurrences] = useState([]); const [showSessions, setShowSessions] = useState(false); const [incompleteExpanded, setIncompleteExpanded] = useState(false);
+  const [plansLoaded, setPlansLoaded] = useState(false); const [workoutsLoaded, setWorkoutsLoaded] = useState(false); const [occurrencesProgrammeId, setOccurrencesProgrammeId] = useState(null);
   const today = todayString();
-  useEffect(() => repository.subscribePlans(db, user.uid, setPlans, () => {}), [repository, user.uid]);
-  useEffect(() => repository.subscribeWorkouts(db, user.uid, setWorkouts, () => {}), [repository, user.uid]);
+  useEffect(() => repository.subscribePlans(db, user.uid, (items) => { setPlans(items); setPlansLoaded(true); }, () => setPlansLoaded(true)), [repository, user.uid]);
+  useEffect(() => repository.subscribeWorkouts(db, user.uid, (items) => { setWorkouts(items); setWorkoutsLoaded(true); }, () => setWorkoutsLoaded(true)), [repository, user.uid]);
   const programme = useMemo(() => plans.filter((plan) => plan.isActive && !plan.isArchived).sort((a, b) => String(b.updatedAtToken || b.id).localeCompare(String(a.updatedAtToken || a.id)))[0] || null, [plans]);
-  useEffect(() => { if (!programme) { setOccurrences([]); return undefined; } return onSnapshot(collection(db, "users", user.uid, "routineTaskOccurrences"), (snapshot) => setOccurrences(snapshot.docs.map((item) => item.data()).filter((item) => item.programmeId === programme.id)), () => {}); }, [programme, user.uid]);
+  useEffect(() => {
+    setOccurrencesProgrammeId(null);
+    if (!programme) { setOccurrences([]); return undefined; }
+    return onSnapshot(collection(db, "users", user.uid, "routineTaskOccurrences"), (snapshot) => {
+      setOccurrences(snapshot.docs.map((item) => item.data()).filter((item) => item.programmeId === programme.id));
+      setOccurrencesProgrammeId(programme.id);
+    }, () => setOccurrencesProgrammeId(programme.id));
+  }, [programme, user.uid]);
   const unfinishedWorkout = useMemo(() => workouts.find((item) => item.status === "in_progress") || null, [workouts]);
   const incompleteWorkoutList = useMemo(() => incompleteWorkouts(workouts), [workouts]);
   const groups = useMemo(() => routineGroups(programme, occurrences, today), [programme, occurrences, today]);
+  const homeReady = plansLoaded && workoutsLoaded && (!programme || occurrencesProgrammeId === programme.id);
   async function setStatus(task, status) {
     if (!programme) return;
     const taskId = task.baseTaskId || task.id;
@@ -197,5 +206,5 @@ export default function HomeScreen({ user, surgeryDate, trainingMode = "gym", on
   }
   function continueIncomplete(workout) { onOpenWorkout({ mode: "catch_up", workoutId: workout.id }); }
   async function dismissIncomplete(workout) { await updateDoc(doc(db, "users", user.uid, "workouts", workout.id), { dismissedIncompleteAt: serverTimestamp(), updatedAt: serverTimestamp() }); }
-  return <div className="space-y-8">{fromProgramme ? <Button variant="outline" onClick={onBackToProgramme}>← Back to programme</Button> : null}<HomeDashboard programme={programme} unfinishedWorkout={unfinishedWorkout} incompleteWorkoutList={incompleteWorkoutList} incompleteExpanded={incompleteExpanded} surgeryDate={surgeryDate} trainingMode={trainingMode} today={today} routineGroups={groups} onRoutineStatus={setStatus} showSessions={showSessions} onStart={() => setShowSessions(true)} onContinue={() => onOpenWorkout({ mode: "continue", workoutId: unfinishedWorkout.id })} onContinueIncomplete={continueIncomplete} onDismissIncomplete={dismissIncomplete} onToggleIncomplete={() => setIncompleteExpanded((value) => !value)} onChooseSession={(sessionId) => onOpenWorkout({ mode: "session", sessionId })} onOneOff={() => onOpenWorkout({ mode: "one_off" })}/><section id="exercise-library" className="scroll-mt-6"><PlansScreen user={user} view="exercises" trainingMode={trainingMode}/></section></div>;
+  return <div className="space-y-8" data-home-dashboard-ready={homeReady ? "true" : "false"}>{fromProgramme ? <Button variant="outline" onClick={onBackToProgramme}>← Back to programme</Button> : null}{homeReady ? <HomeDashboard programme={programme} unfinishedWorkout={unfinishedWorkout} incompleteWorkoutList={incompleteWorkoutList} incompleteExpanded={incompleteExpanded} surgeryDate={surgeryDate} trainingMode={trainingMode} today={today} routineGroups={groups} onRoutineStatus={setStatus} showSessions={showSessions} onStart={() => setShowSessions(true)} onContinue={() => onOpenWorkout({ mode: "continue", workoutId: unfinishedWorkout.id })} onContinueIncomplete={continueIncomplete} onDismissIncomplete={dismissIncomplete} onToggleIncomplete={() => setIncompleteExpanded((value) => !value)} onChooseSession={(sessionId) => onOpenWorkout({ mode: "session", sessionId })} onOneOff={() => onOpenWorkout({ mode: "one_off" })}/> : <div className="min-h-[320px]" aria-hidden="true"/>}<section id="exercise-library" className="scroll-mt-6"><PlansScreen user={user} view="exercises" trainingMode={trainingMode}/></section></div>;
 }

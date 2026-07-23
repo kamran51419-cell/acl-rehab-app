@@ -25,6 +25,7 @@ import { installBuilderUxEnhancements } from './builderUxEnhancements'
 import { installFinalRequestedFixes } from './finalRequestedFixes'
 import { installWorkoutExerciseCardStyleFix } from './workoutExerciseCardStyleFix'
 import { installNewProgrammeExerciseExpandFix } from './newProgrammeExerciseExpandFix'
+import { installMobileExerciseSelectorScrollFix } from './mobileExerciseSelectorScrollFix'
 
 const updateSW = registerSW({
   immediate: true,
@@ -51,6 +52,7 @@ installBuilderUxEnhancements()
 installFinalRequestedFixes()
 installWorkoutExerciseCardStyleFix()
 installNewProgrammeExerciseExpandFix()
+installMobileExerciseSelectorScrollFix()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

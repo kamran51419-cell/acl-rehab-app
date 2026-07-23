@@ -123,6 +123,14 @@ function removeRightExerciseCollapseControls() {
   });
 }
 
+function allowDuplicateProgrammeExercises() {
+  document.querySelectorAll('[id^="programme-session-"] .rounded-xl.border-dashed button').forEach((button) => {
+    if (button.textContent?.trim() !== "Selected") return;
+    button.disabled = false;
+    button.textContent = "Add";
+  });
+}
+
 function removeRedundantExerciseLibraryCopy() {
   document.querySelectorAll("h1").forEach((heading) => {
     if (heading.textContent?.trim() !== "Manage Exercises") return;
@@ -215,6 +223,7 @@ function removeProgrammePageHeading() {
 function applyFixes() {
   addProgrammeSessionCollapseControls();
   removeRightExerciseCollapseControls();
+  allowDuplicateProgrammeExercises();
   removeProgrammePageHeading();
   removeRedundantExerciseLibraryCopy();
   installExerciseCategoryFilters();

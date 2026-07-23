@@ -138,7 +138,7 @@ function openExerciseLibrary() {
 
 function hideLibraryAfterHomeRender(attempt = 0) {
   const homeButton = [...document.querySelectorAll("button")].find((button) => text(button) === "Home");
-  const homeIsActive = homeButton?.className?.includes("bg-slate-100") || !programmeRoot();
+  const homeIsActive = homeButton?.className?.includes("bg-slate-100") || homeButton?.className?.includes("bg-slate-900");
   if (homeIsActive || attempt >= 30) {
     hideExerciseLibrary();
     homeFrame = 0;

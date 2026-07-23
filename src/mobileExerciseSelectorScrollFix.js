@@ -1,94 +1,61 @@
 function text(element) {
-  return (element?.textContent || "").trim();
+  return (element?.textContent || '').trim()
 }
 
-function selectorInSession(session) {
-  if (!session) return null;
-  const heading = [...session.querySelectorAll("strong")]
-    .find((item) => ["Exercise picker", "Exercise selector"].includes(text(item)));
-  return heading?.closest(".rounded-xl.border-dashed") || null;
+function isPhoneViewport() {
+  return window.matchMedia('(max-width: 767px)').matches
 }
 
-function scrollContainerFor(element) {
-  let current = element?.parentElement;
-  while (current && current !== document.body) {
-    const style = window.getComputedStyle(current);
-    if (/(auto|scroll)/.test(style.overflowY) && current.scrollHeight > current.clientHeight) return current;
-    current = current.parentElement;
-  }
-  return document.scrollingElement || document.documentElement;
+function programmeEditorRoot(element) {
+  return element?.closest?.('[data-final-programme-editor="true"]') || null
 }
 
-function alignSelectorToTop(selector) {
-  if (!selector?.isConnected) return;
-
-  const results = selector.querySelector(".overflow-y-auto");
-  if (results) results.scrollTop = 0;
-
-  const scroller = scrollContainerFor(selector);
-  const selectorRect = selector.getBoundingClientRect();
-
-  if (scroller === document.scrollingElement || scroller === document.documentElement) {
-    window.scrollTo({ top: window.scrollY + selectorRect.top - 8, behavior: "auto" });
-    return;
-  }
-
-  const scrollerRect = scroller.getBoundingClientRect();
-  scroller.scrollTop += selectorRect.top - scrollerRect.top - 8;
+function setMobileExerciseSelectorMode(root, enabled) {
+  if (!root) return
+  if (enabled) root.dataset.mobileExerciseSelectorOpen = 'true'
+  else delete root.dataset.mobileExerciseSelectorOpen
 }
 
 export function installMobileExerciseSelectorScrollFix() {
-  if (typeof document === "undefined") return () => {};
+  if (typeof document === 'undefined') return () => {}
 
-  const timers = new Set();
-  let activeSelector = null;
-
-  const later = (callback, delay) => {
-    const timer = window.setTimeout(() => {
-      timers.delete(timer);
-      callback();
-    }, delay);
-    timers.add(timer);
-  };
-
-  const realignActiveSelector = () => {
-    if (activeSelector?.isConnected) alignSelectorToTop(activeSelector);
-  };
+  const style = document.createElement('style')
+  style.id = 'mobile-exercise-selector-scroll-fix'
+  style.textContent = `
+    @media (max-width: 767px) {
+      [data-final-programme-editor="true"][data-mobile-exercise-selector-open="true"] {
+        overflow-y: visible !important;
+        max-height: none !important;
+      }
+    }
+  `
+  document.head.appendChild(style)
 
   const handleClick = (event) => {
-    const button = event.target?.closest?.("button");
-    if (!button || text(button) !== "Add exercise") return;
+    const button = event.target?.closest?.('button')
+    if (!button || !isPhoneViewport()) return
 
-    const session = button.closest('[id^="programme-session-"]');
-    if (!session) return;
+    const label = text(button)
+    const root = programmeEditorRoot(button)
+    if (!root) return
 
-    activeSelector = null;
-    let attempts = 0;
-    const waitForSelector = () => {
-      const selector = selectorInSession(session);
-      if (!selector) {
-        attempts += 1;
-        if (attempts < 40) later(waitForSelector, 25);
-        return;
-      }
+    if (label === 'Add exercise' || label === 'Change exercise') {
+      setMobileExerciseSelectorMode(root, true)
+      return
+    }
 
-      activeSelector = selector;
-      [0, 60, 140, 260, 450, 700, 1000].forEach((delay) => later(realignActiveSelector, delay));
-    };
+    if (label === 'Add' || label === 'Use' || label === 'Close') {
+      requestAnimationFrame(() => setMobileExerciseSelectorMode(root, false))
+    }
+  }
 
-    requestAnimationFrame(waitForSelector);
-  };
-
-  document.addEventListener("click", handleClick, true);
-  window.visualViewport?.addEventListener("resize", realignActiveSelector);
-  window.visualViewport?.addEventListener("scroll", realignActiveSelector);
+  document.addEventListener('click', handleClick, true)
 
   return () => {
-    document.removeEventListener("click", handleClick, true);
-    window.visualViewport?.removeEventListener("resize", realignActiveSelector);
-    window.visualViewport?.removeEventListener("scroll", realignActiveSelector);
-    timers.forEach((timer) => window.clearTimeout(timer));
-    timers.clear();
-    activeSelector = null;
-  };
+    document.removeEventListener('click', handleClick, true)
+    document.getElementById(style.id)?.remove()
+    document.querySelectorAll('[data-mobile-exercise-selector-open="true"]').forEach((root) => {
+      delete root.dataset.mobileExerciseSelectorOpen
+    })
+  }
 }

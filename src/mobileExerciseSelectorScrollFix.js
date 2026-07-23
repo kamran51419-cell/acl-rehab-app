@@ -9,23 +9,50 @@ function selectorInSession(session) {
   return heading?.closest(".rounded-xl.border-dashed") || null;
 }
 
+function scrollContainerFor(element) {
+  let current = element?.parentElement;
+  while (current && current !== document.body) {
+    const style = window.getComputedStyle(current);
+    if (/(auto|scroll)/.test(style.overflowY) && current.scrollHeight > current.clientHeight) return current;
+    current = current.parentElement;
+  }
+  return document.scrollingElement || document.documentElement;
+}
+
 function alignSelectorToTop(selector) {
   if (!selector?.isConnected) return;
+
   const results = selector.querySelector(".overflow-y-auto");
   if (results) results.scrollTop = 0;
-  selector.scrollIntoView({ behavior: "auto", block: "start", inline: "nearest" });
+
+  const scroller = scrollContainerFor(selector);
+  const selectorRect = selector.getBoundingClientRect();
+
+  if (scroller === document.scrollingElement || scroller === document.documentElement) {
+    window.scrollTo({ top: window.scrollY + selectorRect.top - 8, behavior: "auto" });
+    return;
+  }
+
+  const scrollerRect = scroller.getBoundingClientRect();
+  scroller.scrollTop += selectorRect.top - scrollerRect.top - 8;
 }
 
 export function installMobileExerciseSelectorScrollFix() {
   if (typeof document === "undefined") return () => {};
 
   const timers = new Set();
+  let activeSelector = null;
+
   const later = (callback, delay) => {
     const timer = window.setTimeout(() => {
       timers.delete(timer);
       callback();
     }, delay);
     timers.add(timer);
+  };
+
+  const realignActiveSelector = () => {
+    if (activeSelector?.isConnected) alignSelectorToTop(activeSelector);
   };
 
   const handleClick = (event) => {
@@ -35,6 +62,7 @@ export function installMobileExerciseSelectorScrollFix() {
     const session = button.closest('[id^="programme-session-"]');
     if (!session) return;
 
+    activeSelector = null;
     let attempts = 0;
     const waitForSelector = () => {
       const selector = selectorInSession(session);
@@ -44,19 +72,23 @@ export function installMobileExerciseSelectorScrollFix() {
         return;
       }
 
-      alignSelectorToTop(selector);
-      later(() => alignSelectorToTop(selector), 80);
-      later(() => alignSelectorToTop(selector), 180);
-      later(() => alignSelectorToTop(selector), 350);
+      activeSelector = selector;
+      [0, 60, 140, 260, 450, 700, 1000].forEach((delay) => later(realignActiveSelector, delay));
     };
 
     requestAnimationFrame(waitForSelector);
   };
 
   document.addEventListener("click", handleClick, true);
+  window.visualViewport?.addEventListener("resize", realignActiveSelector);
+  window.visualViewport?.addEventListener("scroll", realignActiveSelector);
+
   return () => {
     document.removeEventListener("click", handleClick, true);
+    window.visualViewport?.removeEventListener("resize", realignActiveSelector);
+    window.visualViewport?.removeEventListener("scroll", realignActiveSelector);
     timers.forEach((timer) => window.clearTimeout(timer));
     timers.clear();
+    activeSelector = null;
   };
 }

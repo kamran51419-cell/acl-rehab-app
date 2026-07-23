@@ -1,21 +1,16 @@
-const VIEW_KEY = "programme-subview";
-const RETURN_KEY = "programme-library-return-session";
-const SNAPSHOT_ID = "programme-return-snapshot";
+import React from "react";
+import { createRoot } from "react-dom/client";
+import PlansScreen from "./features/plans/PlansScreen";
+import { auth } from "./firebase";
 
-let programmeSnapshot = null;
-let programmeScrollY = 0;
-let restoreFrame = 0;
+const VIEW_KEY = "programme-subview";
+const LIBRARY_OVERLAY_ID = "programme-exercise-library-overlay";
+
+let libraryRoot = null;
+let homeCloseFrame = 0;
 
 function text(element) {
   return (element?.textContent || "").trim();
-}
-
-function findTab(label) {
-  return [...document.querySelectorAll("button")].find((button) => text(button) === label);
-}
-
-function goToTab(label) {
-  findTab(label)?.click();
 }
 
 function makeChevronRow(label, count, onClick) {
@@ -52,10 +47,7 @@ function programmeRoot() {
 }
 
 function sectionByTitle(root, title) {
-  return [...root.querySelectorAll("section")].find((section) => {
-    const heading = section.querySelector(":scope > h2");
-    return text(heading) === title;
-  });
+  return [...root.querySelectorAll("section")].find((section) => text(section.querySelector(":scope > h2")) === title);
 }
 
 function showProgrammeOverview(root) {
@@ -70,47 +62,69 @@ function showProgrammeOverview(root) {
 function showInactiveScreen(root, inactiveSection) {
   sessionStorage.setItem(VIEW_KEY, "inactive");
   [...root.children].forEach((child) => { child.hidden = true; });
-  const header = makeBackHeader("Inactive programmes", () => showProgrammeOverview(root));
-  root.prepend(header);
+  root.prepend(makeBackHeader("Inactive programmes", () => showProgrammeOverview(root)));
   inactiveSection.hidden = false;
   inactiveSection.querySelector(":scope > h2")?.classList.add("hidden");
 }
 
-function captureProgrammeSnapshot() {
-  const root = programmeRoot();
-  if (!root) return;
-  programmeSnapshot = root.cloneNode(true);
-  programmeSnapshot.querySelectorAll("[id]").forEach((item) => item.removeAttribute("id"));
-  programmeSnapshot.querySelectorAll("button, input, select, textarea, a").forEach((item) => {
-    item.tabIndex = -1;
-    item.setAttribute("aria-hidden", "true");
-  });
-  programmeScrollY = window.scrollY;
+function closeExerciseLibrary() {
+  cancelAnimationFrame(homeCloseFrame);
+  homeCloseFrame = 0;
+  libraryRoot?.unmount();
+  libraryRoot = null;
+  document.getElementById(LIBRARY_OVERLAY_ID)?.remove();
+  document.body.style.overflow = "";
 }
 
-function showProgrammeSnapshot() {
-  if (!programmeSnapshot || document.getElementById(SNAPSHOT_ID)) return;
-  const cover = document.createElement("div");
-  cover.id = SNAPSHOT_ID;
-  cover.setAttribute("aria-hidden", "true");
-  cover.style.cssText = "position:fixed;inset:0;z-index:2147483646;background:#f8fafc;overflow:auto;pointer-events:none";
+function closeExerciseLibraryAfterHomeRender(attempt = 0) {
+  if (!document.getElementById(LIBRARY_OVERLAY_ID)) return;
 
-  const shell = document.createElement("div");
-  shell.className = "mx-auto w-full max-w-6xl px-4 pb-28 pt-4 md:px-6";
-  shell.appendChild(programmeSnapshot.cloneNode(true));
-  cover.appendChild(shell);
-  document.body.appendChild(cover);
-  cover.scrollTop = programmeScrollY;
+  const homeButton = [...document.querySelectorAll("button")].find((button) => text(button) === "Home");
+  const homeIsActive = homeButton?.className?.includes("bg-slate-100") || !programmeRoot();
+
+  if (homeIsActive || attempt >= 60) {
+    closeExerciseLibrary();
+    return;
+  }
+
+  homeCloseFrame = requestAnimationFrame(() => closeExerciseLibraryAfterHomeRender(attempt + 1));
 }
 
-function removeProgrammeSnapshot() {
-  document.getElementById(SNAPSHOT_ID)?.remove();
+function ExerciseLibraryOverlay() {
+  return React.createElement(
+    "div",
+    { className: "min-h-screen bg-slate-50 p-4 pb-24 md:p-8 md:pb-8" },
+    React.createElement(
+      "div",
+      { className: "mx-auto max-w-7xl space-y-6" },
+      React.createElement(
+        "button",
+        {
+          type: "button",
+          onClick: closeExerciseLibrary,
+          className: "text-sm font-medium text-slate-600 hover:text-slate-900",
+        },
+        "← Programme"
+      ),
+      React.createElement(PlansScreen, {
+        user: auth.currentUser,
+        view: "exercises",
+      })
+    )
+  );
 }
 
 function openExerciseLibrary() {
-  captureProgrammeSnapshot();
-  sessionStorage.setItem(VIEW_KEY, "library");
-  goToTab("Home");
+  if (document.getElementById(LIBRARY_OVERLAY_ID) || !auth.currentUser) return;
+
+  const host = document.createElement("div");
+  host.id = LIBRARY_OVERLAY_ID;
+  host.style.cssText = "position:fixed;inset:0;z-index:2147483646;overflow:auto;background:#f8fafc";
+  document.body.appendChild(host);
+  document.body.style.overflow = "hidden";
+
+  libraryRoot = createRoot(host);
+  libraryRoot.render(React.createElement(ExerciseLibraryOverlay));
 }
 
 function enhanceProgramme() {
@@ -137,135 +151,48 @@ function enhanceProgramme() {
   if (sessionStorage.getItem(VIEW_KEY) === "inactive") showInactiveScreen(root, inactiveSection);
 }
 
-function enhanceHomeLibrary() {
-  const library = document.getElementById("exercise-library");
-  if (!library) return;
+function handleNavigation(event) {
+  const button = event.target.closest("button");
+  if (!button) return;
 
-  const homeContainer = library.parentElement;
-  const mode = sessionStorage.getItem(VIEW_KEY);
+  const label = text(button);
 
-  if (mode !== "library") {
-    library.hidden = true;
+  if (label === "Manage Exercise Library") {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    openExerciseLibrary();
     return;
   }
 
-  library.hidden = false;
-  [...homeContainer.children].forEach((child) => {
-    if (child !== library && child.dataset.programmeLibraryHeader !== "true") child.hidden = true;
+  if (label === "Home" && document.getElementById(LIBRARY_OVERLAY_ID)) {
+    cancelAnimationFrame(homeCloseFrame);
+    homeCloseFrame = requestAnimationFrame(() => closeExerciseLibraryAfterHomeRender());
+  }
+}
+
+function renamePicker() {
+  [...document.querySelectorAll("strong")].forEach((heading) => {
+    if (text(heading) === "Exercise picker") heading.textContent = "Exercise selector";
   });
-
-  const helper = [...library.querySelectorAll("p")].find((item) => text(item) === "Define what an exercise is. Configure it inside a programme.");
-  helper?.remove();
-
-  if (!homeContainer.querySelector("[data-programme-library-header]")) {
-    const header = makeBackHeader("Exercise Library", () => {
-      showProgrammeSnapshot();
-      sessionStorage.removeItem(VIEW_KEY);
-      goToTab("Programme");
-      cancelAnimationFrame(restoreFrame);
-      restoreFrame = requestAnimationFrame(() => restoreLibraryReturn());
-    });
-    header.dataset.programmeLibraryHeader = "true";
-    homeContainer.prepend(header);
-  }
-}
-
-function restoreNormalHome() {
-  if (sessionStorage.getItem(VIEW_KEY) === "library") return;
-  const library = document.getElementById("exercise-library");
-  const container = library?.parentElement;
-  if (!container) return;
-  container.querySelectorAll("[data-programme-library-header]").forEach((item) => item.remove());
-  [...container.children].forEach((child) => { child.hidden = child === library; });
-}
-
-function captureProgrammeLibraryButton(event) {
-  const button = event.target.closest("button");
-  if (!button || text(button) !== "Manage Exercise Library") return;
-  captureProgrammeSnapshot();
-  sessionStorage.setItem(VIEW_KEY, "library");
-}
-
-function selectorInSession(session) {
-  return [...session.querySelectorAll('[data-exercise-picker], div.rounded-xl.border-dashed')]
-    .find((item) => /Exercise (picker|selector)|Search exercises|Manage Exercise Library/i.test(text(item))) || null;
-}
-
-function restoreLibraryReturn(attempt = 0) {
-  if (sessionStorage.getItem(VIEW_KEY)) return;
-  const raw = sessionStorage.getItem(RETURN_KEY);
-  if (!raw) {
-    if (programmeRoot()) removeProgrammeSnapshot();
-    return;
-  }
-
-  let state;
-  try {
-    state = JSON.parse(raw);
-  } catch {
-    sessionStorage.removeItem(RETURN_KEY);
-    removeProgrammeSnapshot();
-    return;
-  }
-
-  const sessions = [...document.querySelectorAll('[id^="programme-session-"]')];
-  const session = (state.sessionId ? document.getElementById(state.sessionId) : null)
-    || (Number.isInteger(state.sessionIndex) ? sessions[state.sessionIndex] : null);
-
-  if (session) {
-    const selector = selectorInSession(session);
-    if (selector) {
-      selector.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
-      sessionStorage.removeItem(RETURN_KEY);
-      removeProgrammeSnapshot();
-      restoreFrame = 0;
-      return;
-    }
-
-    const expand = session.querySelector('button[aria-label="Expand session"][aria-expanded="false"]');
-    if (expand) HTMLElement.prototype.click.call(expand);
-    else {
-      const addExercise = [...session.querySelectorAll("button")].find((button) => text(button) === "Add exercise");
-      if (addExercise) HTMLElement.prototype.click.call(addExercise);
-    }
-  }
-
-  if (attempt < 240) restoreFrame = requestAnimationFrame(() => restoreLibraryReturn(attempt + 1));
-  else removeProgrammeSnapshot();
-}
-
-function captureLibraryReturn(event) {
-  const button = event.target.closest("button");
-  if (!button || text(button) !== "Manage Exercise Library") return;
-  const session = button.closest('[id^="programme-session-"]');
-  const sessions = [...document.querySelectorAll('[id^="programme-session-"]')];
-  if (session) {
-    sessionStorage.setItem(RETURN_KEY, JSON.stringify({
-      sessionId: session.id || "",
-      sessionIndex: sessions.indexOf(session),
-    }));
-  }
 }
 
 function enhance() {
+  renamePicker();
   enhanceProgramme();
-  enhanceHomeLibrary();
-  restoreNormalHome();
-  restoreLibraryReturn();
 }
 
 export function installProgrammeScreenNavigation() {
   if (typeof document === "undefined" || typeof MutationObserver === "undefined") return () => {};
-  document.addEventListener("click", captureProgrammeLibraryButton, true);
-  document.addEventListener("click", captureLibraryReturn, true);
+
+  document.addEventListener("click", handleNavigation, true);
   enhance();
+
   const observer = new MutationObserver(() => requestAnimationFrame(enhance));
   observer.observe(document.body, { childList: true, subtree: true });
+
   return () => {
-    document.removeEventListener("click", captureProgrammeLibraryButton, true);
-    document.removeEventListener("click", captureLibraryReturn, true);
-    cancelAnimationFrame(restoreFrame);
-    removeProgrammeSnapshot();
+    document.removeEventListener("click", handleNavigation, true);
+    closeExerciseLibrary();
     observer.disconnect();
   };
 }

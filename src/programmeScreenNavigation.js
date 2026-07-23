@@ -11,6 +11,7 @@ let libraryRoot = null;
 let libraryVisible = false;
 let homeFrame = 0;
 let authUnsubscribe = null;
+let programmeObserver = null;
 
 function text(element) {
   return (element?.textContent || "").trim();
@@ -148,6 +149,24 @@ function hideLibraryAfterHomeRender(attempt = 0) {
   homeFrame = requestAnimationFrame(() => hideLibraryAfterHomeRender(attempt + 1));
 }
 
+function updateInactiveProgrammeCount(root) {
+  const inactiveSection = sectionByTitle(root, "Inactive");
+  const inactiveRow = [...root.querySelectorAll("[data-programme-overview-row]")]
+    .find((row) => text(row).startsWith("Inactive programmes"));
+  if (!inactiveSection || !inactiveRow) return;
+
+  const count = inactiveSection.querySelectorAll(".grid > div").length;
+  const countLabel = inactiveRow.querySelector("span > span:nth-child(2)");
+  const nextLabel = `${count} ${count === 1 ? "programme" : "programmes"}`;
+  if (countLabel && text(countLabel) !== nextLabel) countLabel.textContent = nextLabel;
+}
+
+function observeInactiveProgrammeCount(root) {
+  programmeObserver?.disconnect();
+  programmeObserver = new MutationObserver(() => updateInactiveProgrammeCount(root));
+  programmeObserver.observe(root, { childList: true, subtree: true });
+}
+
 function enhanceProgramme() {
   const root = programmeRoot();
   if (!root || root.dataset.programmeNavigationEnhanced === "true") return;
@@ -164,6 +183,8 @@ function enhanceProgramme() {
   const inactiveRow = makeChevronRow("Inactive programmes", inactiveCount, () => showInactiveScreen(root, inactiveSection));
   inactiveRow.dataset.programmeOverviewRow = "true";
   activeSection.insertAdjacentElement("afterend", inactiveRow);
+  observeInactiveProgrammeCount(root);
+  updateInactiveProgrammeCount(root);
 
   const libraryRow = makeChevronRow("Exercise Library", undefined, openExerciseLibrary);
   libraryRow.dataset.programmeOverviewRow = "true";
@@ -238,6 +259,8 @@ export function installProgrammeScreenNavigation() {
     cancelAnimationFrame(homeFrame);
     authUnsubscribe?.();
     authUnsubscribe = null;
+    programmeObserver?.disconnect();
+    programmeObserver = null;
     libraryRoot?.unmount();
     libraryRoot = null;
     document.getElementById(LIBRARY_OVERLAY_ID)?.remove();

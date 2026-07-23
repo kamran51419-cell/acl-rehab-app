@@ -1,9 +1,9 @@
 name: Apply time and weight tracking changes
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/add-strength-time-weight-tracking
+      - main
 
 permissions:
   contents: write

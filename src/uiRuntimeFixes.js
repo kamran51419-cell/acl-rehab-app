@@ -123,6 +123,45 @@ function removeRightExerciseCollapseControls() {
   });
 }
 
+function reactPropsKey(element) {
+  return Object.keys(element).find((key) => key.startsWith("__reactProps$"));
+}
+
+function makeDuplicateAddButtonFunctional(button, primaryClassName) {
+  const key = reactPropsKey(button);
+  const props = key ? button[key] : null;
+  if (key && props?.disabled) button[key] = { ...props, disabled: false, children: "Add" };
+
+  button.disabled = false;
+  button.removeAttribute("disabled");
+  button.removeAttribute("aria-disabled");
+  button.textContent = "Add";
+  button.dataset.duplicateExerciseAdd = "true";
+  button.className = primaryClassName || "inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700";
+  button.style.setProperty("background", "#2563eb", "important");
+  button.style.setProperty("background-image", "none", "important");
+  button.style.setProperty("border-color", "#2563eb", "important");
+  button.style.setProperty("color", "#ffffff", "important");
+}
+
+function allowDuplicateProgrammeExercises() {
+  document.querySelectorAll('[id^="programme-session-"] .rounded-xl.border-dashed').forEach((picker) => {
+    const buttons = Array.from(picker.querySelectorAll("button"));
+    const primaryAdd = buttons.find((button) => button.textContent?.trim() === "Add" && !button.disabled && button.dataset.duplicateExerciseAdd !== "true");
+    const selectedButtons = buttons.filter((button) => button.textContent?.trim() === "Selected");
+    selectedButtons.forEach((button) => makeDuplicateAddButtonFunctional(button, primaryAdd?.className));
+  });
+}
+
+function prepareDuplicateExerciseClick(event) {
+  const button = event.target?.closest?.('button[data-duplicate-exercise-add="true"]');
+  if (!button) return;
+  const key = reactPropsKey(button);
+  const props = key ? button[key] : null;
+  if (key && props?.disabled) button[key] = { ...props, disabled: false, children: "Add" };
+  button.disabled = false;
+}
+
 function removeRedundantExerciseLibraryCopy() {
   document.querySelectorAll("h1").forEach((heading) => {
     if (heading.textContent?.trim() !== "Manage Exercises") return;
@@ -215,6 +254,7 @@ function removeProgrammePageHeading() {
 function applyFixes() {
   addProgrammeSessionCollapseControls();
   removeRightExerciseCollapseControls();
+  allowDuplicateProgrammeExercises();
   removeProgrammePageHeading();
   removeRedundantExerciseLibraryCopy();
   installExerciseCategoryFilters();
@@ -227,11 +267,13 @@ export function installUiRuntimeFixes() {
     if (user) seedStarterExercises(user).catch((error) => console.error("Could not add starter exercises", error));
   });
 
+  document.addEventListener("click", prepareDuplicateExerciseClick, true);
   applyFixes();
   const observer = new MutationObserver(applyFixes);
   observer.observe(document.body, { childList: true, subtree: true });
 
   return () => {
+    document.removeEventListener("click", prepareDuplicateExerciseClick, true);
     observer.disconnect();
     unsubscribeAuth();
   };

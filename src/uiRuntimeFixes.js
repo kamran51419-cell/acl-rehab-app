@@ -137,13 +137,17 @@ function makeDuplicateAddButtonFunctional(button, primaryClassName) {
   button.removeAttribute("aria-disabled");
   button.textContent = "Add";
   button.dataset.duplicateExerciseAdd = "true";
-  if (primaryClassName) button.className = primaryClassName;
+  button.className = primaryClassName || "inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700";
+  button.style.setProperty("background", "#2563eb", "important");
+  button.style.setProperty("background-image", "none", "important");
+  button.style.setProperty("border-color", "#2563eb", "important");
+  button.style.setProperty("color", "#ffffff", "important");
 }
 
 function allowDuplicateProgrammeExercises() {
   document.querySelectorAll('[id^="programme-session-"] .rounded-xl.border-dashed').forEach((picker) => {
     const buttons = Array.from(picker.querySelectorAll("button"));
-    const primaryAdd = buttons.find((button) => button.textContent?.trim() === "Add" && !button.disabled);
+    const primaryAdd = buttons.find((button) => button.textContent?.trim() === "Add" && !button.disabled && button.dataset.duplicateExerciseAdd !== "true");
     const selectedButtons = buttons.filter((button) => button.textContent?.trim() === "Selected");
     selectedButtons.forEach((button) => makeDuplicateAddButtonFunctional(button, primaryAdd?.className));
   });

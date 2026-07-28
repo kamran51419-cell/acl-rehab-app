@@ -30,14 +30,14 @@ input[type="date"] + .mt-2 > button::after {
 }
 
 @media (max-width: 767px) {
-  /* Keep the bottom navigation compact and flush with the bottom of the screen. */
+  /* Keep the bottom navigation compact while preserving its floating border. */
   #root > div > .fixed.bottom-0.left-0.right-0.z-20 {
     left: 0.75rem;
     right: 0.75rem;
-    bottom: 0;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
     padding: 0 !important;
     border: 1px solid rgb(203 213 225 / 0.9);
-    border-radius: 1.4rem 1.4rem 0 0;
+    border-radius: 1.4rem;
     background: rgb(255 255 255);
     box-shadow: 0 12px 32px rgb(15 23 42 / 0.18);
     overflow: hidden;

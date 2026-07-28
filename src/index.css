@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+/* Remove the standalone Quick Workout button from Home while keeping it in the session chooser and Workout tab. */
+[data-home-dashboard-ready="true"]
+  > .mx-auto.max-w-2xl.space-y-5
+  > section.space-y-4
+  > button:last-child:not(:first-child) {
+  display: none;
+}
+
 /* The primary navigation already names each screen, so repeated page labels and
    introductory headings are hidden to keep the app compact. */
 .mx-auto.max-w-2xl.space-y-8 > div:first-child,
@@ -107,18 +115,37 @@ input[type="date"] + .mt-2 > button::after {
     box-shadow: none;
   }
 
-  [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4:has(> .workout-session-chooser) > button:first-child {
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 17.05rem);
-  }
-
-  [data-home-dashboard-ready="true"] .workout-session-chooser {
+  [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4:has(> .workout-session-chooser) {
     position: fixed;
     left: 0.75rem;
     right: 0.75rem;
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 3.5rem);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 2.5rem);
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4:has(> .workout-session-chooser) > * {
+    margin-block: 0 !important;
+  }
+
+  [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4:has(> .workout-session-chooser) > button:first-child {
+    position: static;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    width: 100%;
+  }
+
+  [data-home-dashboard-ready="true"] .workout-session-chooser {
+    position: static;
+    left: auto;
+    right: auto;
+    bottom: auto;
     z-index: 30;
     box-sizing: border-box;
-    width: auto;
+    width: 100%;
     max-width: none;
     max-height: none;
     overflow: visible;

@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+/* Remove Quick Workout from Home while keeping it available in the Workout tab. */
+[data-home-dashboard-ready="true"] .quick-workout-option,
+[data-home-dashboard-ready="true"]
+  > .mx-auto.max-w-2xl.space-y-5
+  > section.space-y-4
+  > button:last-child:not(:first-child) {
+  display: none;
+}
+
 /* The primary navigation already names each screen, so repeated page labels and
    introductory headings are hidden to keep the app compact. */
 .mx-auto.max-w-2xl.space-y-8 > div:first-child,

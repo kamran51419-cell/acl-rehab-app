@@ -182,15 +182,3 @@
     border-right-color: var(--border);
   }
 }
-
-/* Keep Quick Workout available from the Workout tab, but not from Home. */
-.quick-workout-option {
-  display: none;
-}
-
-[data-home-dashboard-ready="true"]
-  > .mx-auto.max-w-2xl.space-y-5
-  > section.space-y-4
-  > button:last-child:not(:first-child) {
-  display: none;
-}

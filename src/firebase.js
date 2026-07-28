@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { browserLocalPersistence, getAuth, setPersistence } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAr4ol3T4TcbwYIf27jK63PAJLgVHODf1o",
@@ -19,4 +19,4 @@ setPersistence(auth, browserLocalPersistence).catch((error) => {
   console.error("Could not initialise persistent authentication", error);
 });
 
-export const db = getFirestore(app);
+export const db = initializeFirestore(app, { ignoreUndefinedProperties: true });

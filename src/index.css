@@ -42,7 +42,7 @@ input[type="date"] + .mt-2 > button::after {
     padding: 0 !important;
     border: 1px solid rgb(203 213 225 / 0.9);
     border-radius: 1.4rem;
-    background: rgb(255 255 255);
+    background: rgb(255 255 255 / 0.96);
     box-shadow: 0 12px 32px rgb(15 23 42 / 0.18);
     overflow: hidden;
   }
@@ -62,43 +62,39 @@ input[type="date"] + .mt-2 > button::after {
     gap: 0.15rem;
   }
 
+  /* Leave room for the expanded session controls without increasing the nav itself. */
   #root > div:has([data-home-dashboard-ready="true"]) {
-    padding-bottom: calc(18rem + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: calc(20rem + env(safe-area-inset-bottom, 0px)) !important;
   }
 
-  /* Use one full-width mobile action stack matching the floating bottom tab. */
-  [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4 {
-    position: fixed;
-    left: 0.75rem;
-    right: 0.75rem;
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 5.15rem);
-    z-index: 30;
-    display: flex;
-    width: auto;
-    max-width: none;
-    flex-direction: column;
-    gap: 0.55rem;
-  }
-
+  /* Default compact Start/Continue position directly above the mobile navigation. */
   [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4 > button:first-child {
-    position: static;
-    width: 100%;
-    max-width: none;
+    position: fixed;
+    left: 50%;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 4.45rem);
+    z-index: 31;
+    width: calc(100% - 5.5rem);
+    max-width: 16.5rem;
     min-width: 0;
-    height: 2.9rem;
-    transform: none;
+    height: 2.8rem;
+    transform: translateX(-50%);
     border: 1px solid rgb(191 219 254 / 0.9);
-    border-radius: 1rem;
-    padding: 0.6rem 1rem;
+    border-radius: 9999px;
+    padding: 0.55rem 0.9rem;
     background: linear-gradient(90deg, rgb(30 64 175), rgb(37 99 235));
     color: white;
     font-size: 0.9rem;
     line-height: 1;
-    box-shadow: 0 8px 20px rgb(30 64 175 / 0.24);
+    box-shadow: 0 8px 20px rgb(30 64 175 / 0.26);
+  }
+
+  /* When sessions are visible, move Start high enough for the full chooser. */
+  [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4:has(> div.rounded-2xl) > button:first-child {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 18rem);
   }
 
   [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4 > button:first-child:active {
-    transform: scale(0.99);
+    transform: translateX(-50%) scale(0.98);
   }
 
   [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4 > button:first-child:disabled {
@@ -106,73 +102,72 @@ input[type="date"] + .mt-2 > button::after {
     box-shadow: none;
   }
 
-  /* Hide the standalone Quick Workout button until the chooser is open. */
-  [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4 > button:last-child {
-    display: none;
-  }
-
-  /* The session panel and Quick Workout row read as one solid card. */
+  /* Show every programme session at once beneath Start, with no internal scrolling. */
   [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4 > div.rounded-2xl {
-    position: static;
+    position: fixed;
+    left: 50%;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 7.6rem);
+    z-index: 30;
     box-sizing: border-box;
-    width: 100%;
-    max-width: none;
+    width: calc(100% - 5.5rem);
+    max-width: 16.5rem;
     max-height: none;
-    transform: none;
+    transform: translateX(-50%);
     overflow: visible;
     border: 1px solid rgb(203 213 225 / 0.95);
-    border-radius: 1rem 1rem 0 0;
-    padding: 0.7rem 0.7rem 0.55rem;
-    background: rgb(255 255 255);
+    border-radius: 1rem;
+    padding: 0.5rem;
+    background: rgb(255 255 255 / 0.98);
     box-shadow: 0 8px 20px rgb(15 23 42 / 0.14);
   }
 
   [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4 > div.rounded-2xl h2 {
-    margin: 0 0 0.45rem;
+    margin: 0 0 0.35rem;
     text-align: left;
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-weight: 600;
     color: rgb(100 116 139);
   }
 
   [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4 > div.rounded-2xl > div {
     margin-top: 0;
-    gap: 0.3rem;
+    gap: 0.25rem;
   }
 
   [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4 > div.rounded-2xl button {
-    min-height: 2.35rem;
+    min-height: 2.25rem;
     border: 0;
-    border-radius: 0.75rem;
-    padding: 0.5rem 0.75rem;
+    border-radius: 0.7rem;
+    padding: 0.45rem 0.65rem;
     background: rgb(248 250 252);
     color: rgb(30 41 59);
-    font-size: 0.86rem;
+    font-size: 0.84rem;
     box-shadow: inset 0 0 0 1px rgb(226 232 240);
   }
 
-  [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4 > div.rounded-2xl button:active {
-    background: rgb(239 246 255);
-    box-shadow: inset 0 0 0 1px rgb(147 197 253);
-  }
-
+  /* Quick Workout remains separate from programme sessions but visually belongs to the chooser. */
   [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4:has(> div.rounded-2xl) > button:last-child {
-    display: block;
-    width: 100%;
-    min-height: 2.75rem;
-    margin-top: -0.55rem;
+    position: fixed;
+    left: 50%;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 4.75rem);
+    z-index: 30;
+    width: calc(100% - 5.5rem);
+    max-width: 16.5rem;
+    min-height: 2.35rem;
+    transform: translateX(-50%);
     border: 1px solid rgb(203 213 225 / 0.95);
-    border-top: 1px solid rgb(226 232 240);
-    border-radius: 0 0 1rem 1rem;
-    padding: 0.65rem 0.8rem;
+    border-radius: 0.85rem;
+    padding: 0.5rem 0.7rem;
     background: rgb(248 250 252);
     color: rgb(30 41 59);
-    font-size: 0.88rem;
-    font-weight: 600;
-    box-shadow: 0 8px 20px rgb(15 23 42 / 0.14);
+    font-size: 0.84rem;
+    font-weight: 500;
+    box-shadow: inset 0 0 0 1px rgb(226 232 240), 0 8px 20px rgb(15 23 42 / 0.12);
   }
 
+  [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4 > div.rounded-2xl button:active,
   [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4:has(> div.rounded-2xl) > button:last-child:active {
     background: rgb(239 246 255);
+    box-shadow: inset 0 0 0 1px rgb(147 197 253);
   }
 }

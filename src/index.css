@@ -30,19 +30,19 @@ input[type="date"] + .mt-2 > button::after {
 }
 
 @media (max-width: 767px) {
-  /* Keep the bottom navigation compact and close to the bottom edge. */
+  /* Keep the bottom navigation floating at the bottom while preserving its top spacing. */
   #root > div > .fixed.bottom-0.left-0.right-0.z-20 {
     left: 0.75rem;
     right: 0.75rem;
-    bottom: 0.15rem;
-    height: 3.75rem;
-    min-height: 3.75rem;
-    max-height: 3.75rem;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 0.15rem);
+    height: 4.25rem;
+    min-height: 4.25rem;
+    max-height: 4.25rem;
     padding: 0 !important;
     border: 1px solid rgb(203 213 225 / 0.9);
-    border-radius: 1.3rem;
+    border-radius: 1.4rem;
     background: rgb(255 255 255);
-    box-shadow: 0 10px 28px rgb(15 23 42 / 0.18);
+    box-shadow: 0 12px 32px rgb(15 23 42 / 0.18);
     overflow: hidden;
   }
 
@@ -50,26 +50,26 @@ input[type="date"] + .mt-2 > button::after {
     box-sizing: border-box;
     height: 100%;
     min-height: 0;
-    padding: 0.05rem 0.4rem !important;
+    padding: 0.2rem 0.45rem 0.05rem !important;
     align-items: stretch;
   }
 
   #root > div > .fixed.bottom-0.left-0.right-0.z-20 button {
     min-height: 0;
     height: 100%;
-    padding: 0.15rem 0.1rem !important;
-    gap: 0.05rem;
+    padding: 0.25rem 0.1rem 0.05rem !important;
+    gap: 0.15rem;
   }
 
   #root > div:has([data-home-dashboard-ready="true"]) {
-    padding-bottom: calc(16rem + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: calc(19rem + env(safe-area-inset-bottom, 0px)) !important;
   }
 
   [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4 > button:first-child {
     position: fixed;
     left: 0.75rem;
     right: 0.75rem;
-    bottom: 4.1rem;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 4.55rem);
     z-index: 31;
     width: auto;
     max-width: none;
@@ -96,14 +96,14 @@ input[type="date"] + .mt-2 > button::after {
   }
 
   [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4:has(> .workout-session-chooser) > button:first-child {
-    bottom: 15rem;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 18.5rem);
   }
 
   [data-home-dashboard-ready="true"] .workout-session-chooser {
     position: fixed;
     left: 0.75rem;
     right: 0.75rem;
-    bottom: 4.1rem;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 4.55rem);
     z-index: 30;
     box-sizing: border-box;
     width: auto;

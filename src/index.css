@@ -1,7 +1,6 @@
 @import "tailwindcss";
 
-/* Remove Quick Workout from Home while keeping it available in the Workout tab. */
-[data-home-dashboard-ready="true"] .quick-workout-option,
+/* Remove the standalone Quick Workout button from Home while keeping it in the session chooser and Workout tab. */
 [data-home-dashboard-ready="true"]
   > .mx-auto.max-w-2xl.space-y-5
   > section.space-y-4

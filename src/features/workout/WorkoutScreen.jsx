@@ -67,7 +67,18 @@ function CompletedWorkoutEditor({ user, saved, mode, onClose }) {
     setSaving(true); setError("");
     try {
       const editedById = new Map(draft.exercises.map((exercise) => [exercise.id, exercise]));
-      const exercises = original.current.exercises.map((exercise) => { const edited = editedById.get(exercise.id); if (!edited) return exercise; return { ...edited, completedDate: exerciseAttempted(edited) ? entryDate : edited.completedDate }; });
+      const completedCatchUpIds = catchUp
+        ? new Set(draft.exercises.filter(exerciseAttempted).map((exercise) => exercise.id))
+        : null;
+      if (catchUp && completedCatchUpIds.size === 0) {
+        setError("Complete at least one missing exercise before saving.");
+        return;
+      }
+      const exercises = original.current.exercises.map((exercise) => {
+        const edited = editedById.get(exercise.id);
+        if (!edited || (catchUp && !completedCatchUpIds.has(exercise.id))) return exercise;
+        return { ...edited, completedDate: exerciseAttempted(edited) ? entryDate : edited.completedDate };
+      });
       const updated = { ...original.current, exercises, date: catchUp ? original.current.date : entryDate, workoutDate: catchUp ? original.current.workoutDate : entryDate, status: "completed", completed: true, dismissedIncompleteAt: null, updatedAt: serverTimestamp() };
       await updateDoc(doc(db, "users", user.uid, "workouts", saved.id), updated);
       sessionStorage.removeItem("completedWorkoutIntent"); onClose();

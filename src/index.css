@@ -56,15 +56,21 @@ input[type="date"] + .mt-2 > button::after {
     box-sizing: border-box;
     height: auto;
     min-height: 0;
-    padding: 0.15rem 0.45rem !important;
+    padding: 0.25rem 0.35rem !important;
     align-items: center;
   }
 
   #root > div > .fixed.bottom-0.left-0.right-0.z-20 button {
     min-height: 0;
     height: auto;
-    padding: 0.35rem 0.1rem 0.25rem !important;
-    gap: 0.15rem;
+    padding: 0.45rem 0 0.35rem !important;
+    gap: 0.2rem;
+    font-size: 0.72rem;
+  }
+
+  #root > div > .fixed.bottom-0.left-0.right-0.z-20 button svg {
+    width: 1.15rem;
+    height: 1.15rem;
   }
 
   #root > div:has([data-home-dashboard-ready="true"]) {
@@ -75,7 +81,7 @@ input[type="date"] + .mt-2 > button::after {
     position: fixed;
     left: 0.75rem;
     right: 0.75rem;
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 2.725rem);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 3.2rem);
     z-index: 31;
     width: auto;
     max-width: none;
@@ -102,14 +108,14 @@ input[type="date"] + .mt-2 > button::after {
   }
 
   [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4:has(> .workout-session-chooser) > button:first-child {
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 17.2rem);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 17.675rem);
   }
 
   [data-home-dashboard-ready="true"] .workout-session-chooser {
     position: fixed;
     left: 0.75rem;
     right: 0.75rem;
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 3.65rem);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 4.125rem);
     z-index: 30;
     box-sizing: border-box;
     width: auto;

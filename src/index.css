@@ -81,7 +81,7 @@ input[type="date"] + .mt-2 > button::after {
     position: fixed;
     left: 0.75rem;
     right: 0.75rem;
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 2.575rem);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 3rem);
     z-index: 31;
     width: auto;
     max-width: none;
@@ -108,7 +108,7 @@ input[type="date"] + .mt-2 > button::after {
   }
 
   [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4:has(> .workout-session-chooser) > button:first-child {
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 17.05rem);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 14.4rem);
   }
 
   [data-home-dashboard-ready="true"] .workout-session-chooser {

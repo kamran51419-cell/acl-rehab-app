@@ -29,15 +29,21 @@ input[type="date"] + .mt-2 > button::after {
   font-size: 0.875rem;
 }
 
+#today-routine-title {
+  font-size: 0;
+}
+
+#today-routine-title::after {
+  content: "Today's tasks";
+  font-size: 1rem;
+}
+
 @media (max-width: 767px) {
-  /* Keep the bottom navigation compact with safe-area space outside the bar. */
+  /* Keep the bottom navigation compact while preserving its floating border. */
   #root > div > .fixed.bottom-0.left-0.right-0.z-20 {
     left: 0.75rem;
     right: 0.75rem;
     bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
-    height: 4.25rem;
-    min-height: 4.25rem;
-    max-height: 4.25rem;
     padding: 0 !important;
     border: 1px solid rgb(203 213 225 / 0.9);
     border-radius: 1.4rem;
@@ -48,16 +54,16 @@ input[type="date"] + .mt-2 > button::after {
 
   #root > div > .fixed.bottom-0.left-0.right-0.z-20 > div {
     box-sizing: border-box;
-    height: 100%;
+    height: auto;
     min-height: 0;
-    padding: 0.2rem 0.45rem !important;
-    align-items: stretch;
+    padding: 0.15rem 0.45rem !important;
+    align-items: center;
   }
 
   #root > div > .fixed.bottom-0.left-0.right-0.z-20 button {
     min-height: 0;
-    height: 100%;
-    padding: 0.25rem 0.1rem !important;
+    height: auto;
+    padding: 0.35rem 0.1rem 0.25rem !important;
     gap: 0.15rem;
   }
 
@@ -69,7 +75,7 @@ input[type="date"] + .mt-2 > button::after {
     position: fixed;
     left: 0.75rem;
     right: 0.75rem;
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 4.95rem);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 3.075rem);
     z-index: 31;
     width: auto;
     max-width: none;
@@ -96,14 +102,14 @@ input[type="date"] + .mt-2 > button::after {
   }
 
   [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4:has(> .workout-session-chooser) > button:first-child {
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 18.5rem);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 17.55rem);
   }
 
   [data-home-dashboard-ready="true"] .workout-session-chooser {
     position: fixed;
     left: 0.75rem;
     right: 0.75rem;
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 4.95rem);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 4rem);
     z-index: 30;
     box-sizing: border-box;
     width: auto;

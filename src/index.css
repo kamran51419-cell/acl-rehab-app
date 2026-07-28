@@ -62,9 +62,9 @@ input[type="date"] + .mt-2 > button::after {
     gap: 0.15rem;
   }
 
-  /* Leave room for the floating controls without increasing the nav itself. */
+  /* Leave room for the expanded session controls without increasing the nav itself. */
   #root > div:has([data-home-dashboard-ready="true"]) {
-    padding-bottom: calc(13rem + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: calc(17rem + env(safe-area-inset-bottom, 0px)) !important;
   }
 
   /* Default compact Start/Continue position directly above the mobile navigation. */
@@ -88,9 +88,9 @@ input[type="date"] + .mt-2 > button::after {
     box-shadow: 0 8px 20px rgb(30 64 175 / 0.26);
   }
 
-  /* When sessions are visible, move Start upward so the choices can open beneath it. */
+  /* When sessions are visible, move Start high enough for every session to remain visible. */
   [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4:has(> div.rounded-2xl) > button:first-child {
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 11.35rem);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 15.25rem);
   }
 
   [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4 > button:first-child:active {
@@ -102,7 +102,7 @@ input[type="date"] + .mt-2 > button::after {
     box-shadow: none;
   }
 
-  /* Session choices now appear below Start and above the fixed mobile navigation. */
+  /* Show every session at once beneath Start, with no internal scrolling. */
   [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4 > div.rounded-2xl {
     position: fixed;
     left: 50%;
@@ -111,10 +111,9 @@ input[type="date"] + .mt-2 > button::after {
     box-sizing: border-box;
     width: calc(100% - 5.5rem);
     max-width: 16.5rem;
-    max-height: 6.15rem;
+    max-height: none;
     transform: translateX(-50%);
-    overflow-y: auto;
-    overscroll-behavior: contain;
+    overflow: visible;
     border: 1px solid rgb(203 213 225 / 0.95);
     border-radius: 1rem;
     padding: 0.5rem;

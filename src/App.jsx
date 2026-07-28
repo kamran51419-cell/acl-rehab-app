@@ -212,8 +212,6 @@ export default function ACLTrackerApp() {
     if (authLoading) return;
 
     if (!user) {
-      // The legacy app clears user-scoped data immediately on sign-out.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setWeeks([]);
       setCustomExercises([]);
       setSurgeryDate("");
@@ -221,9 +219,6 @@ export default function ACLTrackerApp() {
       return;
     }
 
-    // Programme and Workout use only their v2 user-scoped repositories. Home
-    // and Settings retain the legacy surgery-date field until it is migrated by
-    // a future, explicit data-model change.
     if (["programme", "workout"].includes(activeTab)) return;
 
     return subscribeLegacyRehabData(
@@ -240,7 +235,6 @@ export default function ACLTrackerApp() {
       }
     );
   }, [user, authLoading, activeTab]);
-
 
   async function handleAuthSubmit(e) {
     e.preventDefault();
@@ -303,8 +297,6 @@ export default function ACLTrackerApp() {
   useEffect(() => {
     if (surgeryDate && !weekManuallyEdited) {
       const autoWeek = calculateWeekFromSurgeryDate(surgeryDate, form.date);
-      // Keep Phase 0 behavior identical: date/surgery-date changes update the legacy week field.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setForm((prev) => ({ ...prev, week: autoWeek }));
     }
   }, [surgeryDate, form.date, weekManuallyEdited]);
@@ -324,105 +316,77 @@ export default function ACLTrackerApp() {
   });
 
   async function addCustomExercise() {
-  const name = newExerciseName.trim();
-  if (!name) return;
+    const name = newExerciseName.trim();
+    if (!name) return;
 
-  const id = `custom-${makeId()}`;
-  const item = { id, label: name, singleLeg: newExerciseSingleLeg, builtIn: false };
-  const nextCustomExercises = [...customExercises, item];
+    const id = `custom-${makeId()}`;
+    const item = { id, label: name, singleLeg: newExerciseSingleLeg, builtIn: false };
+    const nextCustomExercises = [...customExercises, item];
 
-  setCustomExercises(nextCustomExercises);
-  setForm((prev) => ({ ...prev, exerciseId: id }));
-  setNewExerciseName("");
-  setNewExerciseSingleLeg(true);
+    setCustomExercises(nextCustomExercises);
+    setForm((prev) => ({ ...prev, exerciseId: id }));
+    setNewExerciseName("");
+    setNewExerciseSingleLeg(true);
 
-  await saveAllData(weeks, nextCustomExercises, surgeryDate);
-}
-
-  function deleteCustomExercise(exerciseId) {
-    setCustomExercises((prev) => prev.filter((e) => e.id !== exerciseId));
-    setWeeks((prev) =>
-      prev
-        .map((w) => ({ ...w, sessions: (w.sessions || []).filter((s) => s.exerciseId !== exerciseId) }))
-        .filter((w) => (w.sessions || []).length > 0)
-    );
-    if (form.exerciseId === exerciseId) setForm((prev) => ({ ...prev, exerciseId: "lp" }));
-    if (graphsTab === exerciseId) setGraphsTab("combined");
-    if (progressTab === exerciseId || progressTab === "custom") setProgressTab("all");
+    await saveAllData(weeks, nextCustomExercises, surgeryDate);
   }
-async function saveAllData(nextWeeks = weeks, nextCustomExercises = customExercises, nextSurgeryDate = surgeryDate, nextTrainingMode = trainingMode) {
-  if (!user?.uid) return;
 
-  try {
+  async function saveAllData(nextWeeks = weeks, nextCustomExercises = customExercises, nextSurgeryDate = surgeryDate, nextTrainingMode = trainingMode) {
+    if (!user) return;
     await saveLegacyRehabData(db, user.uid, {
       weeks: nextWeeks,
       customExercises: nextCustomExercises,
       surgeryDate: nextSurgeryDate,
       trainingMode: nextTrainingMode,
     });
-  } catch (error) {
-    console.error("Failed to save rehab data to Firestore", error);
   }
-}
-async function saveSession() {
-  if (!form.week || !user?.uid) return;
 
-  let nextWeeks = [];
+  async function deleteCustomExercise(id) {
+    const next = customExercises.filter((item) => item.id !== id);
+    setCustomExercises(next);
+    if (form.exerciseId === id) setForm((prev) => ({ ...prev, exerciseId: DEFAULT_EXERCISES[0].id }));
+    await saveAllData(weeks, next, surgeryDate);
+  }
 
-  setWeeks((prev) => {
-    const existing = prev.find((w) => String(w.week) === String(form.week));
-    const base = existing ? { ...existing, sessions: [...(existing.sessions || [])] } : emptyWeek(String(form.week));
-    base.week = String(form.week);
+  async function submitSession() {
+    let nextWeeks;
+    setWeeks((prev) => {
+      const existing = prev.find((w) => String(w.week) === String(form.week));
+      const base = existing ? { ...existing, sessions: [...(existing.sessions || [])] } : emptyWeek(form.week);
 
-    if (editing) {
-      base.sessions = base.sessions.map((session) => {
-        if (session.id !== editing.sessionId) return session;
-        if (selectedExercise?.singleLeg) {
-          return {
-            ...session,
-            exerciseId: form.exerciseId,
-            date: form.date,
-            singleLeg: true,
-            leftSets: form.left.sets,
-            rightSets: form.right.sets,
-            notes: form.notes,
-          };
-        }
-        return {
-          ...session,
-          exerciseId: form.exerciseId,
-          date: form.date,
-          singleLeg: false,
-          sets: form.bilateral.sets,
-          notes: form.notes,
-        };
-      });
-    } else {
-      const session = selectedExercise?.singleLeg
-        ? makeSingleLegSession(form.exerciseId, form.date, form.left.sets, form.right.sets, form.notes)
-        : makeBilateralSession(form.exerciseId, form.date, form.bilateral.sets, form.notes);
-      base.sessions.push(session);
-    }
+      if (editing) {
+        base.sessions = base.sessions.map((session) => {
+          if (session.id !== editing.sessionId) return session;
+          return selectedExercise?.singleLeg
+            ? makeSingleLegSession(form.exerciseId, form.date, form.left.sets, form.right.sets, form.notes, session.id)
+            : makeBilateralSession(form.exerciseId, form.date, form.bilateral.sets, form.notes, session.id);
+        });
+      } else {
+        const session = selectedExercise?.singleLeg
+          ? makeSingleLegSession(form.exerciseId, form.date, form.left.sets, form.right.sets, form.notes)
+          : makeBilateralSession(form.exerciseId, form.date, form.bilateral.sets, form.notes);
+        base.sessions.push(session);
+      }
 
-    const filtered = prev.filter((w) => String(w.week) !== String(form.week));
-    nextWeeks = [...filtered, base].sort((a, b) => Number(a.week) - Number(b.week));
-    return nextWeeks;
-  });
+      const filtered = prev.filter((w) => String(w.week) !== String(form.week));
+      nextWeeks = [...filtered, base].sort((a, b) => Number(a.week) - Number(b.week));
+      return nextWeeks;
+    });
 
-  setEditing(null);
-  setWeekManuallyEdited(false);
+    setEditing(null);
+    setWeekManuallyEdited(false);
 
-  const nextExerciseId = form.exerciseId;
+    const nextExerciseId = form.exerciseId;
 
-  setForm((prev) => ({
-    ...blankForm,
-    week: surgeryDate ? calculateWeekFromSurgeryDate(surgeryDate, todayString()) : prev.week ? String(Number(prev.week) + 1) : "",
-    date: todayString(),
-    exerciseId: nextExerciseId,
-  }));
+    setForm((prev) => ({
+      ...blankForm,
+      week: surgeryDate ? calculateWeekFromSurgeryDate(surgeryDate, todayString()) : prev.week ? String(Number(prev.week) + 1) : "",
+      date: todayString(),
+      exerciseId: nextExerciseId,
+    }));
 
-  await saveAllData(nextWeeks, customExercises, surgeryDate);
-}
+    await saveAllData(nextWeeks, customExercises, surgeryDate);
+  }
 
   function editSession(weekData, session) {
     const nextDate = session.date || todayString();
@@ -457,9 +421,7 @@ async function saveSession() {
   if (authLoading) {
     return (
       <div className="min-h-screen bg-slate-50 p-4 flex items-center justify-center">
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-md text-center">
-          Loading...
-        </div>
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-md text-center">Loading...</div>
       </div>
     );
   }
@@ -473,66 +435,30 @@ async function saveSession() {
               Rehab logging dashboard
             </div>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight">ACL Rehab Tracker</h1>
-            <p className="mt-2 text-sm text-slate-500">
-              Sign in to access your rehab data on phone and laptop.
-            </p>
+            <p className="mt-2 text-sm text-slate-500">Sign in to access your rehab data on phone and laptop.</p>
           </div>
 
           <div className="mb-4 flex gap-2">
-            <TabButton active={authMode === "login"} onClick={() => setAuthMode("login")}>
-              Log in
-            </TabButton>
-            <TabButton active={authMode === "signup"} onClick={() => setAuthMode("signup")}>
-              Sign up
-            </TabButton>
+            <TabButton active={authMode === "login"} onClick={() => setAuthMode("login")}>Log in</TabButton>
+            <TabButton active={authMode === "signup"} onClick={() => setAuthMode("signup")}>Sign up</TabButton>
           </div>
 
           <form onSubmit={handleAuthSubmit} className="space-y-4">
             <div>
               <Label>Email</Label>
-              <Input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email"
-                autoComplete="email"
-              />
+              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" autoComplete="email" />
             </div>
 
             <div>
               <Label>Password</Label>
-              <Input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Password"
-                autoComplete={authMode === "login" ? "current-password" : "new-password"}
-              />
+              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" autoComplete={authMode === "login" ? "current-password" : "new-password"} />
             </div>
 
-            {authError ? (
-              <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {authError}
-              </div>
-            ) : null}
-            {authNotice ? (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-                {authNotice}
-              </div>
-            ) : null}
+            {authError ? <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{authError}</div> : null}
+            {authNotice ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{authNotice}</div> : null}
 
-            <Button type="submit" className="w-full">
-              {authMode === "signup" ? "Create account" : "Log in"}
-            </Button>
-
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={handleResetPassword}
-            >
-              Forgot password
-            </Button>
+            <Button type="submit" className="w-full">{authMode === "signup" ? "Create account" : "Log in"}</Button>
+            <Button type="button" variant="outline" className="w-full" onClick={handleResetPassword}>Forgot password</Button>
           </form>
         </div>
       </div>
@@ -540,7 +466,7 @@ async function saveSession() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 pb-24 md:p-8 md:pb-8">
+    <div className={cls("min-h-screen bg-slate-50 p-4 md:p-8 md:pb-8", activeTab === "home" ? "pb-36" : "pb-24")}> 
       <div className="mx-auto max-w-7xl space-y-6">
         <div className="hidden md:flex flex-wrap gap-2">
           <TabButton active={activeTab === "home"} onClick={() => setActiveTab("home")}>Home</TabButton>
@@ -551,473 +477,19 @@ async function saveSession() {
         </div>
 
         {activeTab === "home" && <HomeScreen user={user} surgeryDate={surgeryDate} trainingMode={trainingMode} fromProgramme={libraryFromProgramme} onBackToProgramme={() => { setLibraryFromProgramme(false); setActiveTab("programme"); }} onOpenWorkout={(intent) => { setWorkoutIntent({ ...intent, token: Date.now() }); setActiveTab("workout"); }} />}
-
-        {activeTab === "log" && (
-          <div className="space-y-6">
-            <CardShell title="Custom exercises">
-              <div className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-[1fr_180px_120px]">
-                  <div>
-                    <Label className="text-sm font-medium text-slate-700">New exercise name</Label>
-                    <Input value={newExerciseName} onChange={(e) => setNewExerciseName(e.target.value)} placeholder="e.g. Squat" />
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-slate-700">Single leg</Label>
-                    <div className="mt-2 flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setNewExerciseSingleLeg(true)}
-                        className={cls(
-                          "rounded-md border px-3 py-2 text-sm",
-                          newExerciseSingleLeg ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white"
-                        )}
-                      >
-                        On
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setNewExerciseSingleLeg(false)}
-                        className={cls(
-                          "rounded-md border px-3 py-2 text-sm",
-                          !newExerciseSingleLeg ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white"
-                        )}
-                      >
-                        Off
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex items-end">
-                    <Button onClick={addCustomExercise} className="w-full">Add exercise</Button>
-                  </div>
-                </div>
-
-                {customExercises.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {customExercises.map((exercise) => (
-                      <div key={exercise.id} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm">
-                        <span>{exercise.label}</span>
-                        <span className="text-slate-400">•</span>
-                        <span className="text-slate-500">{exercise.singleLeg ? "Single leg" : "Both legs"}</span>
-                        <button
-                          type="button"
-                          onClick={() => deleteCustomExercise(exercise.id)}
-                          className="inline-flex items-center justify-center rounded-full border border-slate-200 p-1 hover:bg-slate-50"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </CardShell>
-
-            <CardShell title={editing ? `Edit session — Week ${editing.week}` : "Add Session"}>
-              <div className="space-y-5">
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div>
-                    <Label className="text-sm font-medium text-slate-700">Week</Label>
-                    <Input
-                      value={form.week}
-                      onChange={(e) => {
-                        setWeekManuallyEdited(true);
-                        setForm({ ...form, week: e.target.value });
-                      }}
-                      placeholder={surgeryDate ? "Auto" : "Enter week"}
-                      inputMode="numeric"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-slate-700">Date</Label>
-                    <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-slate-700">Exercise</Label>
-                    <select
-                      value={form.exerciseId}
-                      onChange={(e) => setForm({ ...form, exerciseId: e.target.value })}
-                      className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                    >
-                      {exerciseKeys.map((ex) => (
-                        <option key={ex.id} value={ex.id}>{ex.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {selectedExercise?.singleLeg ? (
-                  <>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <SetsInput title="Left" data={form.left} setData={(v) => setForm({ ...form, left: v })} />
-                      <SetsInput title="Right" data={form.right} setData={(v) => setForm({ ...form, right: v })} />
-                    </div>
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
-                      <span className="font-medium">Symmetry: </span>
-                      {currentSymmetry ?? "—"}
-                      {currentSymmetry != null ? "%" : ""}
-                    </div>
-                  </>
-                ) : (
-                  <SetsInput title="Sets" data={form.bilateral} setData={(v) => setForm({ ...form, bilateral: v })} />
-                )}
-
-                <div>
-                  <Label className="text-sm font-medium text-slate-700">Notes</Label>
-                  <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Optional notes for this session" />
-                </div>
-
-                <div className="flex gap-3">
-                  <Button onClick={() => { saveSession(); setActiveTab("table"); }}>
-                    {editing ? "Update Session" : "Save Session"}
-                  </Button>
-                  {editing && (
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setEditing(null);
-                        setForm({ ...blankForm, date: todayString(), exerciseId: form.exerciseId });
-                        setWeekManuallyEdited(false);
-                        setActiveTab("table");
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </CardShell>
-          </div>
-        )}
-
-        {activeTab === "programme" && <PlansScreen user={user} onManageExerciseLibrary={() => { setLibraryFromProgramme(true); setActiveTab("home"); requestAnimationFrame(() => document.getElementById("exercise-library")?.scrollIntoView({ behavior: "smooth" })); }} />}
-        {activeTab === "workout" && <WorkoutScreen user={user} intent={workoutIntent} onIntentHandled={() => setWorkoutIntent(null)} onFinished={() => setActiveTab("workout-history")} onDiscarded={() => setActiveTab("workout")} />}
-        {["progress", "workout-history"].includes(activeTab) && <ProgressScreen key={activeTab} user={user} trainingMode={trainingMode} initialTab={activeTab === "workout-history" ? "history" : "stats"} />}
-        {activeTab === "more" && <div className="space-y-4"><div><h1 className="text-2xl font-semibold">Settings</h1><p className="text-sm text-slate-500">Manage app preferences and your account.</p></div><CardShell title="Settings"><div className="max-w-md space-y-4"><div><Label>Training mode</Label><select className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm" value={trainingMode} onChange={async (event) => { const nextMode = event.target.value; setTrainingMode(nextMode); await saveAllData(weeks, customExercises, surgeryDate, nextMode); }}><option value="gym">Gym</option><option value="rehab">Rehab</option></select></div>{trainingMode === "rehab" ? <div><Label>Surgery date (optional)</Label><Input className="mt-1" type="date" value={surgeryDate} onChange={async (event) => { const nextDate = event.target.value; setSurgeryDate(nextDate); setWeekManuallyEdited(false); await saveAllData(weeks, customExercises, nextDate, trainingMode); }} />{surgeryDate ? <div className="mt-2 flex items-center justify-between gap-3"><p className="text-sm text-slate-500">{new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit", timeZone: "UTC" }).format(new Date(`${surgeryDate}T00:00:00Z`))}</p><Button size="sm" variant="outline" onClick={async () => { setSurgeryDate(""); await saveAllData(weeks, customExercises, "", trainingMode); }}>Remove</Button></div> : null}</div> : null}</div></CardShell><CardShell title="Account"><div className="max-w-md space-y-4"><div><Label>Email</Label><p className="mt-1 text-sm text-slate-600">{user.email}</p></div><Button variant="outline" onClick={handleLogout}>Log out</Button></div></CardShell></div>}
-
-        {activeTab === "table" && (
-          <div className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              <TabButton active={progressTab === "all"} onClick={() => setProgressTab("all")}>All</TabButton>
-              {builtInTabs.map((exercise) => (
-                <TabButton key={exercise.id} active={progressTab === exercise.id} onClick={() => setProgressTab(exercise.id)}>
-                  {exercise.label}
-                </TabButton>
-              ))}
-              {customExercisesPresent.length > 0 && (
-                <TabButton active={progressTab === "custom"} onClick={() => setProgressTab("custom")}>Custom</TabButton>
-              )}
-            </div>
-
-            {progressTab === "all" && (
-              <CardShell
-                title="Weekly Overview"
-                right={<Button variant="outline" onClick={() => setShowAllRows((v) => !v)}>{showAllRows ? "Show last 8 weeks" : "Show all weeks"}</Button>}
-              >
-                <div className="space-y-4 md:hidden">
-                  {displayedWeeks.length === 0 ? (
-                    <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-500">No sessions saved yet.</div>
-                  ) : (
-                    displayedWeeks.map((week) => (
-                      <div key={week.week} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="text-lg font-semibold text-slate-900">Week {week.week}</div>
-                          <div className="text-xs text-slate-500">{compactDate(week.sessions || [])}</div>
-                        </div>
-                        <div className="space-y-3">
-                          {exerciseKeys.map((exercise) => {
-                            const summary = compactExerciseSummary(week, exercise);
-                            if (!summary) return null;
-                            return (
-                              <div key={`${week.week}-${exercise.id}-mobile`} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-                                <div className="text-sm font-semibold text-slate-900">{exercise.label}</div>
-                                <div className="mt-1 text-xs text-slate-500">{summary.dates}</div>
-                                {summary.type === "single" ? (
-                                  <>
-                                    <div className="mt-2 flex items-center justify-between gap-3 text-sm">
-                                      <span>L: {summary.left}</span>
-                                      <span className="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600">
-                                        {summary.symmetry != null ? `${summary.symmetry}%` : "—"}
-                                      </span>
-                                    </div>
-                                    <div className="mt-1 text-sm">R: {summary.right}</div>
-                                  </>
-                                ) : (
-                                  <div className="mt-2 text-sm">{summary.value}</div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white md:block">
-                  <table className="w-full min-w-[1200px] border-collapse text-sm">
-                    <thead className="bg-slate-100">
-                      <tr>
-                        <th className="border-b p-3 text-left font-semibold">Week</th>
-                        {exerciseKeys.map((exercise) => (
-                          <React.Fragment key={exercise.id}>
-                            <th className="border-b p-3 text-left font-semibold">{exercise.label}</th>
-                            {exercise.singleLeg && <th className="border-b p-3 text-left font-semibold">{exercise.label} Symmetry</th>}
-                          </React.Fragment>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {displayedWeeks.length === 0 ? (
-                        <tr>
-                          <td colSpan={1 + exerciseKeys.length + exerciseKeys.filter((e) => e.singleLeg).length} className="p-8 text-center text-slate-500">
-                            No sessions saved yet.
-                          </td>
-                        </tr>
-                      ) : (
-                        displayedWeeks.map((week, idx) => (
-                          <tr key={week.week} className={idx % 2 === 0 ? "bg-white" : "bg-slate-50/50"}>
-                            <td className="border-b p-3 align-top font-medium whitespace-nowrap">Week {week.week}</td>
-                            {exerciseKeys.flatMap((exercise) => {
-                              const summary = compactExerciseSummary(week, exercise);
-                              const cells = [];
-                              cells.push(
-                                <td key={`${week.week}-${exercise.id}-main`} className="border-b p-3 align-top min-w-[220px]">
-                                  {!summary ? (
-                                    <span className="text-slate-400">—</span>
-                                  ) : summary.type === "single" ? (
-                                    <div className="space-y-1">
-                                      <div className="text-xs text-slate-500">{summary.dates}</div>
-                                      <div className="text-sm">L: {summary.left}</div>
-                                      <div className="text-sm">R: {summary.right}</div>
-                                    </div>
-                                  ) : (
-                                    <div className="space-y-1">
-                                      <div className="text-xs text-slate-500">{summary.dates}</div>
-                                      <div className="text-sm">{summary.value}</div>
-                                    </div>
-                                  )}
-                                </td>
-                              );
-                              if (exercise.singleLeg) {
-                                cells.push(
-                                  <td key={`${week.week}-${exercise.id}-sym`} className="border-b p-3 align-top min-w-[120px]">
-                                    {summary && summary.type === "single" ? (summary.symmetry != null ? `${summary.symmetry}%` : "—") : <span className="text-slate-400">—</span>}
-                                  </td>
-                                );
-                              }
-                              return cells;
-                            })}
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </CardShell>
-            )}
-
-            {builtInTabs.map((exercise) => progressTab === exercise.id && (
-              <CardShell
-                key={exercise.id}
-                title={exercise.label}
-                right={<Button variant="outline" onClick={() => setShowAllRows((v) => !v)}>{showAllRows ? "Show last 8 weeks" : "Show all weeks"}</Button>}
-              >
-                <div className="space-y-4">
-                  {displayedWeeks.length === 0 ? (
-                    <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-500">No sessions saved yet.</div>
-                  ) : (
-                    displayedWeeks.map((week) => {
-                      const exSessions = aggregateWeekExerciseSessions(week, exercise.id);
-                      if (!exSessions.length) return null;
-                      return (
-                        <div key={`${exercise.id}-${week.week}`} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
-                          <div className="text-lg font-semibold">Week {week.week}</div>
-                          {exSessions.map((session, idx) => {
-                            const sum = sessionSummary(session);
-                            return (
-                              <div key={session.id} className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                                <div className="flex flex-wrap items-center justify-between gap-3">
-                                  <div className="text-sm font-medium">Session {idx + 1} • {sum.date}</div>
-                                  <div className="flex gap-2">
-                                    <Button variant="outline" size="sm" onClick={() => editSession(week, session)}>Edit</Button>
-                                    <Button variant="destructive" size="sm" onClick={() => deleteSession(week.week, session.id)}>
-                                      <Trash2 className="mr-1 h-4 w-4" /> Delete
-                                    </Button>
-                                  </div>
-                                </div>
-                                {session.singleLeg ? (
-                                  <div className="grid gap-4 md:grid-cols-3">
-                                    <div><div className="mb-1 text-sm font-medium">Left</div>{sum.left.map((line, i) => <div key={i} className="text-sm">{line}</div>)}</div>
-                                    <div><div className="mb-1 text-sm font-medium">Right</div>{sum.right.map((line, i) => <div key={i} className="text-sm">{line}</div>)}</div>
-                                    <div><div className="mb-1 text-sm font-medium">Symmetry</div><div className="text-sm">{sum.symmetry ?? "—"}{sum.symmetry != null ? "%" : ""}</div></div>
-                                  </div>
-                                ) : (
-                                  <div>
-                                    <div className="mb-1 text-sm font-medium">Sets</div>
-                                    {sum.sets.map((line, i) => <div key={i} className="text-sm">{line}</div>)}
-                                  </div>
-                                )}
-                                <div className="rounded-xl bg-white p-3 text-sm text-slate-700"><span className="font-medium">Notes: </span>{sum.notes}</div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </CardShell>
-            ))}
-
-            {progressTab === "custom" && (
-              <CardShell
-                title="Custom exercises"
-                right={<Button variant="outline" onClick={() => setShowAllRows((v) => !v)}>{showAllRows ? "Show last 8 weeks" : "Show all weeks"}</Button>}
-              >
-                <div className="space-y-6">
-                  {customExercisesPresent.length === 0 ? (
-                    <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-500">No custom exercise sessions saved yet.</div>
-                  ) : customExercisesPresent.map((exercise) => (
-                    <div key={exercise.id} className="space-y-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <h3 className="text-lg font-semibold">{exercise.label}</h3>
-                        <div className="text-sm text-slate-500">{exercise.singleLeg ? "Single leg" : "Both legs"}</div>
-                      </div>
-                      {displayedWeeks.map((week) => {
-                        const exSessions = aggregateWeekExerciseSessions(week, exercise.id);
-                        if (!exSessions.length) return null;
-                        return (
-                          <div key={`${exercise.id}-${week.week}`} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
-                            <div className="text-base font-semibold">Week {week.week}</div>
-                            {exSessions.map((session, idx) => {
-                              const sum = sessionSummary(session);
-                              return (
-                                <div key={session.id} className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                                  <div className="flex flex-wrap items-center justify-between gap-3">
-                                    <div className="text-sm font-medium">Session {idx + 1} • {sum.date}</div>
-                                    <div className="flex gap-2">
-                                      <Button variant="outline" size="sm" onClick={() => editSession(week, session)}>Edit</Button>
-                                      <Button variant="destructive" size="sm" onClick={() => deleteSession(week.week, session.id)}>
-                                        <Trash2 className="mr-1 h-4 w-4" /> Delete
-                                      </Button>
-                                    </div>
-                                  </div>
-                                  {session.singleLeg ? (
-                                    <div className="grid gap-4 md:grid-cols-3">
-                                      <div><div className="mb-1 text-sm font-medium">Left</div>{sum.left.map((line, i) => <div key={i} className="text-sm">{line}</div>)}</div>
-                                      <div><div className="mb-1 text-sm font-medium">Right</div>{sum.right.map((line, i) => <div key={i} className="text-sm">{line}</div>)}</div>
-                                      <div><div className="mb-1 text-sm font-medium">Symmetry</div><div className="text-sm">{sum.symmetry ?? "—"}{sum.symmetry != null ? "%" : ""}</div></div>
-                                    </div>
-                                  ) : (
-                                    <div>
-                                      <div className="mb-1 text-sm font-medium">Sets</div>
-                                      {sum.sets.map((line, i) => <div key={i} className="text-sm">{line}</div>)}
-                                    </div>
-                                  )}
-                                  <div className="rounded-xl bg-white p-3 text-sm text-slate-700"><span className="font-medium">Notes: </span>{sum.notes}</div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-              </CardShell>
-            )}
-          </div>
-        )}
-
-        {activeTab === "graphs" && (
-          <div className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              <TabButton active={graphsTab === "combined"} onClick={() => setGraphsTab("combined")}>Combined</TabButton>
-              {singleLegExercises.map((exercise) => (
-                <TabButton key={exercise.id} active={graphsTab === exercise.id} onClick={() => setGraphsTab(exercise.id)}>
-                  {exercise.label}
-                </TabButton>
-              ))}
-            </div>
-
-            {graphsTab === "combined" && (
-              <CardShell title="Symmetry over time">
-                <div className="h-[360px] rounded-2xl bg-slate-50 p-2">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={graphData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="week" />
-                      <YAxis domain={[0, 100]} />
-                      <Tooltip />
-                      <Legend />
-                      <ReferenceLine y={90} stroke="#94a3b8" strokeDasharray="4 4" />
-                      {singleLegExercises.map((exercise, idx) => (
-                        <Line
-                          key={exercise.id}
-                          type="monotone"
-                          dataKey={exercise.id}
-                          name={exercise.label}
-                          stroke={["#2563eb", "#16a34a", "#ea580c", "#7c3aed", "#dc2626", "#0891b2"][idx % 6]}
-                          strokeWidth={2}
-                          dot={false}
-                          connectNulls
-                        />
-                      ))}
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardShell>
-            )}
-
-            {singleLegExercises.map((exercise) => (
-              graphsTab === exercise.id ? <ExerciseGraph key={exercise.id} title={`${exercise.label} symmetry`} dataKey={exercise.id} data={graphData} /> : null
-            ))}
-          </div>
-        )}
+        {activeTab === "programme" && <PlansScreen user={user} trainingMode={trainingMode} onOpenExerciseLibrary={() => { setLibraryFromProgramme(true); setActiveTab("home"); }} />}
+        {activeTab === "workout" && <WorkoutScreen user={user} intent={workoutIntent} trainingMode={trainingMode} />}
+        {activeTab === "progress" && <ProgressScreen user={user} trainingMode={trainingMode} />}
+        {activeTab === "more" && <div className="space-y-4"><CardShell title="Settings"><div className="space-y-4"><div><Label>Training mode</Label><div className="mt-2 flex gap-2"><TabButton active={trainingMode === "gym"} onClick={() => { setTrainingMode("gym"); saveAllData(weeks, customExercises, surgeryDate, "gym"); }}>Gym</TabButton><TabButton active={trainingMode === "rehab"} onClick={() => { setTrainingMode("rehab"); saveAllData(weeks, customExercises, surgeryDate, "rehab"); }}>Rehab</TabButton></div></div>{trainingMode === "rehab" ? <div><Label>Surgery date</Label><Input type="date" value={surgeryDate} onChange={(e) => { setSurgeryDate(e.target.value); saveAllData(weeks, customExercises, e.target.value); }} /></div> : null}<Button variant="outline" onClick={handleLogout}>Log out</Button></div></CardShell></div>}
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-slate-200 bg-white/95 backdrop-blur md:hidden">
         <div className="mx-auto grid max-w-md grid-cols-5 p-2">
-          <button
-            type="button"
-            onClick={() => setActiveTab("home")}
-            className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "home" ? "bg-slate-100 font-medium" : "text-slate-500")}
-          >
-            <Home className="h-4 w-4" />
-            Home
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("programme")}
-            className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "programme" ? "bg-slate-100 font-medium" : "text-slate-500")}
-          >
-            <ClipboardList className="h-4 w-4" />
-            Programme
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("workout")}
-            className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "workout" ? "bg-slate-100 font-medium" : "text-slate-500")}
-          >
-            <Dumbbell className="h-4 w-4" />
-            Workout
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("progress")}
-            className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", ["progress", "workout-history", "table", "graphs"].includes(activeTab) ? "bg-slate-100 font-medium" : "text-slate-500")}
-          >
-            <Table2 className="h-4 w-4" />
-            Progress
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("more")}
-            className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "more" ? "bg-slate-100 font-medium" : "text-slate-500")}
-          >
-            <Settings className="h-4 w-4" />
-            Settings
-          </button>
+          <button type="button" onClick={() => setActiveTab("home")} className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "home" ? "bg-slate-100 font-medium" : "text-slate-500")}><Home className="h-4 w-4" />Home</button>
+          <button type="button" onClick={() => setActiveTab("programme")} className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "programme" ? "bg-slate-100 font-medium" : "text-slate-500")}><ClipboardList className="h-4 w-4" />Programme</button>
+          <button type="button" onClick={() => setActiveTab("workout")} className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "workout" ? "bg-slate-100 font-medium" : "text-slate-500")}><Dumbbell className="h-4 w-4" />Workout</button>
+          <button type="button" onClick={() => setActiveTab("progress")} className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", ["progress", "workout-history", "table", "graphs"].includes(activeTab) ? "bg-slate-100 font-medium" : "text-slate-500")}><Table2 className="h-4 w-4" />Progress</button>
+          <button type="button" onClick={() => setActiveTab("more")} className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs", activeTab === "more" ? "bg-slate-100 font-medium" : "text-slate-500")}><Settings className="h-4 w-4" />Settings</button>
         </div>
       </div>
     </div>

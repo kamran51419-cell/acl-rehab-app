@@ -75,7 +75,7 @@ input[type="date"] + .mt-2 > button::after {
     position: fixed;
     left: 0.75rem;
     right: 0.75rem;
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 3.75rem);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 3.55rem);
     z-index: 31;
     width: auto;
     max-width: none;

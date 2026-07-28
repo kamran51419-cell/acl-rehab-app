@@ -40,4 +40,29 @@ input[type="date"] + .mt-2 > button::after {
     box-shadow: 0 12px 32px rgb(15 23 42 / 0.18);
     overflow: hidden;
   }
+
+  /* Preview the existing Start/Continue action as a floating Home button. */
+  [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4 > button:first-child {
+    position: fixed;
+    right: 1rem;
+    bottom: calc(max(0.75rem, env(safe-area-inset-bottom)) + 5.75rem);
+    z-index: 30;
+    width: auto;
+    min-width: 8.75rem;
+    border: 1px solid rgb(191 219 254 / 0.9);
+    border-radius: 9999px;
+    padding: 0.9rem 1.25rem;
+    background: linear-gradient(135deg, rgb(30 64 175), rgb(37 99 235));
+    color: white;
+    box-shadow: 0 14px 30px rgb(30 64 175 / 0.32);
+  }
+
+  [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4 > button:first-child:active {
+    transform: scale(0.97);
+  }
+
+  [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4 > button:first-child:disabled {
+    opacity: 0.5;
+    box-shadow: none;
+  }
 }

@@ -64,7 +64,7 @@ input[type="date"] + .mt-2 > button::after {
 
   /* Leave room for the expanded session controls without increasing the nav itself. */
   #root > div:has([data-home-dashboard-ready="true"]) {
-    padding-bottom: calc(17rem + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: calc(20rem + env(safe-area-inset-bottom, 0px)) !important;
   }
 
   /* Default compact Start/Continue position directly above the mobile navigation. */
@@ -88,9 +88,9 @@ input[type="date"] + .mt-2 > button::after {
     box-shadow: 0 8px 20px rgb(30 64 175 / 0.26);
   }
 
-  /* When sessions are visible, move Start high enough for every session to remain visible. */
+  /* When sessions are visible, move Start high enough for the full chooser. */
   [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4:has(> div.rounded-2xl) > button:first-child {
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 15.25rem);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 18rem);
   }
 
   [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4 > button:first-child:active {
@@ -102,11 +102,11 @@ input[type="date"] + .mt-2 > button::after {
     box-shadow: none;
   }
 
-  /* Show every session at once beneath Start, with no internal scrolling. */
+  /* Show every programme session at once beneath Start, with no internal scrolling. */
   [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4 > div.rounded-2xl {
     position: fixed;
     left: 50%;
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 4.75rem);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 7.6rem);
     z-index: 30;
     box-sizing: border-box;
     width: calc(100% - 5.5rem);
@@ -145,7 +145,28 @@ input[type="date"] + .mt-2 > button::after {
     box-shadow: inset 0 0 0 1px rgb(226 232 240);
   }
 
-  [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4 > div.rounded-2xl button:active {
+  /* Quick Workout remains separate from programme sessions but visually belongs to the chooser. */
+  [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4:has(> div.rounded-2xl) > button:last-child {
+    position: fixed;
+    left: 50%;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 4.75rem);
+    z-index: 30;
+    width: calc(100% - 5.5rem);
+    max-width: 16.5rem;
+    min-height: 2.35rem;
+    transform: translateX(-50%);
+    border: 1px solid rgb(203 213 225 / 0.95);
+    border-radius: 0.85rem;
+    padding: 0.5rem 0.7rem;
+    background: rgb(248 250 252);
+    color: rgb(30 41 59);
+    font-size: 0.84rem;
+    font-weight: 500;
+    box-shadow: inset 0 0 0 1px rgb(226 232 240), 0 8px 20px rgb(15 23 42 / 0.12);
+  }
+
+  [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4 > div.rounded-2xl button:active,
+  [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4:has(> div.rounded-2xl) > button:last-child:active {
     background: rgb(239 246 255);
     box-shadow: inset 0 0 0 1px rgb(147 197 253);
   }

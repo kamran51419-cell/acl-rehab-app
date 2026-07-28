@@ -28,3 +28,16 @@ input[type="date"] + .mt-2 > button::after {
   content: "Clear";
   font-size: 0.875rem;
 }
+
+/* Float the mobile tab bar above the screen edges while preserving its tabs and behaviour. */
+@media (max-width: 767px) {
+  #root > div > .fixed.bottom-0.left-0.right-0.z-20 {
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: max(0.75rem, env(safe-area-inset-bottom));
+    border: 1px solid rgb(203 213 225 / 0.9);
+    border-radius: 1.5rem;
+    box-shadow: 0 12px 32px rgb(15 23 42 / 0.18);
+    overflow: hidden;
+  }
+}

@@ -102,14 +102,14 @@ input[type="date"] + .mt-2 > button::after {
   }
 
   [data-home-dashboard-ready="true"] .mx-auto.max-w-2xl > section.space-y-4:has(> .workout-session-chooser) > button:first-child {
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 16.625rem);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 16.875rem);
   }
 
   [data-home-dashboard-ready="true"] .workout-session-chooser {
     position: fixed;
     left: 0.75rem;
     right: 0.75rem;
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 3.075rem);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 3.325rem);
     z-index: 30;
     box-sizing: border-box;
     width: auto;

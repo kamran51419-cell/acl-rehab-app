@@ -29,6 +29,15 @@ input[type="date"] + .mt-2 > button::after {
   font-size: 0.875rem;
 }
 
+#today-routine-title {
+  font-size: 0;
+}
+
+#today-routine-title::after {
+  content: "Today's tasks";
+  font-size: 1rem;
+}
+
 @media (max-width: 767px) {
   /* Keep the bottom navigation compact while preserving its floating border. */
   #root > div > .fixed.bottom-0.left-0.right-0.z-20 {
@@ -66,7 +75,7 @@ input[type="date"] + .mt-2 > button::after {
     position: fixed;
     left: 0.75rem;
     right: 0.75rem;
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 4.95rem);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 4.15rem);
     z-index: 31;
     width: auto;
     max-width: none;

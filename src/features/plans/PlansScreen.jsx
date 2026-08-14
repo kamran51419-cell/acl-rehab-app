@@ -538,7 +538,7 @@ function PlanEditor({
 
                   <div className="relative">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-                    <Input className="h-12 rounded-xl pl-11 text-base" autoFocus aria-label="Search exercises" value={exerciseQuery} onChange={(event) => setExerciseQuery(event.target.value)} placeholder="Search exercises" />
+                    <Input className="h-12 rounded-xl pl-10 text-base" autoFocus aria-label="Search exercises" value={exerciseQuery} onChange={(event) => setExerciseQuery(event.target.value)} placeholder="Search exercises" />
                   </div>
                       <div className="mt-3 max-h-72 space-y-2 overflow-y-auto">
                         {filteredExercises.length ? filteredExercises.map((libraryExercise) => {

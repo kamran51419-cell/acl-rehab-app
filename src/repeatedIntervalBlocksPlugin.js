@@ -16,10 +16,26 @@ function transformPlans(code, id) {
     pushDuplicateErrors(stages, \`${'${path}'}.stages\`, errors);
     stages.forEach((stage, index) => {
       if (![INTERVAL_PHASE.WORK, INTERVAL_PHASE.REST].includes(stage.phase)) errors.push(\`${'${path}'}.stages[${'${index}'}] has an invalid phase.\`);
-      if (!positiveInt(stage.durationSeconds)) errors.push(\`${'${path}'}.stages[${'${index}'}] must have a positive duration.\`);
+      const isDistanceStage = stage.distance !== undefined && stage.distance !== null;
+      if (isDistanceStage) {
+        if (!Number.isFinite(Number(stage.distance)) || Number(stage.distance) <= 0) errors.push(\`${'${path}'}.stages[${'${index}'}] must have a positive distance.\`);
+        if (!["m", "km"].includes(stage.distanceUnit || "m")) errors.push(\`${'${path}'}.stages[${'${index}'}] has an invalid distance unit.\`);
+      } else if (!positiveInt(stage.durationSeconds)) {
+        errors.push(\`${'${path}'}.stages[${'${index}'}] must have a positive duration.\`);
+      }
     });
   } else if (method === EXERCISE_LOGGING_METHOD.DISTANCE) {`,
     `  if (method === EXERCISE_LOGGING_METHOD.INTERVALS) {
+    const validateIntervalStage = (stage, stagePath) => {
+      if (![INTERVAL_PHASE.WORK, INTERVAL_PHASE.REST].includes(stage.phase)) errors.push(\`${'${stagePath}'} has an invalid phase.\`);
+      const isDistanceStage = stage.distance !== undefined && stage.distance !== null;
+      if (isDistanceStage) {
+        if (!Number.isFinite(Number(stage.distance)) || Number(stage.distance) <= 0) errors.push(\`${'${stagePath}'} must have a positive distance.\`);
+        if (!["m", "km"].includes(stage.distanceUnit || "m")) errors.push(\`${'${stagePath}'} has an invalid distance unit.\`);
+      } else if (!positiveInt(stage.durationSeconds)) {
+        errors.push(\`${'${stagePath}'} must have a positive duration.\`);
+      }
+    };
     const repeatedGroups = asArray(exercise.prescription?.repeatedGroups);
     if (exercise.prescription?.intervalFormat === "repeated") {
       if (!repeatedGroups.length) errors.push(\`${'${path}'} repeated intervals must include at least one block.\`);
@@ -30,19 +46,13 @@ function transformPlans(code, id) {
         const groupStages = asArray(group.stages);
         if (!groupStages.length) errors.push(\`${'${groupPath}'} must include at least one interval.\`);
         pushDuplicateErrors(groupStages, \`${'${groupPath}'}.stages\`, errors);
-        groupStages.forEach((stage, stageIndex) => {
-          if (![INTERVAL_PHASE.WORK, INTERVAL_PHASE.REST].includes(stage.phase)) errors.push(\`${'${groupPath}'}.stages[${'${stageIndex}'}] has an invalid phase.\`);
-          if (!positiveInt(stage.durationSeconds)) errors.push(\`${'${groupPath}'}.stages[${'${stageIndex}'}] must have a positive duration.\`);
-        });
+        groupStages.forEach((stage, stageIndex) => validateIntervalStage(stage, \`${'${groupPath}'}.stages[${'${stageIndex}'}]\`));
       });
     } else {
       const stages = asArray(exercise.prescription?.stages);
       if (!stages.length) errors.push(\`${'${path}'} intervals must include at least one stage.\`);
       pushDuplicateErrors(stages, \`${'${path}'}.stages\`, errors);
-      stages.forEach((stage, index) => {
-        if (![INTERVAL_PHASE.WORK, INTERVAL_PHASE.REST].includes(stage.phase)) errors.push(\`${'${path}'}.stages[${'${index}'}] has an invalid phase.\`);
-        if (!positiveInt(stage.durationSeconds)) errors.push(\`${'${path}'}.stages[${'${index}'}] must have a positive duration.\`);
-      });
+      stages.forEach((stage, index) => validateIntervalStage(stage, \`${'${path}'}.stages[${'${index}'}]\`));
     }
   } else if (method === EXERCISE_LOGGING_METHOD.DISTANCE) {`,
     id,
@@ -75,11 +85,7 @@ function transformPlansScreen(code, id) {
                   <option value={INTERVAL_PHASE.REST}>Rest</option>
                 </Select>
               </Field>
-              <DurationInput
-                seconds={stage.durationSeconds}
-                durationUnit={stage.durationUnit}
-                onChange={({ seconds, unit }) => updateStages(stages.map((item, itemIndex) => itemIndex === index ? { ...item, durationSeconds: seconds, durationUnit: unit } : item))}
-              />
+              <IntervalValueInput stage={stage} onChange={(nextStage) => updateStages(stages.map((item, itemIndex) => itemIndex === index ? nextStage : item))} />
               <Field label="Label (optional)"><Input value={stage.label || ""} onChange={(event) => updateStages(stages.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item))} /></Field>
             </div>
             <Button size="sm" variant="danger" onClick={() => updateStages(stages.filter((_, itemIndex) => itemIndex !== index))}>Remove</Button>
@@ -134,7 +140,7 @@ function transformPlansScreen(code, id) {
                     <option value={INTERVAL_PHASE.REST}>Rest</option>
                   </Select>
                 </Field>
-                <DurationInput seconds={stage.durationSeconds} durationUnit={stage.durationUnit} onChange={({ seconds, unit }) => updateStages(stages.map((item, itemIndex) => itemIndex === index ? { ...item, durationSeconds: seconds, durationUnit: unit } : item))} />
+                <IntervalValueInput stage={stage} onChange={(nextStage) => updateStages(stages.map((item, itemIndex) => itemIndex === index ? nextStage : item))} />
                 <Field label="Label (optional)"><Input value={stage.label || ""} onChange={(event) => updateStages(stages.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item))} /></Field>
               </div>
               <Button size="sm" variant="danger" onClick={() => updateStages(stages.filter((_, itemIndex) => itemIndex !== index))}>Remove</Button>
@@ -154,7 +160,7 @@ function transformPlansScreen(code, id) {
               {(group.stages || []).map((stage, stageIndex) => (
                 <div key={stage.id} className="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 md:grid-cols-[140px_1fr_1fr_auto]">
                   <Field label="Stage"><Select value={stage.phase} onChange={(event) => updateGroupStages(groupIndex, group.stages.map((item, index) => index === stageIndex ? { ...item, phase: event.target.value } : item))}><option value={INTERVAL_PHASE.WORK}>Work</option><option value={INTERVAL_PHASE.REST}>Rest</option></Select></Field>
-                  <DurationInput seconds={stage.durationSeconds} durationUnit={stage.durationUnit} onChange={({ seconds, unit }) => updateGroupStages(groupIndex, group.stages.map((item, index) => index === stageIndex ? { ...item, durationSeconds: seconds, durationUnit: unit } : item))} />
+                  <IntervalValueInput stage={stage} onChange={(nextStage) => updateGroupStages(groupIndex, group.stages.map((item, index) => index === stageIndex ? nextStage : item))} />
                   <Field label="Label (optional)"><Input value={stage.label || ""} onChange={(event) => updateGroupStages(groupIndex, group.stages.map((item, index) => index === stageIndex ? { ...item, label: event.target.value } : item))} /></Field>
                   <Button size="sm" variant="danger" onClick={() => updateGroupStages(groupIndex, group.stages.filter((_, index) => index !== stageIndex))}>Remove</Button>
                 </div>

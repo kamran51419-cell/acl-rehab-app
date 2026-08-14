@@ -11,6 +11,16 @@ export function verticalIntervalWorkoutDisplayPlugin() {
     enforce: 'pre',
     transform(code, id) {
       const cleanId = id.split('?')[0].replaceAll('\\', '/')
+
+      if (cleanId.endsWith('/src/features/workout/WorkoutHistoryScreen.jsx')) {
+        return replaceOnce(
+          code,
+          '{stage.phase === "rest" ? "Rest" : "Work"} {durationLabel(stage.durationSeconds, stage.durationUnit)}</span>',
+          '{stage.phase === "rest" ? "Rest" : "Work"} {stage.distance !== undefined && stage.distance !== null ? `${stage.distance} ${stage.distanceUnit || "m"}` : durationLabel(stage.durationSeconds, stage.durationUnit)}</span>',
+          id,
+        )
+      }
+
       if (!cleanId.endsWith('/src/features/workout/WorkoutScreen.jsx')) return null
 
       return replaceOnce(

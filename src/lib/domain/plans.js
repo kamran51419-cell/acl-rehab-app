@@ -168,8 +168,14 @@ export function createCardioPrescription({ targetDurationSeconds = 900, duration
 
 export const INTERVAL_PHASE = Object.freeze({ WORK: "work", REST: "rest" });
 
-export function createIntervalStage({ id = makeGeneratedId("interval"), phase = INTERVAL_PHASE.WORK, durationSeconds = 60, durationUnit = inferDurationUnit(durationSeconds), label = "", sortOrder = 0 } = {}) {
-  return { id, phase, durationSeconds: Number(durationSeconds), durationUnit, label, sortOrder };
+export function createIntervalStage({ id = makeGeneratedId("interval"), phase = INTERVAL_PHASE.WORK, durationSeconds = 60, durationUnit = inferDurationUnit(durationSeconds), distance = undefined, distanceUnit = undefined, label = "", sortOrder = 0 } = {}) {
+  return {
+    id,
+    phase,
+    ...(distance === undefined ? { durationSeconds: Number(durationSeconds), durationUnit } : { distance: Number(distance), distanceUnit: distanceUnit || "m" }),
+    label,
+    sortOrder,
+  };
 }
 
 export function createIntervalPrescription({ stages } = {}) {
@@ -356,7 +362,13 @@ function validateCardio(exercise, path, errors) {
     pushDuplicateErrors(stages, `${path}.stages`, errors);
     stages.forEach((stage, index) => {
       if (![INTERVAL_PHASE.WORK, INTERVAL_PHASE.REST].includes(stage.phase)) errors.push(`${path}.stages[${index}] has an invalid phase.`);
-      if (!positiveInt(stage.durationSeconds)) errors.push(`${path}.stages[${index}] must have a positive duration.`);
+      const isDistanceStage = stage.distance !== undefined && stage.distance !== null;
+      if (isDistanceStage) {
+        if (!Number.isFinite(Number(stage.distance)) || Number(stage.distance) <= 0) errors.push(`${path}.stages[${index}] must have a positive distance.`);
+        if (!["m", "km"].includes(stage.distanceUnit || "m")) errors.push(`${path}.stages[${index}] has an invalid distance unit.`);
+      } else if (!positiveInt(stage.durationSeconds)) {
+        errors.push(`${path}.stages[${index}] must have a positive duration.`);
+      }
     });
   } else if (method === EXERCISE_LOGGING_METHOD.DISTANCE) {
     if (!nonNegativeNumber(exercise.prescription?.targetDistance) || Number(exercise.prescription?.targetDistance) <= 0) errors.push(`${path} cardio distance must be positive.`);

@@ -15,7 +15,7 @@ import {
 import { SIDE, WORKOUT_STATUS } from "../../lib/domain/v2Models";
 import { createWorkoutExerciseSnapshot } from "../../lib/domain/workoutSession";
 import { makeId } from "../../lib/domain/legacyWorkouts";
-import { DirectStrengthPrescription, DurationInput, Field, Input, Select, Textarea } from "../plans/ProgrammeFormControls";
+import { DirectStrengthPrescription, DurationInput, Field, Input, IntervalValueInput, Select, Textarea } from "../plans/ProgrammeFormControls";
 
 const METHOD_LABELS = {
   [EXERCISE_LOGGING_METHOD.REPS]: "Reps",
@@ -143,7 +143,7 @@ function QuickExerciseSetupEditor({ exercise, onChange, trainingMode }) {
           <div key={stage.id || index} className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
             <div className="grid gap-2 md:grid-cols-[140px_1fr_1fr]">
               <Field label="Stage"><Select value={stage.phase} onChange={(event) => updateStages(stages.map((item, itemIndex) => itemIndex === index ? { ...item, phase: event.target.value } : item))}><option value={INTERVAL_PHASE.WORK}>Work</option><option value={INTERVAL_PHASE.REST}>Rest</option></Select></Field>
-              <DurationInput seconds={stage.durationSeconds} durationUnit={stage.durationUnit} onChange={({ seconds, unit }) => updateStages(stages.map((item, itemIndex) => itemIndex === index ? { ...item, durationSeconds: seconds, durationUnit: unit } : item))} />
+              <IntervalValueInput stage={stage} onChange={(nextStage) => updateStages(stages.map((item, itemIndex) => itemIndex === index ? nextStage : item))} />
               <Field label="Label (optional)"><Input value={stage.label || ""} onChange={(event) => updateStages(stages.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item))} /></Field>
             </div>
             <Button size="sm" variant="danger" onClick={() => updateStages(stages.filter((_, itemIndex) => itemIndex !== index))}>Remove</Button>

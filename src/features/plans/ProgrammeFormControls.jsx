@@ -139,7 +139,13 @@ export function IntervalValueInput({ stage, onChange }) {
           onChange={(event) => {
             const [kind, nextUnit] = event.target.value.split(":");
             if (kind === "distance") {
-              onChange({ ...stage, distance: stage.distance ?? 0, distanceUnit: nextUnit, durationSeconds: undefined, durationUnit: undefined });
+              const currentDistance = Number(stage.distance ?? 0);
+              const convertedDistance = isDistance && distanceUnit !== nextUnit
+                ? nextUnit === "km"
+                  ? currentDistance / 1000
+                  : currentDistance * 1000
+                : currentDistance;
+              onChange({ ...stage, distance: convertedDistance, distanceUnit: nextUnit, durationSeconds: undefined, durationUnit: undefined });
             } else {
               onChange({ ...stage, durationSeconds: stage.durationSeconds ?? 0, durationUnit: nextUnit, distance: undefined, distanceUnit: undefined });
             }

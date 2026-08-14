@@ -39,3 +39,37 @@ test("Stats opens as a searchable browser containing only completed exercises", 
   assert.match(markup, /Strength/);
   assert.doesNotMatch(markup, /Never Completed|All Exercises/);
 });
+
+test("strength graph uses the highest e1RM set from each workout and preserves separate same-day workouts", async (context) => {
+  const vite = await createServer({ server: { middlewareMode: true }, appType: "custom", logLevel: "silent" });
+  context.after(() => vite.close());
+  const { estimatedOneRepMax, strengthGraphPoints } = await vite.ssrLoadModule("/src/features/progress/ProgressScreen.jsx");
+  assert.equal(estimatedOneRepMax(20, 12), 28);
+  const entries = [
+    { workoutId: "w1", date: "2026-08-10", displayDate: "10/08/2026", weight: 20, reps: 12, sideMode: "standard" },
+    { workoutId: "w1", date: "2026-08-10", displayDate: "10/08/2026", weight: 22.5, reps: 9, sideMode: "standard" },
+    { workoutId: "w2", date: "2026-08-10", displayDate: "10/08/2026", weight: 25, reps: 6, sideMode: "standard" },
+  ];
+  const points = strengthGraphPoints(entries);
+  assert.equal(points.length, 2);
+  assert.equal(points[0].strength, estimatedOneRepMax(22.5, 9));
+  assert.equal(points[0].strengthWeight, 22.5);
+  assert.equal(points[0].strengthReps, 9);
+  assert.equal(points[1].strength, estimatedOneRepMax(25, 6));
+});
+
+test("left and right strength graph values use their own best e1RM sets", async (context) => {
+  const vite = await createServer({ server: { middlewareMode: true }, appType: "custom", logLevel: "silent" });
+  context.after(() => vite.close());
+  const { estimatedOneRepMax, strengthGraphPoints } = await vite.ssrLoadModule("/src/features/progress/ProgressScreen.jsx");
+  const entries = [
+    { workoutId: "w1", date: "2026-08-12", displayDate: "12/08/2026", weight: 20, reps: 12, sideMode: "left_right", side: "left" },
+    { workoutId: "w1", date: "2026-08-12", displayDate: "12/08/2026", weight: 22.5, reps: 8, sideMode: "left_right", side: "left" },
+    { workoutId: "w1", date: "2026-08-12", displayDate: "12/08/2026", weight: 20, reps: 10, sideMode: "left_right", side: "right" },
+  ];
+  const [point] = strengthGraphPoints(entries);
+  assert.equal(point.left, estimatedOneRepMax(22.5, 8));
+  assert.equal(point.leftWeight, 22.5);
+  assert.equal(point.leftReps, 8);
+  assert.equal(point.right, estimatedOneRepMax(20, 10));
+});

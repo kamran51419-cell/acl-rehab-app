@@ -60,7 +60,7 @@ export function strengthGraphPoints(entries = []) {
 function StrengthTooltip({ active, payload }) {
   const point = payload?.[0]?.payload;
   if (!active || !point) return null;
-  return <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-lg"><div className="font-medium">{point.displayDate}</div>{payload.filter((item) => item.value !== undefined && item.value !== null).map((item) => <div key={item.dataKey}><div>{item.name}: {item.value} kg e1RM</div><div className="text-xs text-slate-500">{point[`${item.dataKey}Weight`]} kg × {point[`${item.dataKey}Reps`]} reps</div></div>)}</div>;
+  return <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-lg"><div className="font-medium">{point.displayDate}</div>{payload.filter((item) => item.value !== undefined && item.value !== null).map((item) => <div key={item.dataKey}><div>{item.name}: {item.value} kg</div><div className="text-xs text-slate-500">{point[`${item.dataKey}Weight`]} kg × {point[`${item.dataKey}Reps`]} reps</div></div>)}</div>;
 }
 
 function shortDate(value) {

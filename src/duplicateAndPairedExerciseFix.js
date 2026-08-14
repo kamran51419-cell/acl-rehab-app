@@ -53,8 +53,9 @@ function exerciseCardInfo(section) {
   if (!title) return null;
 
   const labels = [...section.querySelectorAll(":scope > div:first-child p")].map(textOf);
-  const side = labels.find((label) => label === "Left only" || label === "Right only");
-  if (!side) return null;
+  const sideLabel = labels.find((label) => label.startsWith("Left only") || label.startsWith("Right only"));
+  if (!sideLabel) return null;
+  const side = sideLabel.startsWith("Left only") ? "Left only" : "Right only";
 
   return { title: textOf(title), side, titleElement: title };
 }
@@ -103,10 +104,10 @@ function groupLeftRightExerciseCards() {
     right.titleElement.remove();
 
     [...leftCard.querySelectorAll("p")].forEach((label) => {
-      if (textOf(label) === "Left only") label.textContent = "Left";
+      if (textOf(label).startsWith("Left only")) label.textContent = textOf(label).replace(/^Left only/, "Left");
     });
     [...rightCard.querySelectorAll("p")].forEach((label) => {
-      if (textOf(label) === "Right only") label.textContent = "Right";
+      if (textOf(label).startsWith("Right only")) label.textContent = textOf(label).replace(/^Right only/, "Right");
     });
 
     compactSideCard(leftCard);

@@ -22,10 +22,45 @@ function StatCard({ label, value, detail }) {
   return <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="text-sm text-slate-500">{label}</div><div className="mt-1 text-lg font-semibold">{value || "—"}</div>{detail ? <div className="text-sm text-slate-500">{detail}</div> : null}</div>;
 }
 
-function WeightTooltip({ active, payload }) {
+export function estimatedOneRepMax(weight, reps) {
+  const numericWeight = Number(weight);
+  const numericReps = Number(reps);
+  if (!Number.isFinite(numericWeight) || !Number.isFinite(numericReps) || numericWeight < 0 || numericReps <= 0) return null;
+  return Math.round((numericWeight * (1 + numericReps / 30)) * 10) / 10;
+}
+
+function graphKey(entry) {
+  if (entry.sideMode === PROGRESS_SIDE_MODE.LEFT_RIGHT) return entry.side === SIDE.RIGHT ? "right" : "left";
+  return "strength";
+}
+
+export function strengthGraphPoints(entries = []) {
+  const bestByWorkoutAndSide = new Map();
+  entries.forEach((entry) => {
+    const e1rm = estimatedOneRepMax(entry.weight, entry.reps);
+    if (e1rm === null) return;
+    const sideKey = entry.sideMode === PROGRESS_SIDE_MODE.LEFT_RIGHT ? entry.side : "standard";
+    const key = `${entry.workoutId}:${sideKey}`;
+    const current = bestByWorkoutAndSide.get(key);
+    if (!current || e1rm > current.e1rm || (e1rm === current.e1rm && entry.weight > current.weight)) bestByWorkoutAndSide.set(key, { ...entry, e1rm });
+  });
+
+  const workouts = new Map();
+  bestByWorkoutAndSide.forEach((entry) => {
+    if (!workouts.has(entry.workoutId)) workouts.set(entry.workoutId, { workoutId: entry.workoutId, date: entry.date, displayDate: entry.displayDate });
+    const point = workouts.get(entry.workoutId);
+    const key = graphKey(entry);
+    point[key] = entry.e1rm;
+    point[`${key}Weight`] = entry.weight;
+    point[`${key}Reps`] = entry.reps;
+  });
+  return [...workouts.values()].sort((a, b) => a.date.localeCompare(b.date) || String(a.workoutId).localeCompare(String(b.workoutId)));
+}
+
+function StrengthTooltip({ active, payload }) {
   const point = payload?.[0]?.payload;
   if (!active || !point) return null;
-  return <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-lg"><div className="font-medium">{point.displayDate}</div>{payload.filter((item) => item.value !== undefined).map((item) => <div key={item.dataKey}>{item.name}: {item.value} kg{point[`${item.dataKey}Reps`] ? ` × ${point[`${item.dataKey}Reps`]}` : ""}</div>)}</div>;
+  return <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-lg"><div className="font-medium">{point.displayDate}</div>{payload.filter((item) => item.value !== undefined && item.value !== null).map((item) => <div key={item.dataKey}><div>{item.name}: {item.value} kg e1RM</div><div className="text-xs text-slate-500">{point[`${item.dataKey}Weight`]} kg × {point[`${item.dataKey}Reps`]} reps</div></div>)}</div>;
 }
 
 function shortDate(value) {
@@ -33,25 +68,11 @@ function shortDate(value) {
   return parts.length >= 2 ? `${parts[0]}/${parts[1]}` : value;
 }
 
-function graphKey(entry) {
-  if (entry.sideMode === PROGRESS_SIDE_MODE.LEFT_RIGHT) return entry.side === SIDE.RIGHT ? "right" : "left";
-  return "weight";
-}
-
-function WeightGraph({ entries, leftRight = false }) {
-  const points = useMemo(() => {
-    const dates = new Map();
-    dailyHeaviest(entries).forEach((entry) => {
-      if (!dates.has(entry.date)) dates.set(entry.date, { date: entry.date, displayDate: entry.displayDate });
-      const point = dates.get(entry.date);
-      const key = graphKey(entry);
-      point[key] = entry.weight;
-      point[`${key}Reps`] = entry.reps;
-    });
-    return [...dates.values()].sort((a, b) => a.date.localeCompare(b.date));
-  }, [entries]);
+function StrengthGraph({ entries, leftRight = false }) {
+  const points = useMemo(() => strengthGraphPoints(entries), [entries]);
   if (!points.length) return null;
-  return <section className="space-y-2"><h3 className="font-semibold">Weight progress</h3><div className="h-64 rounded-2xl border border-slate-200 bg-white p-2 sm:p-3"><ResponsiveContainer width="100%" height="100%"><LineChart data={points} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="displayDate" tickFormatter={shortDate} interval="preserveStartEnd" minTickGap={36} tick={{ fontSize: 12 }}/><YAxis unit=" kg" width={52} tick={{ fontSize: 12 }}/><Tooltip content={<WeightTooltip />}/>{leftRight ? <><Legend verticalAlign="top" height={28}/><Line type="monotone" dataKey="left" name="Left" stroke="#2563eb" strokeWidth={2} connectNulls/><Line type="monotone" dataKey="right" name="Right" stroke="#059669" strokeWidth={2} connectNulls/></> : <Line type="monotone" dataKey="weight" name="Weight" stroke="#2563eb" strokeWidth={2} connectNulls/>}</LineChart></ResponsiveContainer></div></section>;
+  const tickInterval = Math.max(0, Math.ceil(points.length / 6) - 1);
+  return <section className="space-y-2"><h3 className="font-semibold">Strength progress</h3><div className="h-64 rounded-2xl border border-slate-200 bg-white p-2 sm:p-3"><ResponsiveContainer width="100%" height="100%"><LineChart data={points} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="displayDate" tickFormatter={shortDate} interval={tickInterval} minTickGap={36} tick={{ fontSize: 12 }}/><YAxis unit=" kg" width={52} tick={{ fontSize: 12 }}/><Tooltip content={<StrengthTooltip />}/>{leftRight ? <><Legend verticalAlign="top" height={28}/><Line type="monotone" dataKey="left" name="Left" stroke="#2563eb" strokeWidth={2} connectNulls/><Line type="monotone" dataKey="right" name="Right" stroke="#059669" strokeWidth={2} connectNulls/></> : <Line type="monotone" dataKey="strength" name="e1RM" stroke="#2563eb" strokeWidth={2} connectNulls/>}</LineChart></ResponsiveContainer></div></section>;
 }
 
 function SymmetryStats({ group }) {
@@ -82,7 +103,7 @@ function LeftRightStats({ group, trainingMode }) {
   const entries = sideModeEntries(group, PROGRESS_SIDE_MODE.LEFT_RIGHT);
   const left = entries.filter((entry) => entry.side === SIDE.LEFT);
   const right = entries.filter((entry) => entry.side === SIDE.RIGHT);
-  return <div className="space-y-5"><div className="space-y-3"><h3 className="font-semibold">Left</h3><StatsCards entries={left}/></div><div className="space-y-3"><h3 className="font-semibold">Right</h3><StatsCards entries={right}/></div><WeightGraph entries={entries} leftRight/>{trainingMode === "rehab" && symmetryEntries(group).length ? <SymmetryStats group={group}/> : null}</div>;
+  return <div className="space-y-5"><div className="space-y-3"><h3 className="font-semibold">Left</h3><StatsCards entries={left}/></div><div className="space-y-3"><h3 className="font-semibold">Right</h3><StatsCards entries={right}/></div><StrengthGraph entries={entries} leftRight/>{trainingMode === "rehab" && symmetryEntries(group).length ? <SymmetryStats group={group}/> : null}</div>;
 }
 
 function WeightedStats({ group, trainingMode }) {
@@ -92,7 +113,7 @@ function WeightedStats({ group, trainingMode }) {
   if (!availableModes.length) return <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">No valid weighted data is available for this exercise.</div>;
   if (mode === PROGRESS_SIDE_MODE.LEFT_RIGHT) return <div className="space-y-5">{availableModes.length > 1 ? <div className="flex flex-wrap gap-2">{availableModes.map((item) => <Button key={item} variant={mode === item ? "primary" : "outline"} onClick={() => setMode(item)}>{SIDE_MODE_LABELS[item]}</Button>)}</div> : <p className="text-sm font-medium text-slate-600">Left & Right</p>}<LeftRightStats group={group} trainingMode={trainingMode}/></div>;
   const selectedEntries = sideModeEntries(group, mode);
-  return <div className="space-y-5">{availableModes.length > 1 ? <div className="flex flex-wrap gap-2">{availableModes.map((item) => <Button key={item} variant={mode === item ? "primary" : "outline"} onClick={() => setMode(item)}>{SIDE_MODE_LABELS[item]}</Button>)}</div> : <p className="text-sm font-medium text-slate-600">{SIDE_MODE_LABELS[availableModes[0]]}</p>}<StatsCards entries={selectedEntries}/><WeightGraph entries={selectedEntries}/></div>;
+  return <div className="space-y-5">{availableModes.length > 1 ? <div className="flex flex-wrap gap-2">{availableModes.map((item) => <Button key={item} variant={mode === item ? "primary" : "outline"} onClick={() => setMode(item)}>{SIDE_MODE_LABELS[item]}</Button>)}</div> : <p className="text-sm font-medium text-slate-600">{SIDE_MODE_LABELS[availableModes[0]]}</p>}<StatsCards entries={selectedEntries}/><StrengthGraph entries={selectedEntries}/></div>;
 }
 
 export function ExerciseStats({ group, trainingMode, onBack }) {

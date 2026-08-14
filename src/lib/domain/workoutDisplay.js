@@ -86,14 +86,18 @@ export function previousWeightForExercise(workouts = [], exerciseId) {
 
 export function previousWeightsForExercise(workouts = [], target) {
   const sets = previousSetsForExercise(workouts, target);
-  const weighted = sets.filter((set) => Number.isFinite(Number(set.weight)));
+  const weighted = sets.filter((set) => set.weight !== "" && set.weight !== undefined && set.weight !== null && Number.isFinite(Number(set.weight)));
   return weighted.length ? Object.fromEntries(weighted.map((set, index) => [Number(set.setNumber || index + 1), Number(set.weight)])) : {};
 }
 
 export function previousRepsForExercise(workouts = [], target) {
   const sets = previousSetsForExercise(workouts, target);
-  const reps = sets.filter((set) => Number.isFinite(Number(set.actualReps ?? set.rawReps ?? set.reps)));
-  return reps.length ? Object.fromEntries(reps.map((set, index) => [Number(set.setNumber || index + 1), Number(set.actualReps ?? set.rawReps ?? set.reps)])) : {};
+  const reps = sets.flatMap((set, index) => {
+    const value = set.actualReps ?? set.rawReps ?? set.reps;
+    if (value === "" || value === undefined || value === null || !Number.isFinite(Number(value))) return [];
+    return [[Number(set.setNumber || index + 1), Number(value)]];
+  });
+  return reps.length ? Object.fromEntries(reps) : {};
 }
 
 export function groupSessionExercises(exercises = []) {

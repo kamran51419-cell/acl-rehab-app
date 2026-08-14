@@ -12,7 +12,7 @@ export function prescribedRepsSnapshot(targetReps = {}) {
     : { type: "fixed", value: targetReps.value };
 }
 
-export function createWorkoutExerciseSnapshot(exercise, previousWeights = {}) {
+export function createWorkoutExerciseSnapshot(exercise, previousWeights = {}, previousReps = {}) {
   const setBased = [
     EXERCISE_LOGGING_METHOD.REPS,
     EXERCISE_LOGGING_METHOD.REPS_WEIGHT,
@@ -41,6 +41,7 @@ export function createWorkoutExerciseSnapshot(exercise, previousWeights = {}) {
       prescribedReps,
       actualReps: initialReps,
       rawReps: String(initialReps ?? ""),
+      previousReps: previousReps[index + 1] ?? "",
       durationSeconds: "",
       rawDuration: "",
       distance: "",
@@ -56,7 +57,7 @@ export function createWorkoutExerciseSnapshot(exercise, previousWeights = {}) {
   };
 }
 
-export function createInProgressWorkout({ id, userId, programme, session, date, previousWeightsByExercise = {}, createdAt = null }) {
+export function createInProgressWorkout({ id, userId, programme, session, date, previousWeightsByExercise = {}, previousRepsByExercise = {}, createdAt = null }) {
   return {
     id,
     userId,
@@ -75,14 +76,19 @@ export function createInProgressWorkout({ id, userId, programme, session, date, 
     sessionId: session.id,
     sessionNameSnapshot: session.name,
     exercises: ordered(session.exercises).flatMap((exercise) => {
-      const previousWeights = previousWeightsByExercise[exercise.id] || previousWeightsByExercise[exercise.exerciseId] || {};
       const supportsSides = [EXERCISE_TYPE.STRENGTH, EXERCISE_TYPE.BALANCE].includes(exercise.exerciseType);
       if (!supportsSides || exercise.prescription?.side !== SIDE.SEPARATE) {
-        return [createWorkoutExerciseSnapshot(exercise, previousWeights)];
+        const previousWeights = previousWeightsByExercise[exercise.id] || previousWeightsByExercise[exercise.exerciseId] || {};
+        const previousReps = previousRepsByExercise[exercise.id] || previousRepsByExercise[exercise.exerciseId] || {};
+        return [createWorkoutExerciseSnapshot(exercise, previousWeights, previousReps)];
       }
       const left = { ...exercise, id: `${exercise.id}-left`, prescription: { ...exercise.prescription, side: SIDE.LEFT } };
       const right = { ...exercise, id: `${exercise.id}-right`, prescription: { ...exercise.prescription, side: SIDE.RIGHT } };
-      return [createWorkoutExerciseSnapshot(left, previousWeights), createWorkoutExerciseSnapshot(right, previousWeights)];
+      const leftWeights = previousWeightsByExercise[left.id] || {};
+      const rightWeights = previousWeightsByExercise[right.id] || {};
+      const leftReps = previousRepsByExercise[left.id] || {};
+      const rightReps = previousRepsByExercise[right.id] || {};
+      return [createWorkoutExerciseSnapshot(left, leftWeights, leftReps), createWorkoutExerciseSnapshot(right, rightWeights, rightReps)];
     }),
     notes: "",
   };
@@ -149,6 +155,7 @@ export function addRecordedSet(workout, exerciseId) {
           setNumber,
           actualReps: "",
           rawReps: "",
+          previousReps: "",
           weight: "",
           rawWeight: "",
           previousWeight: "",
@@ -210,6 +217,7 @@ export function resumeWorkout(existing, template) {
             id: set.id,
             setNumber: set.setNumber,
             prescribedReps: set.prescribedReps,
+            previousReps: set.previousReps,
             previousWeight: set.previousWeight,
             weight,
             rawWeight: previous.rawWeight !== undefined && previous.rawWeight !== "" ? previous.rawWeight : (weight !== undefined && weight !== "" ? String(weight) : set.rawWeight),

@@ -54,17 +54,12 @@ function transformPlansScreen(code, id) {
   return next
 }
 
-function transformWorkoutDisplay(code, id) {
-  return replaceOnce(code,
-    '\nexport function groupSessionExercises(exercises = []) {',
-    '\nexport function previousSetValuesForExercise(workouts = [], target) {\n  const exerciseId = typeof target === "string" ? target : target.exerciseId;\n  const targetSide = typeof target === "string" ? undefined : resolveWorkoutExerciseSide(target);\n  const ordered = workouts.slice().sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));\n  const candidates = ordered.flatMap((workout) => (workout.exercises || []).filter((item) => item.exerciseId === exerciseId).map((exercise) => ({ exercise, side: resolveWorkoutExerciseSide(exercise) })));\n  const explicit = candidates.filter(({ side }) => side === targetSide && (targetSide !== undefined || side === undefined));\n  const legacy = candidates.filter(({ side }) => side === undefined);\n  const pool = explicit.length ? explicit : legacy;\n  const match = pool.find(({ exercise }) => {\n    const sets = exercise?.recordedSets?.length ? exercise.recordedSets : (exercise?.prescriptionBlocks || []).flatMap((block) => block.actualSets || []);\n    return sets.some((set) => set.weight !== "" && set.weight !== undefined && set.weight !== null && Number.isFinite(Number(set.weight)));\n  });\n  if (!match) return {};\n  const sets = match.exercise?.recordedSets?.length ? match.exercise.recordedSets : (match.exercise?.prescriptionBlocks || []).flatMap((block) => block.actualSets || []);\n  const prescribed = typeof target === "string" ? {} : target.prescription?.targetReps || {};\n  const prescribedValue = prescribed.type === "range" ? Number(prescribed.min) : Number(prescribed.value);\n  const targetSetCount = Math.max(Number(typeof target === "string" ? 0 : target.prescription?.targetSets || 0), sets.length);\n  return Object.fromEntries(Array.from({ length: targetSetCount }, (_, index) => {\n    const setNumber = index + 1;\n    const set = sets.find((item, itemIndex) => Number(item.setNumber || itemIndex + 1) === setNumber);\n    const weight = set && set.weight !== "" && set.weight !== undefined && set.weight !== null && Number.isFinite(Number(set.weight)) ? Number(set.weight) : "-";\n    const actualReps = Number(set?.actualReps ?? set?.rawReps);\n    const repsChanged = Number.isFinite(actualReps) && Number.isFinite(prescribedValue) && actualReps !== prescribedValue;\n    return [setNumber, { weight, previousReps: repsChanged ? actualReps : "" }];\n  }));\n}\n\nexport function groupSessionExercises(exercises = []) {', id)
+function transformWorkoutDisplay(code) {
+  return code
 }
 
 function transformWorkoutScreen(code, id) {
   let next = code
-  next = replaceOnce(next,
-    'durationLabel, previousWeightsForExercise, resolveWorkoutExerciseSide, sessionWorkoutStatus, workoutExerciseSideLabel',
-    'durationLabel, previousSetValuesForExercise, previousWeightsForExercise, resolveWorkoutExerciseSide, sessionWorkoutStatus, workoutExerciseSideLabel', id)
   next = replaceOnce(next,
     'if (exercise?.loggingMethod === EXERCISE_LOGGING_METHOD.REPS_WEIGHT) return sets.some(hasWeight);',
     'if ([EXERCISE_LOGGING_METHOD.REPS_WEIGHT, EXERCISE_LOGGING_METHOD.TIME_WEIGHT].includes(exercise?.loggingMethod)) return sets.some(hasWeight);', id)
@@ -73,14 +68,13 @@ function transformWorkoutScreen(code, id) {
     'function fieldsFor(method) { return { reps: [EXERCISE_LOGGING_METHOD.REPS, EXERCISE_LOGGING_METHOD.REPS_WEIGHT].includes(method), weight: [EXERCISE_LOGGING_METHOD.REPS_WEIGHT, EXERCISE_LOGGING_METHOD.TIME_WEIGHT].includes(method), time: [EXERCISE_LOGGING_METHOD.TIME, EXERCISE_LOGGING_METHOD.TIME_WEIGHT, EXERCISE_LOGGING_METHOD.TIME_DISTANCE].includes(method), distance: [EXERCISE_LOGGING_METHOD.DISTANCE, EXERCISE_LOGGING_METHOD.TIME_DISTANCE].includes(method) }; }', id)
   next = replaceOnce(next,
     '{fields.reps ? <label className="text-xs font-medium">Reps<RepsInput exercise={exercise} set={set} onChange={onChange}/></label> : null}{isWeighted ? <label className="text-xs font-medium">Weight (kg)<input inputMode="decimal" className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3" value={set.rawWeight ?? set.weight ?? ""} onFocus={(event) => event.currentTarget.select()} onChange={(event) => onChange(exercise.id, set.id, "weight", event.target.value)}/>{set.previousWeight !== undefined && set.previousWeight !== "" ? <span className="mt-1 block text-[11px] font-normal text-slate-400">Prev. {set.previousWeight}</span> : null}</label> : null}',
-    '{fields.reps ? <label className="text-xs font-medium">Reps<div className="mt-1"><RepsInput exercise={exercise} set={set} onChange={onChange}/></div><span className={`mt-1 block h-4 text-[11px] font-normal text-slate-400 ${set.previousReps !== undefined && set.previousReps !== "" ? "" : "invisible"}`}>Prev. {set.previousReps || "—"}</span></label> : fields.time ? <label className="text-xs font-medium">Time<div className="mt-1 flex h-10 items-center rounded-lg border border-slate-200 bg-slate-100 px-3 text-sm">{prescribedDuration}</div><span className="mt-1 block h-4 invisible text-[11px]">—</span></label> : null}{isWeighted ? <label className="text-xs font-medium">Weight (kg)<input inputMode="decimal" className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3" value={set.rawWeight ?? set.weight ?? ""} onFocus={(event) => event.currentTarget.select()} onChange={(event) => onChange(exercise.id, set.id, "weight", event.target.value)}/><span className={`mt-1 block h-4 text-[11px] font-normal text-slate-400 ${set.previousWeight !== undefined && set.previousWeight !== "" ? "" : "invisible"}`}>Prev. {set.previousWeight || "—"}</span></label> : null}', id)
+    '{fields.reps ? <label className="text-xs font-medium">Reps<div className="mt-1"><RepsInput exercise={exercise} set={set} onChange={onChange}/></div></label> : fields.time ? <label className="text-xs font-medium">Time<div className="mt-1 flex h-10 items-center rounded-lg border border-slate-200 bg-slate-100 px-3 text-sm">{prescribedDuration}</div></label> : null}{isWeighted ? <label className="text-xs font-medium">Weight (kg)<input inputMode="decimal" className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3" value={set.rawWeight ?? set.weight ?? ""} onFocus={(event) => event.currentTarget.select()} onChange={(event) => onChange(exercise.id, set.id, "weight", event.target.value)}/>{set.previousWeight !== undefined && set.previousWeight !== "" ? <span className="mt-1 block text-[11px] font-normal text-slate-400">Prev. {set.previousWeight}</span> : null}</label> : null}', id)
   next = replaceOnce(next,
     'grid items-end gap-2 rounded-xl bg-slate-50 p-3',
     'grid items-start gap-2 rounded-xl bg-slate-50 p-3', id)
   next = replaceOnce(next,
     '<span className="pb-2 text-sm font-medium">Set {set.setNumber}</span>',
     '<span className="pt-7 text-sm font-medium">Set {set.setNumber}</span>', id)
-  next = next.replaceAll('previousWeightsForExercise(workouts.filter((item) => item.status === "completed"), exercise)', 'previousSetValuesForExercise(workouts.filter((item) => item.status === "completed"), exercise)')
   return next
 }
 
@@ -91,13 +85,7 @@ function transformWorkoutSession(code, id) {
     '    EXERCISE_LOGGING_METHOD.TIME,\n    EXERCISE_LOGGING_METHOD.TIME_WEIGHT,\n    EXERCISE_LOGGING_METHOD.DISTANCE,', id)
   next = replaceOnce(next,
     '      previousWeight: previousWeights[index + 1] ?? "",',
-    '      previousWeight: [EXERCISE_LOGGING_METHOD.REPS_WEIGHT, EXERCISE_LOGGING_METHOD.TIME_WEIGHT].includes(exercise.loggingMethod) ? previousWeights[index + 1]?.weight ?? previousWeights[index + 1] ?? "" : "",\n      previousReps: previousWeights[index + 1]?.previousReps ?? "",', id)
-  next = replaceOnce(next,
-    '          previousWeight: "",',
-    '          previousWeight: "",\n          previousReps: "",', id)
-  next = replaceOnce(next,
-    '            previousWeight: set.previousWeight,',
-    '            previousWeight: set.previousWeight,\n            previousReps: set.previousReps,', id)
+    '      previousWeight: [EXERCISE_LOGGING_METHOD.REPS_WEIGHT, EXERCISE_LOGGING_METHOD.TIME_WEIGHT].includes(exercise.loggingMethod) ? previousWeights[index + 1]?.weight ?? previousWeights[index + 1] ?? "" : "",', id)
   return next
 }
 

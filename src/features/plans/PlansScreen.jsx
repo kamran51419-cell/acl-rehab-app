@@ -28,7 +28,7 @@ import {
 import { SIDE } from "../../lib/domain/v2Models";
 import { makeId } from "../../lib/domain/legacyWorkouts";
 import { ROUTINE_TIME, WEEKDAYS, createRoutineTask, routineTasksForPlan } from "../../lib/domain/routineTasks";
-import { DirectStrengthPrescription, DurationInput, Field, Input, Select, Textarea } from "./ProgrammeFormControls";
+import { DirectStrengthPrescription, DurationInput, Field, Input, IntervalValueInput, Select, Textarea } from "./ProgrammeFormControls";
 import {
   createPlan,
   duplicatePlanDocument,
@@ -276,11 +276,7 @@ function ExerciseSetupEditor({
                   <option value={INTERVAL_PHASE.REST}>Rest</option>
                 </Select>
               </Field>
-              <DurationInput
-                seconds={stage.durationSeconds}
-                durationUnit={stage.durationUnit}
-                onChange={({ seconds, unit }) => updateStages(stages.map((item, itemIndex) => itemIndex === index ? { ...item, durationSeconds: seconds, durationUnit: unit } : item))}
-              />
+              <IntervalValueInput stage={stage} onChange={(nextStage) => updateStages(stages.map((item, itemIndex) => itemIndex === index ? nextStage : item))} />
               <Field label="Label (optional)"><Input value={stage.label || ""} onChange={(event) => updateStages(stages.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item))} /></Field>
             </div>
             <Button size="sm" variant="danger" onClick={() => updateStages(stages.filter((_, itemIndex) => itemIndex !== index))}>Remove</Button>

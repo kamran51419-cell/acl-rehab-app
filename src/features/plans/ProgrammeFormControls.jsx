@@ -110,6 +110,57 @@ export function DurationInput({ seconds, durationUnit, onChange }) {
   );
 }
 
+export function IntervalValueInput({ stage, onChange }) {
+  const isDistance = stage.distance !== undefined && stage.distance !== null;
+  const timeUnit = stage.durationUnit || "seconds";
+  const distanceUnit = stage.distanceUnit || "m";
+  const value = isDistance
+    ? Number(stage.distance || 0)
+    : timeUnit === "minutes"
+      ? Number(stage.durationSeconds || 0) / 60
+      : Number(stage.durationSeconds || 0);
+
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <Field label={isDistance ? "Distance" : "Duration"}>
+        <Input
+          inputMode="decimal"
+          value={value || ""}
+          onChange={(event) => {
+            const numeric = Number(event.target.value);
+            if (isDistance) onChange({ ...stage, distance: numeric, distanceUnit });
+            else onChange({ ...stage, durationSeconds: numeric * (timeUnit === "minutes" ? 60 : 1), durationUnit: timeUnit });
+          }}
+        />
+      </Field>
+      <Field label="Unit">
+        <Select
+          value={isDistance ? `distance:${distanceUnit}` : `time:${timeUnit}`}
+          onChange={(event) => {
+            const [kind, nextUnit] = event.target.value.split(":");
+            if (kind === "distance") {
+              const currentDistance = Number(stage.distance ?? 0);
+              const convertedDistance = isDistance && distanceUnit !== nextUnit
+                ? nextUnit === "km"
+                  ? currentDistance / 1000
+                  : currentDistance * 1000
+                : currentDistance;
+              onChange({ ...stage, distance: convertedDistance, distanceUnit: nextUnit, durationSeconds: undefined, durationUnit: undefined });
+            } else {
+              onChange({ ...stage, durationSeconds: stage.durationSeconds ?? 0, durationUnit: nextUnit, distance: undefined, distanceUnit: undefined });
+            }
+          }}
+        >
+          <option value="time:seconds">Seconds</option>
+          <option value="time:minutes">Minutes</option>
+          <option value="distance:m">Metres</option>
+          <option value="distance:km">Kilometres</option>
+        </Select>
+      </Field>
+    </div>
+  );
+}
+
 export function DirectStrengthPrescription({
   prescription,
   onChange,

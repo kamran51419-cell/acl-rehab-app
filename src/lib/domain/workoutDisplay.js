@@ -65,27 +65,39 @@ export function workoutExerciseProgressKey(exercise) {
   return `${exercise.exerciseId}:${resolveWorkoutExerciseSide(exercise) || "none"}`;
 }
 
+function previousSetsForExercise(workouts = [], target) {
+  const exerciseId = typeof target === "string" ? target : target.exerciseId;
+  const targetId = typeof target === "string" ? undefined : target.id;
+  const targetSide = typeof target === "string" ? undefined : resolveWorkoutExerciseSide(target);
+  const ordered = workouts.slice().sort((a, b) => String(b.date || b.workoutDate || "").localeCompare(String(a.date || a.workoutDate || "")));
+  const candidates = ordered.flatMap((workout) => (workout.exercises || []).filter((item) => item.exerciseId === exerciseId).map((exercise) => ({ exercise, sameIdentity: Boolean(targetId && exercise.id === targetId) })));
+  const explicit = candidates.filter(({ exercise }) => resolveWorkoutExerciseSide(exercise) === targetSide && (targetSide !== undefined || resolveWorkoutExerciseSide(exercise) === undefined)).sort((a, b) => Number(b.sameIdentity) - Number(a.sameIdentity));
+  const legacy = candidates.filter(({ exercise }) => resolveWorkoutExerciseSide(exercise) === undefined);
+  const match = explicit[0] || (explicit.length === 0 && legacy.length === 1 ? legacy[0] : undefined);
+  if (!match) return [];
+  const exercise = match.exercise;
+  return exercise?.recordedSets?.length ? exercise.recordedSets : (exercise?.prescriptionBlocks || []).flatMap((block) => block.actualSets || []);
+}
+
 export function previousWeightForExercise(workouts = [], exerciseId) {
   const weights = previousWeightsForExercise(workouts, exerciseId);
   return weights[1] ?? Object.values(weights)[0] ?? "";
 }
 
 export function previousWeightsForExercise(workouts = [], target) {
-  const exerciseId = typeof target === "string" ? target : target.exerciseId;
-  const targetId = typeof target === "string" ? undefined : target.id;
-  const targetSide = typeof target === "string" ? undefined : resolveWorkoutExerciseSide(target);
-  const ordered = workouts.slice().sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
-  const candidates = ordered.flatMap((workout) => (workout.exercises || []).filter((item) => item.exerciseId === exerciseId).map((exercise) => ({ exercise, sameIdentity: Boolean(targetId && exercise.id === targetId) })));
-  const explicit = candidates.filter(({ exercise }) => resolveWorkoutExerciseSide(exercise) === targetSide && (targetSide !== undefined || resolveWorkoutExerciseSide(exercise) === undefined)).sort((a, b) => Number(b.sameIdentity) - Number(a.sameIdentity));
-  const legacy = candidates.filter(({ exercise }) => resolveWorkoutExerciseSide(exercise) === undefined);
-  const match = explicit[0] || (explicit.length === 0 && legacy.length === 1 ? legacy[0] : undefined);
-  if (match) {
-    const exercise = match.exercise;
-    const sets = exercise?.recordedSets?.length ? exercise.recordedSets : (exercise?.prescriptionBlocks || []).flatMap((block) => block.actualSets || []);
-    const weighted = sets.filter((set) => Number.isFinite(Number(set.weight)));
-    if (weighted.length) return Object.fromEntries(weighted.map((set, index) => [Number(set.setNumber || index + 1), Number(set.weight)]));
-  }
-  return {};
+  const sets = previousSetsForExercise(workouts, target);
+  const weighted = sets.filter((set) => set.weight !== "" && set.weight !== undefined && set.weight !== null && Number.isFinite(Number(set.weight)));
+  return weighted.length ? Object.fromEntries(weighted.map((set, index) => [Number(set.setNumber || index + 1), Number(set.weight)])) : {};
+}
+
+export function previousRepsForExercise(workouts = [], target) {
+  const sets = previousSetsForExercise(workouts, target);
+  const reps = sets.flatMap((set, index) => {
+    const value = set.actualReps ?? set.rawReps ?? set.reps;
+    if (value === "" || value === undefined || value === null || !Number.isFinite(Number(value))) return [];
+    return [[Number(set.setNumber || index + 1), Number(value)]];
+  });
+  return reps.length ? Object.fromEntries(reps) : {};
 }
 
 export function groupSessionExercises(exercises = []) {

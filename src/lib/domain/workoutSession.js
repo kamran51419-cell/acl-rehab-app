@@ -177,7 +177,7 @@ export function removeRecordedSet(workout, exerciseId, setId) {
     exercises: workout.exercises.map((exercise) => exercise.id !== exerciseId ? exercise : {
       ...exercise,
       recordedSets: exercise.recordedSets.filter((set) => set.id !== setId).map((set, index) => ({ ...set, setNumber: index + 1 })),
-    })),
+    }),
   };
 }
 

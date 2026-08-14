@@ -16,7 +16,13 @@ function setReps(set = {}) {
 }
 
 function completedSets(exercise) {
-  return (exercise.recordedSets || []).filter((set) => Number.isFinite(Number(set.weight)) && Number(set.weight) >= 0).map((set) => ({ ...set, weight: Number(set.weight), reps: setReps(set) }));
+  return (exercise.recordedSets || []).flatMap((set) => {
+    const rawWeight = set.weight ?? set.rawWeight;
+    if (rawWeight === "" || rawWeight === undefined || rawWeight === null) return [];
+    const weight = Number(rawWeight);
+    if (!Number.isFinite(weight) || weight < 0) return [];
+    return [{ ...set, weight, reps: setReps(set) }];
+  });
 }
 
 function variantForSide(side) { return side === SIDE.LEFT || side === SIDE.RIGHT ? EXERCISE_VARIANT.SINGLE : EXERCISE_VARIANT.DOUBLE; }

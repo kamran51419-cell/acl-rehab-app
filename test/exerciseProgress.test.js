@@ -14,6 +14,22 @@ test("progress includes only weighted exercises and sorts by latest workout", ()
   assert.equal(groups[0].latest.date, "2026-07-19");
 });
 
+test("blank weighted sets are treated as not performed", () => {
+  const skippedWorkout = [{
+    id: "skipped",
+    status: "completed",
+    date: "2026-08-09",
+    exercises: [{
+      id: "curl",
+      exerciseId: "curl",
+      exerciseNameSnapshot: "Barbell bicep curl",
+      loggingMethod: "reps_weight",
+      recordedSets: [{ id: "set-1", setNumber: 1, weight: "", prescribedReps: { type: "fixed", value: 12 } }],
+    }],
+  }];
+  assert.deepEqual(groupExerciseProgress(skippedWorkout), []);
+});
+
 test("variants retain every set while graph points use the daily heaviest", () => {
   const group = groupExerciseProgress(workouts)[0];
   const doubles = variantEntries(group, EXERCISE_VARIANT.DOUBLE);

@@ -31,6 +31,11 @@ function transformApp(code) {
     'className={cls("flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs transition-colors duration-150", activeTab === "more" ? "bg-slate-100 font-medium" : "text-slate-500")}',
   )
 
+  next = next.replace(
+    '{trainingMode === "rehab" ? <div><Label>Surgery date</Label><Input type="date" value={surgeryDate}',
+    '{trainingMode === "rehab" ? <div className="space-y-1.5"><Label>Surgery date</Label><Input className="date-field-clip" type="date" value={surgeryDate}',
+  )
+
   return next
 }
 
@@ -58,8 +63,18 @@ function transformPlansScreen(code) {
   )
 
   next = next.replace(
+    '<Button size="sm" disabled={!task.name.trim() || task.days.length === 0} onClick={() => setEditingRoutineId("")}>Done</Button>',
+    '<Button size="sm" variant="outline" disabled={!task.name.trim() || task.days.length === 0} onClick={() => setEditingRoutineId("")}>Done</Button>',
+  )
+
+  next = next.replace(
     ' : <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="font-medium">{task.name || "Unnamed task"}</div>',
     ' : <div className="flex items-center justify-between gap-3"><div className="min-w-0"><div className="font-medium">{task.name || "Unnamed task"}</div>',
+  )
+
+  next = next.replace(
+    '<div className="flex flex-wrap items-end gap-2">\n                  <Button size="sm" variant="outline" onClick={() => setSessions([...draft.sessions, { ...duplicatePlan({ ...draft, sessions: [session] }).sessions[0], sortOrder: draft.sessions.length }])}>Duplicate</Button>\n                  <Button size="sm" variant="danger" onClick={() => setRemoveSessionIndex(sessionIndex)}>Remove</Button>\n                </div>',
+    '<div className="grid grid-cols-2 items-center gap-2 md:flex md:items-end">\n                  <Button className="w-full whitespace-nowrap md:w-auto" size="sm" variant="outline" onClick={() => setSessions([...draft.sessions, { ...duplicatePlan({ ...draft, sessions: [session] }).sessions[0], sortOrder: draft.sessions.length }])}>Duplicate</Button>\n                  <Button className="w-full whitespace-nowrap md:w-auto" size="sm" variant="danger" onClick={() => setRemoveSessionIndex(sessionIndex)}>Remove</Button>\n                </div>',
   )
 
   next = next.replace(
@@ -71,7 +86,7 @@ function transformPlansScreen(code) {
 }
 
 function transformIndexCss(code) {
-  return `${code}\n\n/* Mobile UI audit: keep native date fields consistent and inside their cards. */\ninput[type='date'] {\n  display: block;\n  box-sizing: border-box;\n  width: 11.5rem;\n  min-width: 0;\n  max-width: 100%;\n  height: 2.5rem;\n  text-align: center;\n}\n\ninput[type='date']::-webkit-date-and-time-value {\n  min-width: 0;\n  text-align: center;\n}\n\ninput[type='date']::-webkit-datetime-edit {\n  min-width: 0;\n  padding: 0;\n}\n\n.date-field-clip {\n  box-sizing: border-box;\n  width: 11.5rem !important;\n  min-width: 0;\n  max-width: 100%;\n}\n\n.date-field-clip input[type='date'] {\n  box-sizing: border-box;\n  width: 100%;\n  min-width: 0;\n  max-width: 100%;\n}\n\n@media (max-width: 639px) {\n  input[type='date'] {\n    inline-size: 11.5rem !important;\n    min-inline-size: 0 !important;\n    max-inline-size: 100% !important;\n    padding-inline: 2.5rem !important;\n    overflow: hidden;\n  }\n\n  .date-field-clip {\n    inline-size: 11.5rem !important;\n    max-inline-size: 100% !important;\n  }\n\n  .date-field-clip input[type='date'] {\n    inline-size: 100% !important;\n  }\n\n  input[type='date']::-webkit-date-and-time-value {\n    width: 100%;\n    text-align: center;\n  }\n\n  /* Buttons next to card/header copy should sit at the visual middle of the row. */\n  [data-programme-task-card='true'] > div:not(.space-y-3) {\n    align-items: center;\n  }\n}\n\n@media (prefers-reduced-motion: no-preference) {\n  #root > div > .mx-auto.max-w-7xl.space-y-6 > :not(.hidden) {\n    animation: app-panel-enter 120ms ease-out;\n  }\n}\n\n@keyframes app-panel-enter {\n  from { opacity: 0.96; transform: translateY(2px); }\n  to { opacity: 1; transform: translateY(0); }\n}\n`
+  return `${code}\n\n/* Mobile UI audit: one consistent date control across the app. */\ninput[type='date'] {\n  position: relative;\n  display: block;\n  box-sizing: border-box;\n  inline-size: 11.5rem;\n  width: 11.5rem;\n  min-inline-size: 0;\n  min-width: 0;\n  max-inline-size: 100%;\n  max-width: 100%;\n  block-size: 2.5rem;\n  height: 2.5rem;\n  margin: 0;\n  border: 1px solid rgb(226 232 240);\n  border-radius: 0.75rem;\n  background: white;\n  padding: 0 2.5rem;\n  color: rgb(15 23 42);\n  font-size: 0.875rem;\n  line-height: 1;\n  text-align: center;\n  overflow: hidden;\n}\n\ninput[type='date']::-webkit-date-and-time-value {\n  width: 100%;\n  min-width: 0;\n  margin: 0;\n  text-align: center;\n}\n\ninput[type='date']::-webkit-datetime-edit {\n  display: flex;\n  width: 100%;\n  min-width: 0;\n  justify-content: center;\n  padding: 0;\n}\n\ninput[type='date']::-webkit-calendar-picker-indicator {\n  position: absolute;\n  right: 0.75rem;\n  width: 1.1rem;\n  height: 1.1rem;\n  margin: 0;\n  padding: 0;\n  opacity: 0.65;\n}\n\n.date-field-clip {\n  box-sizing: border-box;\n  inline-size: 11.5rem !important;\n  width: 11.5rem !important;\n  min-inline-size: 0 !important;\n  min-width: 0 !important;\n  max-inline-size: 100% !important;\n  max-width: 100% !important;\n}\n\n@media (max-width: 639px) {\n  input[type='date'],\n  .date-field-clip {\n    max-inline-size: 100% !important;\n    max-width: 100% !important;\n  }\n\n  /* Buttons next to card/header copy should sit at the visual middle of the row. */\n  [data-programme-task-card='true'] > div:not(.space-y-3) {\n    align-items: center;\n  }\n}\n`
 }
 
 export function mobileUiUxAuditBuildPlugin() {

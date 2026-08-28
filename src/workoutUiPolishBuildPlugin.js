@@ -22,12 +22,6 @@ function transformWorkoutScreen(code, id) {
   return next
 }
 
-function transformPlansScreen(code) {
-  return code
-    .split('<div className="max-w-xs">{methodField}</div>').join('<div className="w-full">{methodField}</div>')
-    .replace('<p className="mt-1 text-[11px] font-normal text-slate-400">Default for workouts. Previous programme history follows this unless you changed that workout manually.</p>', '')
-}
-
 function transformIndexCss(code) {
   return `${code}\n\n/* Consistent native select spacing */\nselect:not([multiple]) {\n  -webkit-appearance: none;\n  appearance: none;\n  padding-right: 2.5rem !important;\n  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m6 8 4 4 4-4' stroke='%2364758b' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");\n  background-repeat: no-repeat;\n  background-position: right 0.8rem center;\n  background-size: 1rem 1rem;\n}\n\nselect:not([multiple]):disabled {\n  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m6 8 4 4 4-4' stroke='%2394a3b8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");\n}\n\n#workout-edit-save {\n  background: #2563eb !important;\n  background-image: none !important;\n  color: #ffffff !important;\n  border: 1px solid #2563eb !important;\n}\n\n#workout-edit-save:hover {\n  background: #1d4ed8 !important;\n}\n\n#workout-edit-modal {\n  height: min(92dvh, 760px);\n  max-height: calc(100dvh - 1rem);\n}\n\n#workout-edit-scroll {\n  scrollbar-gutter: stable;\n  padding-bottom: 1rem;\n}\n\n#workout-edit-footer {\n  background: inherit;\n  padding-bottom: calc(1rem + env(safe-area-inset-bottom));\n}\n\n@media (max-width: 639px) {\n  #workout-edit-modal {\n    height: calc(100dvh - 0.75rem);\n    max-height: calc(100dvh - 0.75rem);\n  }\n\n  #workout-edit-header {\n    padding-top: 0.9rem;\n    padding-bottom: 0.65rem;\n  }\n\n  #workout-edit-scroll .space-y-3 > :not([hidden]) ~ :not([hidden]) {\n    margin-top: 0.5rem !important;\n  }\n\n  #workout-edit-scroll select:not([multiple]),\n  #workout-edit-scroll input:not([type='checkbox']):not([type='radio']) {\n    min-height: 2.35rem;\n  }\n\n  #workout-edit-footer {\n    padding-top: 0.6rem;\n  }\n}\n`
 }
@@ -39,7 +33,6 @@ export function workoutUiPolishBuildPlugin() {
     transform(code, id) {
       const cleanId = id.split('?')[0].replaceAll('\\\\', '/')
       if (cleanId.endsWith('/src/features/workout/WorkoutScreen.jsx')) return transformWorkoutScreen(code, id)
-      if (cleanId.endsWith('/src/features/plans/PlansScreen.jsx')) return transformPlansScreen(code)
       if (cleanId.endsWith('/src/index.css')) return transformIndexCss(code)
       return null
     },

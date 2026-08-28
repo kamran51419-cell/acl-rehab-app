@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { timeWeightTrackingBuildPlugin } from './src/timeWeightTrackingBuildPlugin.js'
 import { equipmentTrackingBuildPlugin } from './src/equipmentTrackingBuildPlugin.js'
+import { latestPreviousPerformanceBuildPlugin } from './src/latestPreviousPerformanceBuildPlugin.js'
 import { workoutExerciseEditBuildPlugin } from './src/workoutExerciseEditBuildPlugin.js'
 import { workoutUiPolishBuildPlugin } from './src/workoutUiPolishBuildPlugin.js'
 import { exercisePickerConsistencyBuildPlugin } from './src/exercisePickerConsistencyBuildPlugin.js'
@@ -17,6 +18,7 @@ export default defineConfig({
   plugins: [
     timeWeightTrackingBuildPlugin(),
     equipmentTrackingBuildPlugin(),
+    latestPreviousPerformanceBuildPlugin(),
     workoutExerciseEditBuildPlugin(),
     workoutUiPolishBuildPlugin(),
     repeatedIntervalBlocksPlugin(),

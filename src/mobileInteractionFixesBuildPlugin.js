@@ -94,7 +94,7 @@ function transformQuickWorkoutBuilder(code, id) {
 
 function transformWorkoutScreen(code, id) {
   let next = code
-  next = replaceRequired(next, 'const noop = () => {};', `${TOUCH_HELPER}\n\nfunction AutoGrowTextarea({ className = "", onInput, style, ...props }) {\n  const ref = useRef(null);\n  const resize = useCallback(() => { const node = ref.current; if (!node) return; node.style.height = "auto"; node.style.height = Math.max(40, node.scrollHeight) + "px"; }, []);\n  useEffect(resize, [props.value, resize]);\n  return <textarea ref={ref} rows={1} {...props} style={{ fieldSizing: "content", ...style }} onInput={(event) => { resize(); onInput?.(event); }} className={className} />;\n}\n\nconst noop = () => {};`, id)
+  next = replaceRequired(next, 'const noop = () => {};', `${TOUCH_HELPER}\n\nfunction AutoGrowTextarea({ className = "", onInput, style, ...props }) {\n  const ref = useRef(null);\n  const resize = useCallback(() => { const node = ref.current; if (!node) return; node.style.height = "36px"; if (String(node.value || "").includes("\\n") || node.scrollHeight > 36) node.style.height = Math.max(36, node.scrollHeight) + "px"; }, []);\n  useEffect(resize, [props.value, resize]);\n  return <textarea ref={ref} rows={1} {...props} style={{ height: 36, ...style }} onInput={(event) => { resize(); onInput?.(event); }} className={className} />;\n}\n\nconst noop = () => {};`, id)
 
   next = replaceRequired(
     next,
@@ -103,24 +103,43 @@ function transformWorkoutScreen(code, id) {
     id,
   )
 
-  next = next.split('className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3"').join('className="mt-1 block h-10 w-full min-w-0 max-w-full overflow-hidden rounded-xl border border-slate-200 px-3 text-sm"')
+  next = replaceRequired(
+    next,
+    'className="h-7 max-w-32 rounded-full border border-transparent bg-slate-50 px-2 text-xs font-normal text-slate-500 hover:border-slate-200" value={exercise.equipmentType || "standard"}',
+    'className="workout-equipment-select h-7 max-w-32 rounded-full border border-transparent bg-slate-50 px-2 text-xs font-normal leading-4 text-slate-500 hover:border-slate-200" value={exercise.equipmentType || "standard"}',
+    id,
+  )
+
+  next = replaceRequired(
+    next,
+    '<input type="date" className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3" value={entryDate} onChange={(event) => setEntryDate(event.target.value)}/>',
+    '<span className="date-field-clip mt-1 block w-full max-w-full overflow-hidden rounded-xl border border-slate-200 bg-white"><input type="date" className="block h-10 w-full min-w-0 max-w-full appearance-none border-0 bg-white px-3 text-sm outline-none" value={entryDate} onChange={(event) => setEntryDate(event.target.value)}/></span>',
+    id,
+  )
+  next = replaceRequired(
+    next,
+    '<input type="date" className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3" value={workout.date || ""} onChange={(event) => onDate(event.target.value)}/>',
+    '<span className="date-field-clip mt-1 block w-full max-w-full overflow-hidden rounded-xl border border-slate-200 bg-white"><input type="date" className="block h-10 w-full min-w-0 max-w-full appearance-none border-0 bg-white px-3 text-sm outline-none" value={workout.date || ""} onChange={(event) => onDate(event.target.value)}/></span>',
+    id,
+  )
+
   next = replaceRequired(
     next,
     '<textarea className="mt-1 min-h-16 w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-800 outline-none focus:border-slate-400" value={exercise.workoutNote || ""} placeholder="Add a note for this workout" onChange={(event) => onExerciseNote(exercise.id, event.target.value)}/>',
-    '<AutoGrowTextarea className="mt-1 min-h-10 w-full resize-none overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-800 outline-none focus:border-slate-400" value={exercise.workoutNote || ""} placeholder="Add a note for this workout" onChange={(event) => onExerciseNote(exercise.id, event.target.value)}/>',
+    '<AutoGrowTextarea className="mt-1 block h-9 min-h-9 w-full resize-none overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-normal leading-5 text-slate-800 outline-none focus:border-slate-400" value={exercise.workoutNote || ""} placeholder="Add a note for this workout" onChange={(event) => onExerciseNote(exercise.id, event.target.value)}/>',
     id,
   )
   next = replaceRequired(
     next,
     '<textarea className="mt-1 min-h-24 w-full rounded-xl border border-slate-200 p-3" value={workout.notes || ""} onChange={(event) => onNotes(event.target.value)}/>',
-    '<AutoGrowTextarea className="mt-1 min-h-10 w-full resize-none overflow-hidden rounded-xl border border-slate-200 px-3 py-2" value={workout.notes || ""} onChange={(event) => onNotes(event.target.value)}/>',
+    '<AutoGrowTextarea className="mt-1 block h-9 min-h-9 w-full resize-none overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm leading-5" value={workout.notes || ""} onChange={(event) => onNotes(event.target.value)}/>',
     id,
   )
   return next
 }
 
 function transformIndexCss(code) {
-  return `${code}\n\nbody.touch-reordering {\n  user-select: none;\n  -webkit-user-select: none;\n  overscroll-behavior: none;\n}\n\n@media (hover: none) and (pointer: coarse) {\n  .reorder-target {\n    -webkit-touch-callout: none;\n  }\n\n  body.touch-reordering,\n  body.touch-reordering .reorder-target {\n    touch-action: none;\n  }\n}\n\n@media (max-width: 639px) {\n  input[type='date'] {\n    display: block;\n    width: 100% !important;\n    min-width: 0 !important;\n    max-width: 100% !important;\n    inline-size: 100% !important;\n    max-inline-size: 100% !important;\n    box-sizing: border-box;\n    overflow: hidden;\n    font-size: 16px;\n  }\n}\n`
+  return `${code}\n\nbody.touch-reordering {\n  user-select: none;\n  -webkit-user-select: none;\n  overscroll-behavior: none;\n}\n\n@media (hover: none) and (pointer: coarse) {\n  .reorder-target {\n    -webkit-touch-callout: none;\n  }\n\n  body.touch-reordering,\n  body.touch-reordering .reorder-target {\n    touch-action: none;\n  }\n}\n\n.workout-equipment-select {\n  font-size: 12px !important;\n  line-height: 16px !important;\n  font-weight: 400 !important;\n}\n\n.date-field-clip {\n  min-width: 0;\n  max-width: 100%;\n  box-sizing: border-box;\n}\n\n.date-field-clip input[type='date'] {\n  min-width: 0 !important;\n  max-width: 100% !important;\n  width: 100% !important;\n  box-sizing: border-box;\n  -webkit-appearance: none;\n  appearance: none;\n}\n\n@media (max-width: 639px) {\n  .date-field-clip {\n    width: 100%;\n    overflow: hidden;\n  }\n\n  .date-field-clip input[type='date'] {\n    display: block;\n    inline-size: 100% !important;\n    max-inline-size: 100% !important;\n    overflow: hidden;\n    font-size: 14px;\n  }\n}\n`
 }
 
 export function mobileInteractionFixesBuildPlugin() {

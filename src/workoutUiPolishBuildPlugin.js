@@ -10,13 +10,13 @@ function transformWorkoutScreen(code, id) {
   next = replaceOnce(
     next,
     '<section className="max-h-[88vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-4 shadow-xl sm:p-5"><div className="flex items-start justify-between gap-3"><div><h2 className="text-lg font-semibold">Edit exercise</h2><p className="mt-1 text-xs text-slate-500">Changes here apply to this workout only. Your Programme stays unchanged.</p></div><button type="button" className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600" onClick={onCancel}>Cancel</button></div>',
-    '<section className="max-h-[88vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white px-4 pb-7 pt-5 shadow-xl sm:px-5 sm:pb-8 sm:pt-6"><div><h2 className="text-lg font-semibold">Edit exercise</h2><p className="mt-1 text-xs text-slate-500">Changes here apply to this workout only. Your Programme stays unchanged.</p></div>',
+    '<section className="max-h-[calc(100dvh-1.5rem)] w-full max-w-xl overflow-y-auto rounded-2xl bg-white px-4 pb-10 pt-5 shadow-xl sm:max-h-[88vh] sm:px-5 sm:pb-9 sm:pt-6"><div><h2 className="text-lg font-semibold">Edit exercise</h2><p className="mt-1 text-xs text-slate-500">Changes here apply to this workout only. Your Programme stays unchanged.</p></div>',
     id,
   )
   next = replaceOnce(
     next,
     '<div className="mt-5 grid grid-cols-2 gap-3"><Button variant="outline" onClick={onCancel}>Cancel</Button><Button onClick={() => onSave(draft)}>Save changes</Button></div>',
-    '<div className="mt-6 grid grid-cols-2 gap-3 pb-1"><button type="button" className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50" onClick={onCancel}>Cancel</button><button type="button" className="h-11 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800" onClick={() => onSave(draft)}>Save changes</button></div>',
+    '<div className="mt-7 grid grid-cols-2 gap-3 pb-2"><button type="button" className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50" onClick={onCancel}>Cancel</button><button type="button" className="h-11 rounded-xl px-4 text-sm font-semibold" style={{ backgroundColor: "#2563eb", color: "#ffffff" }} onClick={() => onSave(draft)}>Save changes</button></div>',
     id,
   )
   return next

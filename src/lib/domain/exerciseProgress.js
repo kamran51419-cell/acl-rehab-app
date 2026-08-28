@@ -27,16 +27,16 @@ function completedSets(exercise) {
 
 function variantForSide(side) { return side === SIDE.LEFT || side === SIDE.RIGHT ? EXERCISE_VARIANT.SINGLE : EXERCISE_VARIANT.DOUBLE; }
 function exerciseDate(workout, exercise) { return exercise.completedDate || workout.date || workout.workoutDate || ""; }
-function pairedIdentity(exercise = {}) { return String(exercise.id || "").replace(/-(left|right)$/, ""); }
 
 function progressSideMode(exercise, weightedExercises) {
   const side = resolveWorkoutExerciseSide(exercise);
   if (side === SIDE.BOTH || side === SIDE.SEPARATE || !side) return PROGRESS_SIDE_MODE.STANDARD;
   if (side !== SIDE.LEFT && side !== SIDE.RIGHT) return PROGRESS_SIDE_MODE.STANDARD;
   const opposite = side === SIDE.LEFT ? SIDE.RIGHT : SIDE.LEFT;
+  const equipmentType = exercise.equipmentType || "standard";
   const paired = weightedExercises.some((candidate) => candidate !== exercise
     && candidate.exerciseId === exercise.exerciseId
-    && pairedIdentity(candidate) === pairedIdentity(exercise)
+    && (candidate.equipmentType || "standard") === equipmentType
     && resolveWorkoutExerciseSide(candidate) === opposite);
   if (paired) return PROGRESS_SIDE_MODE.LEFT_RIGHT;
   return side === SIDE.LEFT ? PROGRESS_SIDE_MODE.LEFT_ONLY : PROGRESS_SIDE_MODE.RIGHT_ONLY;

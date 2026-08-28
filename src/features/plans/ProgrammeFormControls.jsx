@@ -74,10 +74,10 @@ export function Textarea({ onInput, style, ...props }) {
     const node = ref.current;
     if (!node) return;
     node.style.height = "36px";
-    if (String(node.value || "").includes("\n") || node.scrollHeight > 36) node.style.height = `${Math.max(36, node.scrollHeight)}px`;
+    if (node.scrollHeight > node.clientHeight + 1) node.style.height = `${Math.min(180, node.scrollHeight)}px`;
   };
   useEffect(resize, [props.value]);
-  return <textarea ref={ref} rows={1} style={{ height: 36, ...style }} className="block h-9 min-h-9 w-full resize-none overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm leading-5" {...props} onInput={(event) => { resize(); onInput?.(event); }} />;
+  return <textarea ref={ref} rows={1} style={{ height: 36, minHeight: 36, maxHeight: 180, boxSizing: "border-box", overflowY: "hidden", ...style }} className="block h-9 min-h-9 w-full resize-none overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm leading-5" {...props} onInput={(event) => { resize(); onInput?.(event); }} />;
 }
 
 export function DurationInput({ seconds, durationUnit, onChange }) {

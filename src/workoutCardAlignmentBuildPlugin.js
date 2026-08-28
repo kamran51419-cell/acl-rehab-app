@@ -12,11 +12,21 @@ function transformWorkoutScreen(code, id) {
     '<div className="workout-card-header flex items-start gap-2"><div className="min-w-0 flex-1">',
   )
 
+  card = card.replace(
+    '<div className="mt-1 inline-flex items-center gap-1.5">',
+    '<div className="workout-card-meta-row mt-1 flex min-h-8 w-full items-center justify-between gap-2">',
+  )
+
+  card = card.replace(
+    'className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-sm transition ${exercise.flaggedSkipped ?',
+    'className={`workout-card-flag inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-sm transition ${exercise.flaggedSkipped ?',
+  )
+
   const setContentAnchor = '{isSetTickExercise ?'
   if (!card.includes(setContentAnchor)) throw new Error(`Workout card alignment transform could not find set content in ${id}`)
   card = card.replace(
     setContentAnchor,
-    '{!hideExerciseName && onFlag ? <div className="workout-card-flag-row"><button type="button" aria-label={exercise.flaggedSkipped ? "Remove exercise flag" : "Flag exercise as intentionally skipped"} aria-pressed={Boolean(exercise.flaggedSkipped)} title={exercise.flaggedSkipped ? "Flagged — tap to remove" : "Flag exercise"} className={`workout-card-flag inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm transition-colors ${exercise.flaggedSkipped ? "border-red-300 bg-red-100 text-red-700 shadow-sm" : "border-slate-200 bg-white text-slate-400 hover:border-red-200 hover:bg-red-50 hover:text-red-600"}`} onClick={() => onFlag(exercise.id, !exercise.flaggedSkipped)}><span aria-hidden="true">⚑</span></button></div> : null}{isSetTickExercise ?',
+    '{!hideExerciseName && onFlag && exercise.exerciseType !== EXERCISE_TYPE.STRENGTH ? <div className="workout-card-meta-row mt-1 flex min-h-8 w-full items-center justify-end"><button type="button" aria-label={exercise.flaggedSkipped ? "Remove exercise flag" : "Flag exercise as intentionally skipped"} aria-pressed={Boolean(exercise.flaggedSkipped)} title={exercise.flaggedSkipped ? "Flagged — tap to remove" : "Flag exercise"} className={`workout-card-flag inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm transition-colors ${exercise.flaggedSkipped ? "border-red-300 bg-red-100 text-red-700 shadow-sm" : "border-slate-200 bg-white text-slate-400 hover:border-red-200 hover:bg-red-50 hover:text-red-600"}`} onClick={() => onFlag(exercise.id, !exercise.flaggedSkipped)}><span aria-hidden="true">⚑</span></button></div> : null}{isSetTickExercise ?',
   )
 
   card = card.replace(

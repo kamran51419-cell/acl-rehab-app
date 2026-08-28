@@ -106,21 +106,27 @@ button.workout-set-control {
   line-height: 1.25rem !important;
 }
 
-/* The edit menu owns the top-right corner. */
+/* Generic workout cards: edit stays at the far-right of the header. */
 .workout-card-header {
-  position: relative;
-  padding-right: 2.5rem;
+  position: relative !important;
+  padding-right: 2.5rem !important;
 }
 
 .workout-card-header > button[aria-label^='Edit '] {
   position: absolute !important;
   top: 0 !important;
   right: 0 !important;
+  width: 2rem !important;
+  height: 2rem !important;
+  min-height: 2rem !important;
+  margin: 0 !important;
+  padding: 0 !important;
   z-index: 3;
 }
 
-/* Strength cards: Equipment left, flag right, both in a real metadata row. */
-.mt-1.inline-flex.items-center.gap-1\.5 {
+/* The flag row follows the full header/description height, so descriptions never affect overlap.
+   The flag is anchored to the content below: one row immediately above it, always far-right. */
+.workout-card-meta-row {
   display: flex !important;
   width: 100% !important;
   min-height: 2rem !important;
@@ -129,7 +135,7 @@ button.workout-set-control {
   gap: 0.5rem !important;
 }
 
-.mt-1.inline-flex.items-center.gap-1\.5 > button[aria-pressed] {
+.workout-card-meta-row .workout-card-flag {
   position: static !important;
   display: inline-flex !important;
   margin-left: auto !important;
@@ -138,50 +144,44 @@ button.workout-set-control {
   height: 2rem !important;
   min-height: 2rem !important;
   padding: 0 !important;
-  border: 1px solid rgb(226 232 240) !important;
-  border-radius: 9999px !important;
-  background: #fff !important;
-  color: rgb(148 163 184) !important;
-}
-
-/* Non-strength cards reserve the same metadata row, so the flag never overlaps sets/content. */
-.workout-card-flag-row {
-  width: 100% !important;
-  min-height: 2rem !important;
   align-items: center !important;
-  justify-content: flex-end !important;
-}
-
-.workout-card-flag-row .workout-card-flag {
-  position: static !important;
-  margin-left: auto !important;
-  flex: 0 0 2rem !important;
-  width: 2rem !important;
-  height: 2rem !important;
-  min-height: 2rem !important;
-  padding: 0 !important;
+  justify-content: center !important;
   border: 1px solid rgb(226 232 240) !important;
   border-radius: 9999px !important;
   background: #fff !important;
   color: rgb(148 163 184) !important;
 }
 
-.mt-1.inline-flex.items-center.gap-1\.5 > button[aria-pressed='true'],
-.workout-card-flag-row .workout-card-flag[aria-pressed='true'] {
+.workout-card-meta-row .workout-card-flag[aria-pressed='true'] {
   border-color: rgb(252 165 165) !important;
   background: rgb(254 226 226) !important;
   color: rgb(185 28 28) !important;
   box-shadow: 0 0 0 2px rgb(239 68 68 / 0.08) !important;
 }
 
-/* Paired L+R cards use the same two-row rule: ... in the header, Equipment + flag below. */
+/* Paired L+R cards use the same rule: menu in the header, metadata row follows the description,
+   flag far-right in that row, then the side/set cards below at their existing fixed gap. */
 section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pressed]) > div:first-child {
+  position: relative !important;
+  padding-right: 2.5rem !important;
   align-items: flex-start !important;
 }
 
 section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pressed]) > div:first-child > .relative {
-  margin-left: auto !important;
-  flex: 0 0 auto !important;
+  position: absolute !important;
+  top: 0 !important;
+  right: 0 !important;
+  width: 2rem !important;
+  height: 2rem !important;
+  margin: 0 !important;
+  z-index: 3;
+}
+
+section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pressed]) > div:first-child > .relative > button[aria-label^='Edit '] {
+  width: 2rem !important;
+  height: 2rem !important;
+  min-height: 2rem !important;
+  padding: 0 !important;
 }
 
 section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pressed]) > .mt-2 {
@@ -195,16 +195,15 @@ section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pre
 
 section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pressed]) > .mt-2 button[aria-pressed] {
   position: static !important;
+  display: inline-flex !important;
   margin-left: auto !important;
   flex: 0 0 2rem !important;
   width: 2rem !important;
   height: 2rem !important;
   min-height: 2rem !important;
   padding: 0 !important;
-  border: 1px solid rgb(226 232 240) !important;
-  border-radius: 9999px !important;
-  background: #fff !important;
-  color: rgb(148 163 184) !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pressed='true']) > .mt-2 button[aria-pressed='true'] {

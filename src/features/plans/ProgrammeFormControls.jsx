@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../../firebase";
 import { REP_TARGET_TYPE, fixedReps, repRange } from "../../lib/domain/plans";
@@ -68,8 +68,16 @@ export function Select({ children, ...props }) {
   );
 }
 
-export function Textarea(props) {
-  return <textarea className="min-h-20 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" {...props} />;
+export function Textarea({ onInput, style, ...props }) {
+  const ref = useRef(null);
+  const resize = () => {
+    const node = ref.current;
+    if (!node) return;
+    node.style.height = "36px";
+    if (String(node.value || "").includes("\n") || node.scrollHeight > 36) node.style.height = `${Math.max(36, node.scrollHeight)}px`;
+  };
+  useEffect(resize, [props.value]);
+  return <textarea ref={ref} rows={1} style={{ height: 36, ...style }} className="block h-9 min-h-9 w-full resize-none overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm leading-5" {...props} onInput={(event) => { resize(); onInput?.(event); }} />;
 }
 
 export function DurationInput({ seconds, durationUnit, onChange }) {

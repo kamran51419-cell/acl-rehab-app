@@ -28,11 +28,19 @@ function transformWorkoutDisplay(code, id) {
     return Number.isFinite(completed) ? completed : 0;
   };
   const ordered = workouts.slice().sort((a, b) => String(b.date || b.workoutDate || "").localeCompare(String(a.date || a.workoutDate || "")) || timestamp(b) - timestamp(a));
-  const hasEnteredValue = (set = {}) => {
+  const hasWeight = (set = {}) => {
     const weight = set.weight ?? set.rawWeight;
-    const reps = set.actualReps ?? set.rawReps ?? set.reps;
-    return (weight !== "" && weight !== undefined && weight !== null && Number.isFinite(Number(weight)))
-      || (reps !== "" && reps !== undefined && reps !== null && Number.isFinite(Number(reps)));
+    return weight !== "" && weight !== undefined && weight !== null && Number.isFinite(Number(weight));
+  };
+  const hasPerformedSet = (set = {}, exercise = {}) => {
+    if (exercise.loggingMethod === "reps_weight") return hasWeight(set);
+    if (exercise.loggingMethod === "reps") return Boolean(set.completed);
+    if (hasWeight(set) || set.completed) return true;
+    if (!exercise.loggingMethod && set.prescribedReps === undefined) {
+      const legacyReps = set.actualReps ?? set.rawReps ?? set.reps;
+      return legacyReps !== "" && legacyReps !== undefined && legacyReps !== null && Number.isFinite(Number(legacyReps));
+    }
+    return false;
   };
 
   for (const workout of ordered) {
@@ -45,14 +53,46 @@ function transformWorkoutDisplay(code, id) {
 
     for (const exercise of matches) {
       const sets = exercise?.recordedSets?.length ? exercise.recordedSets : (exercise?.prescriptionBlocks || []).flatMap((block) => block.actualSets || []);
-      if (sets.some(hasEnteredValue)) return sets;
+      if (sets.some((set) => hasPerformedSet(set, exercise))) return sets;
     }
   }
 
   return [];
 }`
 
-  return replaceRequired(code, oldFunction, newFunction, id)
+  let next = replaceRequired(code, oldFunction, newFunction, id)
+  next = replaceRequired(
+    next,
+    `export function previousRepsForExercise(workouts = [], target) {
+  const sets = previousSetsForExercise(workouts, target);
+  const reps = sets.flatMap((set, index) => {
+    const value = set.actualReps ?? set.rawReps ?? set.reps;
+    if (value === "" || value === undefined || value === null || !Number.isFinite(Number(value))) return [];
+    return [[Number(set.setNumber || index + 1), Number(value)]];
+  });
+  return reps.length ? Object.fromEntries(reps) : {};
+}`,
+    `export function previousRepsForExercise(workouts = [], target) {
+  const sets = previousSetsForExercise(workouts, target);
+  const method = typeof target === "string" ? undefined : target.loggingMethod;
+  const reps = sets.flatMap((set, index) => {
+    const weight = set.weight ?? set.rawWeight;
+    const hasWeight = weight !== "" && weight !== undefined && weight !== null && Number.isFinite(Number(weight));
+    const performed = method === "reps_weight"
+      ? hasWeight
+      : method === "reps"
+        ? Boolean(set.completed)
+        : (hasWeight || Boolean(set.completed) || (method === undefined && set.prescribedReps === undefined));
+    if (!performed) return [];
+    const value = set.actualReps ?? set.rawReps ?? set.reps;
+    if (value === "" || value === undefined || value === null || !Number.isFinite(Number(value))) return [];
+    return [[Number(set.setNumber || index + 1), Number(value)]];
+  });
+  return reps.length ? Object.fromEntries(reps) : {};
+}`,
+    id,
+  )
+  return next
 }
 
 export function latestPreviousPerformanceBuildPlugin() {

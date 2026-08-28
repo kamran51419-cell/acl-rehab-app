@@ -5,6 +5,10 @@ function replaceOnce(code, oldText, newText, id) {
   return code.replace(oldText, newText)
 }
 
+function replaceAll(code, oldText, newText) {
+  return code.split(oldText).join(newText)
+}
+
 function transformWorkoutScreen(code, id) {
   let next = code
   next = replaceOnce(
@@ -19,11 +23,34 @@ function transformWorkoutScreen(code, id) {
     '</div><div id="workout-edit-footer" className="shrink-0 grid grid-cols-2 gap-3 px-4 pb-4 pt-3 sm:px-5 sm:pb-5 sm:pt-4"><button type="button" className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50" onClick={onCancel}>Cancel</button><button id="workout-edit-save" type="button" className="h-11 rounded-xl px-4 text-sm font-semibold" onClick={() => onSave(draft)}>Save changes</button></div>',
     id,
   )
+
+  next = replaceAll(next, 'placeholder="Search exercises" value={query}', 'placeholder="Search exercises" data-exercise-picker-search="true" value={query}')
+  next = replaceAll(next, 'className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left hover:bg-slate-50"', 'className="exercise-picker-row flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left hover:bg-slate-50 sm:px-4 sm:py-3"')
+  next = replaceAll(next, '<span className="text-xs font-medium text-blue-600">Use</span>', '<span className="exercise-picker-action">Select</span>')
+  next = replaceAll(next, '<span className="text-sm font-medium text-blue-600">{replacing ? "Choose" : "Add"}</span>', '<span className="exercise-picker-action">{replacing ? "Select" : "Add"}</span>')
+  return next
+}
+
+function transformPlansScreen(code) {
+  let next = code
+  next = replaceAll(next, '<Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />', '<Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />')
+  next = replaceAll(next, 'className="h-12 rounded-xl pl-10 text-base" autoFocus aria-label="Search exercises"', 'className="exercise-picker-search h-12 rounded-xl pl-11 text-base" autoFocus aria-label="Search exercises"')
+  next = replaceAll(next, 'className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3"', 'className="exercise-picker-row flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 sm:px-4 sm:py-3"')
+  next = replaceAll(next, '{replaceTarget ? "Use" : selected ? "Selected" : "Add"}', '{replaceTarget ? "Select" : selected ? "Selected" : "Add"}')
+  return next
+}
+
+function transformQuickWorkoutBuilder(code) {
+  let next = code
+  next = replaceAll(next, '<Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />', '<Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />')
+  next = replaceAll(next, 'className="h-12 rounded-xl pl-10 text-base" autoFocus aria-label="Search exercises"', 'className="exercise-picker-search h-12 rounded-xl pl-11 text-base" autoFocus aria-label="Search exercises"')
+  next = replaceAll(next, 'className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3"', 'className="exercise-picker-row flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 sm:px-4 sm:py-3"')
+  next = replaceAll(next, '{replaceIndex !== null ? "Use" : "Add"}', '{replaceIndex !== null ? "Select" : "Add"}')
   return next
 }
 
 function transformIndexCss(code) {
-  return `${code}\n\n/* Consistent native select spacing */\nselect:not([multiple]) {\n  -webkit-appearance: none;\n  appearance: none;\n  padding-right: 2.5rem !important;\n  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m6 8 4 4 4-4' stroke='%2364758b' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");\n  background-repeat: no-repeat;\n  background-position: right 0.8rem center;\n  background-size: 1rem 1rem;\n}\n\nselect:not([multiple]):disabled {\n  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m6 8 4 4 4-4' stroke='%2394a3b8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");\n}\n\n#workout-edit-save {\n  background: #2563eb !important;\n  background-image: none !important;\n  color: #ffffff !important;\n  border: 1px solid #2563eb !important;\n}\n\n#workout-edit-save:hover {\n  background: #1d4ed8 !important;\n}\n\n#workout-edit-modal {\n  height: min(92dvh, 760px);\n  max-height: calc(100dvh - 1rem);\n}\n\n#workout-edit-scroll {\n  scrollbar-gutter: stable;\n  padding-bottom: 1rem;\n}\n\n#workout-edit-footer {\n  background: inherit;\n  padding-bottom: calc(1rem + env(safe-area-inset-bottom));\n}\n\n@media (max-width: 639px) {\n  #workout-edit-modal {\n    height: calc(100dvh - 0.75rem);\n    max-height: calc(100dvh - 0.75rem);\n  }\n\n  #workout-edit-header {\n    padding-top: 0.9rem;\n    padding-bottom: 0.65rem;\n  }\n\n  #workout-edit-scroll .space-y-3 > :not([hidden]) ~ :not([hidden]) {\n    margin-top: 0.5rem !important;\n  }\n\n  #workout-edit-scroll select:not([multiple]),\n  #workout-edit-scroll input:not([type='checkbox']):not([type='radio']) {\n    min-height: 2.35rem;\n  }\n\n  #workout-edit-footer {\n    padding-top: 0.6rem;\n  }\n}\n`
+  return `${code}\n\n/* Consistent native select spacing */\nselect:not([multiple]) {\n  -webkit-appearance: none;\n  appearance: none;\n  padding-right: 2.5rem !important;\n  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m6 8 4 4 4-4' stroke='%2364758b' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");\n  background-repeat: no-repeat;\n  background-position: right 0.8rem center;\n  background-size: 1rem 1rem;\n}\n\nselect:not([multiple]):disabled {\n  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m6 8 4 4 4-4' stroke='%2394a3b8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");\n}\n\n#workout-edit-save {\n  background: #2563eb !important;\n  background-image: none !important;\n  color: #ffffff !important;\n  border: 1px solid #2563eb !important;\n}\n\n#workout-edit-save:hover {\n  background: #1d4ed8 !important;\n}\n\n#workout-edit-modal {\n  height: min(92dvh, 760px);\n  max-height: calc(100dvh - 1rem);\n}\n\n#workout-edit-scroll {\n  scrollbar-gutter: stable;\n  padding-bottom: 1rem;\n}\n\n#workout-edit-footer {\n  background: inherit;\n  padding-bottom: calc(1rem + env(safe-area-inset-bottom));\n}\n\n.exercise-picker-search,\n[data-exercise-picker-search='true'] {\n  width: 100%;\n}\n\n.exercise-picker-row {\n  min-height: 3.25rem;\n}\n\n.exercise-picker-action {\n  display: inline-flex;\n  flex-shrink: 0;\n  align-items: center;\n  justify-content: center;\n  min-width: 4.25rem;\n  min-height: 2rem;\n  border-radius: 0.65rem;\n  background: #2563eb;\n  padding: 0.35rem 0.7rem;\n  color: #fff;\n  font-size: 0.75rem;\n  font-weight: 600;\n  line-height: 1;\n}\n\n@media (max-width: 639px) {\n  #workout-edit-modal {\n    height: calc(100dvh - 0.75rem);\n    max-height: calc(100dvh - 0.75rem);\n  }\n\n  #workout-edit-header {\n    padding-top: 0.9rem;\n    padding-bottom: 0.65rem;\n  }\n\n  #workout-edit-scroll .space-y-3 > :not([hidden]) ~ :not([hidden]) {\n    margin-top: 0.5rem !important;\n  }\n\n  #workout-edit-scroll select:not([multiple]),\n  #workout-edit-scroll input:not([type='checkbox']):not([type='radio']) {\n    min-height: 2.35rem;\n  }\n\n  #workout-edit-footer {\n    padding-top: 0.6rem;\n  }\n\n  .exercise-picker-row {\n    min-height: 3rem;\n  }\n\n  .exercise-picker-action {\n    min-width: 3.9rem;\n  }\n}\n`
 }
 
 export function workoutUiPolishBuildPlugin() {
@@ -33,6 +60,8 @@ export function workoutUiPolishBuildPlugin() {
     transform(code, id) {
       const cleanId = id.split('?')[0].replaceAll('\\\\', '/')
       if (cleanId.endsWith('/src/features/workout/WorkoutScreen.jsx')) return transformWorkoutScreen(code, id)
+      if (cleanId.endsWith('/src/features/plans/PlansScreen.jsx')) return transformPlansScreen(code)
+      if (cleanId.endsWith('/src/features/workout/QuickWorkoutBuilder.jsx')) return transformQuickWorkoutBuilder(code)
       if (cleanId.endsWith('/src/index.css')) return transformIndexCss(code)
       return null
     },

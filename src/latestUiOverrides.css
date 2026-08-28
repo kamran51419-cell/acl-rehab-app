@@ -58,10 +58,6 @@ input[type='date']::-webkit-datetime-edit {
   padding-bottom: 0 !important;
   line-height: normal !important;
   text-align: center !important;
-}
-
-input[type='date']::-webkit-date-and-time-value,
-input[type='date']::-webkit-datetime-edit {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -110,26 +106,24 @@ button.workout-set-control {
   line-height: 1.25rem !important;
 }
 
-/* Generic exercise cards reserve a real action rail so the flag never overlaps content. */
+/* Generic exercise-card action layout.
+   The edit menu is always top-right. The flag is directly below it, at the same vertical
+   level as Equipment when Equipment exists. Without Equipment, reserve that same row. */
 .workout-card-header {
   position: relative;
-}
-
-.workout-card-header:has(.workout-card-flag) {
   padding-right: 2.5rem;
 }
 
-.workout-card-header:has(.workout-card-flag):has(button[aria-label^='Edit ']) {
-  min-height: 4.75rem;
-}
-
-.workout-card-header:has(.workout-card-flag):not(:has(button[aria-label^='Edit '])) {
-  min-height: 2rem;
+.workout-card-header > button[aria-label^='Edit '] {
+  position: absolute !important;
+  top: 0 !important;
+  right: 0 !important;
+  z-index: 3;
 }
 
 .workout-card-header .workout-card-flag {
   position: absolute !important;
-  top: 0 !important;
+  top: calc(100% + 0.25rem) !important;
   right: 0 !important;
   z-index: 2;
   width: 2rem !important;
@@ -137,12 +131,14 @@ button.workout-set-control {
   min-height: 2rem !important;
   padding: 0 !important;
   border: 1px solid rgb(226 232 240) !important;
+  border-radius: 9999px !important;
   background: #fff !important;
   color: rgb(148 163 184) !important;
 }
 
-.workout-card-header:has(button[aria-label^='Edit ']) .workout-card-flag {
-  top: 2.5rem !important;
+/* When there is no Equipment row, keep an empty metadata row so the flag cannot overlap sets/content. */
+section.rounded-2xl.border.border-slate-200.bg-white:has(.workout-card-header .workout-card-flag):not(:has(.workout-equipment-select)) .workout-card-header {
+  margin-bottom: 2.25rem;
 }
 
 .workout-card-header .workout-card-flag[aria-pressed='true'],
@@ -153,22 +149,30 @@ button.workout-set-control {
   box-shadow: 0 0 0 2px rgb(239 68 68 / 0.08) !important;
 }
 
-/* Paired L+R cards use the same top-right action rail. Their flag currently lives in the row below the header,
-   so reserve header space for it rather than allowing it to overlap the first set/equipment row. */
-section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pressed]) {
-  position: relative;
+/* Paired L+R cards use the same two-row rule: ... at the far right of the header,
+   then Equipment (if any) + flag on one horizontal metadata row. */
+section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pressed]) > div:first-child {
+  align-items: flex-start !important;
 }
 
-section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pressed]) > div:first-child {
-  min-height: 4.75rem;
-  padding-right: 2.5rem;
+section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pressed]) > div:first-child > .relative {
+  margin-left: auto !important;
+  flex: 0 0 auto !important;
+}
+
+section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pressed]) > .mt-2 {
+  display: flex !important;
+  min-height: 2rem !important;
+  width: 100% !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 0.5rem !important;
 }
 
 section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pressed]) > .mt-2 button[aria-pressed] {
-  position: absolute !important;
-  top: 3rem !important;
-  right: 0.75rem !important;
-  z-index: 2;
+  position: static !important;
+  margin-left: auto !important;
+  flex: 0 0 2rem !important;
   width: 2rem !important;
   height: 2rem !important;
   min-height: 2rem !important;

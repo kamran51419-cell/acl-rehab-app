@@ -5,6 +5,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { timeWeightTrackingBuildPlugin } from './src/timeWeightTrackingBuildPlugin.js'
 import { equipmentTrackingBuildPlugin } from './src/equipmentTrackingBuildPlugin.js'
 import { workoutExerciseEditBuildPlugin } from './src/workoutExerciseEditBuildPlugin.js'
+import { workoutUiPolishBuildPlugin } from './src/workoutUiPolishBuildPlugin.js'
 import { repeatedIntervalBlocksPlugin } from './src/repeatedIntervalBlocksPlugin.js'
 import { verticalIntervalWorkoutDisplayPlugin } from './src/verticalIntervalWorkoutDisplayPlugin.js'
 
@@ -13,6 +14,7 @@ export default defineConfig({
     timeWeightTrackingBuildPlugin(),
     equipmentTrackingBuildPlugin(),
     workoutExerciseEditBuildPlugin(),
+    workoutUiPolishBuildPlugin(),
     repeatedIntervalBlocksPlugin(),
     verticalIntervalWorkoutDisplayPlugin(),
     react(),

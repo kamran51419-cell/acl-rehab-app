@@ -53,6 +53,11 @@ function transformPlansScreen(code) {
   )
 
   next = next.replace(
+    '<Input autoFocus value={task.name}',
+    '<Input value={task.name}',
+  )
+
+  next = next.replace(
     ' : <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="font-medium">{task.name || "Unnamed task"}</div>',
     ' : <div className="flex items-center justify-between gap-3"><div className="min-w-0"><div className="font-medium">{task.name || "Unnamed task"}</div>',
   )

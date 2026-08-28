@@ -16,6 +16,7 @@ import { catchUpParityBuildPlugin } from './src/catchUpParityBuildPlugin.js'
 import { exerciseFlagBuildPlugin } from './src/exerciseFlagBuildPlugin.js'
 import { programmeCollapseBuildPlugin } from './src/programmeCollapseBuildPlugin.js'
 import { leftRightWorkoutGroupingBuildPlugin } from './src/leftRightWorkoutGroupingBuildPlugin.js'
+import { catchUpLeftRightGroupingBuildPlugin } from './src/catchUpLeftRightGroupingBuildPlugin.js'
 import { repeatedIntervalBlocksPlugin } from './src/repeatedIntervalBlocksPlugin.js'
 import { verticalIntervalWorkoutDisplayPlugin } from './src/verticalIntervalWorkoutDisplayPlugin.js'
 
@@ -37,6 +38,7 @@ export default defineConfig({
     exerciseFlagBuildPlugin(),
     programmeCollapseBuildPlugin(),
     leftRightWorkoutGroupingBuildPlugin(),
+    catchUpLeftRightGroupingBuildPlugin(),
     react(),
     tailwindcss(),
     VitePWA({

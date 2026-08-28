@@ -34,24 +34,35 @@ function isLinkedWorkoutRightSide(list, exercise, index) {
   return resolveWorkoutExerciseSide(exercise) === SIDE.RIGHT && linkedWorkoutPairIndex(list, exercise, index) >= 0;
 }
 
-function WorkoutExerciseDisplay({ list, exercise, index, ...props }) {
+function WorkoutExerciseDisplay({ list, exercise, index, previousNote = "", onAddSet, onRemoveSet, onRemoveExercise, onChangeExercise, onEquipment, onExerciseNote, onClearPreviousNote, onFlag, ...props }) {
+  const [sharedActionsOpen, setSharedActionsOpen] = useState(false);
   const pairIndex = linkedWorkoutPairIndex(list, exercise, index);
-  if (pairIndex < 0) return <ExerciseCard exercise={exercise} index={index} {...props}/>;
+  if (pairIndex < 0) return <ExerciseCard exercise={exercise} index={index} previousNote={previousNote} onAddSet={onAddSet} onRemoveSet={onRemoveSet} onRemoveExercise={onRemoveExercise} onChangeExercise={onChangeExercise} onEquipment={onEquipment} onExerciseNote={onExerciseNote} onClearPreviousNote={onClearPreviousNote} onFlag={onFlag} {...props}/>;
   const pair = list[pairIndex];
   const left = resolveWorkoutExerciseSide(exercise) === SIDE.LEFT ? exercise : pair;
   const right = resolveWorkoutExerciseSide(exercise) === SIDE.RIGHT ? exercise : pair;
   const range = left.prescription?.targetReps?.type === "range"
     ? \`Range: \${left.prescription.targetReps.min}–\${left.prescription.targetReps.max} reps\`
     : "";
+  const setCount = Math.max((left.recordedSets || []).length, (right.recordedSets || []).length);
+  const isTask = left.loggingMethod === EXERCISE_LOGGING_METHOD.COMPLETED;
+  const isIntervals = left.loggingMethod === EXERCISE_LOGGING_METHOD.INTERVALS;
   return <section className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
-    <div className="mb-2 min-w-0">
-      <h2 className="font-semibold">{left.exerciseNameSnapshot}</h2>
-      <p className="text-xs text-slate-500">{["Left & Right", range].filter(Boolean).join(" · ")}</p>
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0 flex-1">
+        <h2 className="font-semibold">{left.exerciseNameSnapshot}</h2>
+        <p className="text-xs text-slate-500">{["Left & Right", range].filter(Boolean).join(" · ")}</p>
+      </div>
+      {onChangeExercise || onRemoveExercise ? <div className="relative"><button type="button" aria-label={\`Edit \${left.exerciseNameSnapshot}\`} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100" onClick={() => setSharedActionsOpen((value) => !value)}><MoreHorizontal className="h-5 w-5"/></button>{sharedActionsOpen ? <div className="absolute right-0 top-10 z-30 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">{onChangeExercise ? <button type="button" className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50" onClick={() => { setSharedActionsOpen(false); onChangeExercise(left); }}>Change exercise</button> : null}{onRemoveExercise ? <button type="button" className="block w-full px-3 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50" onClick={() => { setSharedActionsOpen(false); onRemoveExercise(left.id); }}>Delete exercise</button> : null}</div> : null}</div> : null}
     </div>
-    <div className="grid gap-2 sm:grid-cols-2">
-      <ExerciseCard exercise={left} index={index} hideExerciseName {...props}/>
-      <ExerciseCard exercise={right} index={pairIndex} hideExerciseName {...props} onAddSet={undefined} onRemoveSet={undefined} onRemoveExercise={undefined} onChangeExercise={undefined} onEquipment={undefined} onExerciseNote={undefined} onClearPreviousNote={undefined} onFlag={undefined} previousNote=""/>
+    {(left.exerciseType === EXERCISE_TYPE.STRENGTH && onEquipment) || onFlag ? <div className="mt-2 flex flex-wrap items-center gap-2">{left.exerciseType === EXERCISE_TYPE.STRENGTH && onEquipment ? <label className="inline-flex items-center"><span className="sr-only">Equipment</span><select aria-label={\`\${left.exerciseNameSnapshot} equipment\`} className="workout-equipment-select h-7 max-w-32 rounded-full border border-transparent bg-slate-50 px-2 text-xs font-normal leading-4 text-slate-500 hover:border-slate-200" value={left.equipmentType || "standard"} onChange={(event) => onEquipment(left.id, event.target.value)}>{EQUIPMENT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label> : null}{onFlag ? <button type="button" aria-pressed={Boolean(left.flaggedSkipped)} className={\`inline-flex h-7 items-center justify-center rounded-full px-2 transition \${left.flaggedSkipped ? "bg-red-50 text-red-700" : "bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-600"}\`} onClick={() => onFlag(left.id, !left.flaggedSkipped)}><span aria-hidden="true">⚑</span><span className="sr-only">{left.flaggedSkipped ? "Remove flag" : "Flag exercise"}</span></button> : null}</div> : null}
+    <div className="mt-3 grid items-stretch gap-3 sm:grid-cols-2">
+      <ExerciseCard exercise={left} index={index} hideExerciseName {...props} previousNote="" onAddSet={undefined} onRemoveSet={undefined} onRemoveExercise={undefined} onChangeExercise={undefined} onEquipment={undefined} onExerciseNote={undefined} onClearPreviousNote={undefined} onFlag={undefined}/>
+      <ExerciseCard exercise={right} index={pairIndex} hideExerciseName {...props} previousNote="" onAddSet={undefined} onRemoveSet={undefined} onRemoveExercise={undefined} onChangeExercise={undefined} onEquipment={undefined} onExerciseNote={undefined} onClearPreviousNote={undefined} onFlag={undefined}/>
     </div>
+    {previousNote ? <div className="mt-3 flex items-start justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2.5 text-sm text-slate-600"><span className="min-w-0 whitespace-pre-wrap">{previousNote}</span>{onClearPreviousNote ? <button type="button" aria-label="Clear carried note" className="shrink-0 rounded-md px-1.5 text-lg leading-none text-slate-400 hover:bg-slate-200 hover:text-slate-700" onClick={() => onClearPreviousNote(left.id)}>×</button> : null}</div> : null}
+    {onExerciseNote ? <label className="mt-3 block text-xs font-medium text-slate-600">Note<AutoGrowTextarea className="mt-1 block h-9 min-h-9 w-full resize-none overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-normal leading-5 text-slate-800 outline-none focus:border-slate-400" value={left.workoutNote || right.workoutNote || ""} placeholder="Add a note for this workout" onChange={(event) => onExerciseNote(left.id, event.target.value)}/></label> : null}
+    {setCount && !isTask && !isIntervals && (onAddSet || onRemoveSet) ? <div className="mt-3 flex flex-wrap gap-2"><button type="button" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50" onClick={() => onAddSet?.(left.id)}>+ Add set</button><button type="button" disabled={setCount <= 1} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40" onClick={() => onRemoveSet?.(left.id)}>Remove set</button></div> : null}
   </section>;
 }
 `

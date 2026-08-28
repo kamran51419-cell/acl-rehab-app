@@ -1,0 +1,93 @@
+/* Final phone/desktop alignment and workout-card polish. */
+
+/* Date controls: preserve one shared visual size while optically centring the value. */
+input[type='date'] {
+  padding-left: 1.9rem !important;
+  padding-right: 3.1rem !important;
+}
+
+input[type='date']::-webkit-date-and-time-value,
+input[type='date']::-webkit-datetime-edit {
+  height: 100% !important;
+  line-height: 2.5rem !important;
+  transform: translateX(-2px);
+}
+
+@media (max-width: 639px) {
+  input[type='date'] {
+    padding-left: 2.35rem !important;
+    padding-right: 2.65rem !important;
+  }
+
+  input[type='date']::-webkit-date-and-time-value,
+  input[type='date']::-webkit-datetime-edit {
+    line-height: 2.5rem !important;
+    transform: translateY(1.5px);
+  }
+}
+
+/* Add/remove set: compact, but not undersized. */
+button.workout-set-control {
+  height: 2rem !important;
+  min-height: 2rem !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* Keep completion ticks aligned to the reps control even when Prev. text is present. */
+.rounded-xl.bg-slate-50:has(> button[aria-label^='Toggle set']) {
+  align-items: start !important;
+}
+
+.rounded-xl.bg-slate-50:has(> button[aria-label^='Toggle set']) > span:first-child {
+  padding-top: 0.625rem;
+}
+
+.rounded-xl.bg-slate-50:has(> button[aria-label^='Toggle set']) > button[aria-label^='Toggle set'] {
+  align-self: start;
+  margin-top: 0.25rem;
+}
+
+/* Flag is a card-level status/action, so keep it on the card's right edge. */
+section.rounded-2xl.border.border-slate-200.bg-white:has(button[aria-label='Flag exercise as intentionally skipped']),
+section.rounded-2xl.border.border-slate-200.bg-white:has(button[aria-label='Remove exercise flag']),
+section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pressed]) {
+  position: relative;
+}
+
+button[aria-label='Flag exercise as intentionally skipped'],
+button[aria-label='Remove exercise flag'] {
+  position: absolute !important;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 2;
+  width: 2rem !important;
+  height: 2rem !important;
+  min-height: 2rem !important;
+  border: 1px solid rgb(226 232 240) !important;
+  background: #fff !important;
+  color: rgb(148 163 184) !important;
+}
+
+section.rounded-2xl.border.border-slate-200.bg-white:has(button[aria-label^='Edit ']) > .mt-2 button[aria-pressed] {
+  position: absolute !important;
+  top: 0.75rem;
+  right: 3rem;
+  z-index: 2;
+  width: 2rem !important;
+  height: 2rem !important;
+  min-height: 2rem !important;
+  padding: 0 !important;
+  border: 1px solid rgb(226 232 240) !important;
+  background: #fff !important;
+  color: rgb(148 163 184) !important;
+}
+
+button[aria-label='Remove exercise flag'],
+button[aria-label='Flag exercise as intentionally skipped'][aria-pressed='true'],
+section.rounded-2xl.border.border-slate-200.bg-white:has(button[aria-label^='Edit ']) > .mt-2 button[aria-pressed='true'] {
+  border-color: rgb(252 165 165) !important;
+  background: rgb(254 226 226) !important;
+  color: rgb(185 28 28) !important;
+  box-shadow: 0 0 0 2px rgb(239 68 68 / 0.08) !important;
+}

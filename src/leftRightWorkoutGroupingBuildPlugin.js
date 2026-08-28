@@ -11,13 +11,23 @@ function linkedWorkoutPairIndex(list, exercise, index) {
   const side = resolveWorkoutExerciseSide(exercise);
   if (![SIDE.LEFT, SIDE.RIGHT].includes(side)) return -1;
   const opposite = side === SIDE.LEFT ? SIDE.RIGHT : SIDE.LEFT;
-  const baseId = workoutPairBaseId(exercise.id);
-  return list.findIndex((candidate, candidateIndex) => candidateIndex !== index
+  const samePairShape = (candidate, candidateIndex) => candidateIndex !== index
     && candidate.exerciseId === exercise.exerciseId
     && candidate.loggingMethod === exercise.loggingMethod
     && (candidate.equipmentType || "standard") === (exercise.equipmentType || "standard")
-    && workoutPairBaseId(candidate.id) === baseId
-    && resolveWorkoutExerciseSide(candidate) === opposite);
+    && resolveWorkoutExerciseSide(candidate) === opposite;
+  const baseId = workoutPairBaseId(exercise.id);
+  const exactIndex = list.findIndex((candidate, candidateIndex) => samePairShape(candidate, candidateIndex)
+    && workoutPairBaseId(candidate.id) === baseId);
+  if (exactIndex >= 0) return exactIndex;
+  const legacyMatches = list.map((candidate, candidateIndex) => ({ candidate, candidateIndex }))
+    .filter(({ candidate, candidateIndex }) => samePairShape(candidate, candidateIndex));
+  if (legacyMatches.length === 1) return legacyMatches[0].candidateIndex;
+  if (legacyMatches.length > 1) {
+    legacyMatches.sort((a, b) => Math.abs(a.candidateIndex - index) - Math.abs(b.candidateIndex - index));
+    return legacyMatches[0].candidateIndex;
+  }
+  return -1;
 }
 
 function isLinkedWorkoutRightSide(list, exercise, index) {

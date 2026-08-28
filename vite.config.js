@@ -12,7 +12,8 @@ import { reorderUxBuildPlugin } from './src/reorderUxBuildPlugin.js'
 import { wholeCardDragBuildPlugin } from './src/wholeCardDragBuildPlugin.js'
 import { exerciseNotesBuildPlugin } from './src/exerciseNotesBuildPlugin.js'
 import { mobileInteractionFixesBuildPlugin } from './src/mobileInteractionFixesBuildPlugin.js'
-import { repeatedIntervalBlocksPlugin } from './src/repeatedIntervalBlocksPlugin.js'
+import { catchUpParityBuildPlugin } from './src/catchUpParityBuildPlugin.js'
+import { repeatedIntervalBlocksPlugin } from './src/repeatedIntervalBlocksBuildPlugin.js'
 import { verticalIntervalWorkoutDisplayPlugin } from './src/verticalIntervalWorkoutDisplayPlugin.js'
 
 export default defineConfig({
@@ -29,6 +30,7 @@ export default defineConfig({
     wholeCardDragBuildPlugin(),
     exerciseNotesBuildPlugin(),
     mobileInteractionFixesBuildPlugin(),
+    catchUpParityBuildPlugin(),
     react(),
     tailwindcss(),
     VitePWA({

@@ -32,12 +32,16 @@ function transformWorkoutDisplay(code, id) {
     const weight = set.weight ?? set.rawWeight;
     return weight !== "" && weight !== undefined && weight !== null && Number.isFinite(Number(weight));
   };
-  const hasActualReps = (set = {}) => {
-    const reps = set.actualReps ?? set.rawReps;
-    if (reps !== "" && reps !== undefined && reps !== null && Number.isFinite(Number(reps))) return true;
-    return Boolean(set.completed) && set.reps !== "" && set.reps !== undefined && set.reps !== null && Number.isFinite(Number(set.reps));
+  const hasPerformedSet = (set = {}, exercise = {}) => {
+    if (exercise.loggingMethod === "reps_weight") return hasWeight(set);
+    if (exercise.loggingMethod === "reps") return Boolean(set.completed);
+    if (hasWeight(set) || set.completed) return true;
+    if (!exercise.loggingMethod && set.prescribedReps === undefined) {
+      const legacyReps = set.actualReps ?? set.rawReps ?? set.reps;
+      return legacyReps !== "" && legacyReps !== undefined && legacyReps !== null && Number.isFinite(Number(legacyReps));
+    }
+    return false;
   };
-  const hasEnteredValue = (set = {}) => hasWeight(set) || hasActualReps(set);
 
   for (const workout of ordered) {
     const candidates = (workout.exercises || []).filter((exercise) => exercise.exerciseId === exerciseId && (exercise.equipmentType || "standard") === targetEquipment);
@@ -49,7 +53,7 @@ function transformWorkoutDisplay(code, id) {
 
     for (const exercise of matches) {
       const sets = exercise?.recordedSets?.length ? exercise.recordedSets : (exercise?.prescriptionBlocks || []).flatMap((block) => block.actualSets || []);
-      if (sets.some(hasEnteredValue)) return sets;
+      if (sets.some((set) => hasPerformedSet(set, exercise))) return sets;
     }
   }
 
@@ -70,13 +74,17 @@ function transformWorkoutDisplay(code, id) {
 }`,
     `export function previousRepsForExercise(workouts = [], target) {
   const sets = previousSetsForExercise(workouts, target);
+  const method = typeof target === "string" ? undefined : target.loggingMethod;
   const reps = sets.flatMap((set, index) => {
     const weight = set.weight ?? set.rawWeight;
     const hasWeight = weight !== "" && weight !== undefined && weight !== null && Number.isFinite(Number(weight));
-    const enteredReps = set.actualReps ?? set.rawReps;
-    const value = enteredReps !== "" && enteredReps !== undefined && enteredReps !== null
-      ? enteredReps
-      : (set.completed || hasWeight ? set.reps : undefined);
+    const performed = method === "reps_weight"
+      ? hasWeight
+      : method === "reps"
+        ? Boolean(set.completed)
+        : (hasWeight || Boolean(set.completed) || (method === undefined && set.prescribedReps === undefined));
+    if (!performed) return [];
+    const value = set.actualReps ?? set.rawReps ?? set.reps;
     if (value === "" || value === undefined || value === null || !Number.isFinite(Number(value))) return [];
     return [[Number(set.setNumber || index + 1), Number(value)]];
   });

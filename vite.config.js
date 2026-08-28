@@ -20,6 +20,7 @@ import { catchUpLeftRightGroupingBuildPlugin } from './src/catchUpLeftRightGroup
 import { programmeWorkoutVisualPolishBuildPlugin } from './src/programmeWorkoutVisualPolishBuildPlugin.js'
 import { mobileUiUxAuditBuildPlugin } from './src/mobileUiUxAuditBuildPlugin.js'
 import { seamlessTabsBuildPlugin } from './src/seamlessTabsBuildPlugin.js'
+import { workoutCardAlignmentBuildPlugin } from './src/workoutCardAlignmentBuildPlugin.js'
 import { repeatedIntervalBlocksPlugin } from './src/repeatedIntervalBlocksPlugin.js'
 import { intervalSummaryGrammarBuildPlugin } from './src/intervalSummaryGrammarBuildPlugin.js'
 import { verticalIntervalWorkoutDisplayPlugin } from './src/verticalIntervalWorkoutDisplayPlugin.js'
@@ -47,6 +48,7 @@ export default defineConfig({
     programmeWorkoutVisualPolishBuildPlugin(),
     mobileUiUxAuditBuildPlugin(),
     seamlessTabsBuildPlugin(),
+    workoutCardAlignmentBuildPlugin(),
     react(),
     tailwindcss(),
     VitePWA({

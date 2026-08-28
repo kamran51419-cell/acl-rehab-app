@@ -3,14 +3,30 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { timeWeightTrackingBuildPlugin } from './src/timeWeightTrackingBuildPlugin.js'
+import { equipmentTrackingBuildPlugin } from './src/equipmentTrackingBuildPlugin.js'
+import { latestPreviousPerformanceBuildPlugin } from './src/latestPreviousPerformanceBuildPlugin.js'
+import { workoutExerciseEditBuildPlugin } from './src/workoutExerciseEditBuildPlugin.js'
+import { workoutUiPolishBuildPlugin } from './src/workoutUiPolishBuildPlugin.js'
+import { exercisePickerConsistencyBuildPlugin } from './src/exercisePickerConsistencyBuildPlugin.js'
+import { reorderUxBuildPlugin } from './src/reorderUxBuildPlugin.js'
+import { wholeCardDragBuildPlugin } from './src/wholeCardDragBuildPlugin.js'
+import { exerciseNotesBuildPlugin } from './src/exerciseNotesBuildPlugin.js'
 import { repeatedIntervalBlocksPlugin } from './src/repeatedIntervalBlocksPlugin.js'
 import { verticalIntervalWorkoutDisplayPlugin } from './src/verticalIntervalWorkoutDisplayPlugin.js'
 
 export default defineConfig({
   plugins: [
     timeWeightTrackingBuildPlugin(),
+    equipmentTrackingBuildPlugin(),
+    latestPreviousPerformanceBuildPlugin(),
+    workoutExerciseEditBuildPlugin(),
+    workoutUiPolishBuildPlugin(),
     repeatedIntervalBlocksPlugin(),
     verticalIntervalWorkoutDisplayPlugin(),
+    exercisePickerConsistencyBuildPlugin(),
+    reorderUxBuildPlugin(),
+    wholeCardDragBuildPlugin(),
+    exerciseNotesBuildPlugin(),
     react(),
     tailwindcss(),
     VitePWA({

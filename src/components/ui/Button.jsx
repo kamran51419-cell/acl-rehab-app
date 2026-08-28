@@ -12,15 +12,21 @@ function polishAppBranding() {
   if (document.title.includes("ACL Rehab")) document.title = document.title.replace("ACL Rehab", "Gym & Rehab");
 }
 
+let brandingObserver = null;
+function ensureBrandingObserver() {
+  if (typeof document === "undefined") return;
+  polishAppBranding();
+  if (brandingObserver || typeof MutationObserver === "undefined") return;
+  brandingObserver = new MutationObserver(polishAppBranding);
+  brandingObserver.observe(document.body, { childList: true, subtree: true });
+}
+
 export default function Button({ variant = "primary", size = "md", className = "", children, onClick, ...props }) {
   const destructive = variant === "danger" || variant === "destructive";
   const opened = useRef(false);
 
   useEffect(() => {
-    polishAppBranding();
-    const observer = new MutationObserver(polishAppBranding);
-    observer.observe(document.body, { childList: true, subtree: true });
-    return () => observer.disconnect();
+    ensureBrandingObserver();
   }, []);
 
   useEffect(() => {
@@ -37,6 +43,7 @@ export default function Button({ variant = "primary", size = "md", className = "
         "inline-flex items-center justify-center rounded-xl font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-60",
         size === "sm" ? "min-h-9 px-3 py-2 text-xs" : "min-h-10 px-4 py-2 text-sm",
         variant === "primary" && "bg-blue-600 text-white shadow-sm hover:bg-blue-700 active:bg-blue-800",
+        variant === "secondary" && "border border-blue-200 bg-blue-50 text-blue-700 hover:border-blue-300 hover:bg-blue-100 active:bg-blue-100",
         variant === "outline" && "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 active:bg-slate-100",
         destructive && "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 active:bg-red-200",
         className

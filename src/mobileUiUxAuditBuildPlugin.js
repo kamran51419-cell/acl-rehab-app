@@ -52,7 +52,21 @@ function transformPlansScreen(code) {
     '<div className="flex items-center justify-between gap-3">\n          <h3 className="text-lg font-semibold">Sessions</h3>\n          <Button className="shrink-0 whitespace-nowrap" variant="outline" onClick={addSession}><Plus className="mr-1 h-4 w-4" /> Add session</Button>',
   )
 
+  next = next.replace(
+    ' : <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="font-medium">{task.name || "Unnamed task"}</div>',
+    ' : <div className="flex items-center justify-between gap-3"><div className="min-w-0"><div className="font-medium">{task.name || "Unnamed task"}</div>',
+  )
+
+  next = next.replace(
+    '<div className="flex flex-wrap items-start justify-between gap-3"><div><div className="font-medium">{plan.name}</div><div className="text-xs text-slate-500">Version {plan.version} · {plan.sessions.length} sessions</div></div><div className="flex flex-wrap gap-2">',
+    '<div className="flex flex-wrap items-center justify-between gap-3"><div><div className="font-medium">{plan.name}</div><div className="text-xs text-slate-500">Version {plan.version} · {plan.sessions.length} sessions</div></div><div className="flex flex-wrap items-center gap-2">',
+  )
+
   return next
+}
+
+function transformIndexCss(code) {
+  return `${code}\n\n/* Mobile UI audit: keep native date fields consistent and inside their cards. */\ninput[type='date'] {\n  display: block;\n  box-sizing: border-box;\n  width: 100%;\n  min-width: 0;\n  max-width: 100%;\n  height: 2.5rem;\n  text-align: center;\n}\n\ninput[type='date']::-webkit-date-and-time-value {\n  min-width: 0;\n  text-align: center;\n}\n\ninput[type='date']::-webkit-datetime-edit {\n  min-width: 0;\n  padding: 0;\n}\n\n.date-field-clip,\n.date-field-clip input[type='date'] {\n  box-sizing: border-box;\n  width: 100%;\n  min-width: 0;\n  max-width: 100%;\n}\n\n@media (max-width: 639px) {\n  input[type='date'] {\n    inline-size: 100% !important;\n    min-inline-size: 0 !important;\n    max-inline-size: 100% !important;\n    padding-inline: 2.5rem !important;\n    overflow: hidden;\n  }\n\n  input[type='date']::-webkit-date-and-time-value {\n    width: 100%;\n    text-align: center;\n  }\n\n  /* Buttons next to card/header copy should sit at the visual middle of the row. */\n  [data-programme-task-card='true'] > div:not(.space-y-3) {\n    align-items: center;\n  }\n}\n\n@media (prefers-reduced-motion: no-preference) {\n  #root > div > .mx-auto.max-w-7xl.space-y-6 > :not(.hidden) {\n    animation: app-panel-enter 120ms ease-out;\n  }\n}\n\n@keyframes app-panel-enter {\n  from { opacity: 0.96; transform: translateY(2px); }\n  to { opacity: 1; transform: translateY(0); }\n}\n`
 }
 
 export function mobileUiUxAuditBuildPlugin() {
@@ -63,6 +77,7 @@ export function mobileUiUxAuditBuildPlugin() {
       const cleanId = id.split('?')[0].replaceAll('\\\\', '/')
       if (cleanId.endsWith('/src/App.jsx')) return transformApp(code)
       if (cleanId.endsWith('/src/features/plans/PlansScreen.jsx')) return transformPlansScreen(code)
+      if (cleanId.endsWith('/src/index.css')) return transformIndexCss(code)
       return null
     },
   }

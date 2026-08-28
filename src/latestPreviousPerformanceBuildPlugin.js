@@ -28,12 +28,16 @@ function transformWorkoutDisplay(code, id) {
     return Number.isFinite(completed) ? completed : 0;
   };
   const ordered = workouts.slice().sort((a, b) => String(b.date || b.workoutDate || "").localeCompare(String(a.date || a.workoutDate || "")) || timestamp(b) - timestamp(a));
-  const hasEnteredValue = (set = {}) => {
+  const hasWeight = (set = {}) => {
     const weight = set.weight ?? set.rawWeight;
-    const reps = set.actualReps ?? set.rawReps ?? set.reps;
-    return (weight !== "" && weight !== undefined && weight !== null && Number.isFinite(Number(weight)))
-      || (reps !== "" && reps !== undefined && reps !== null && Number.isFinite(Number(reps)));
+    return weight !== "" && weight !== undefined && weight !== null && Number.isFinite(Number(weight));
   };
+  const hasActualReps = (set = {}) => {
+    const reps = set.actualReps ?? set.rawReps;
+    if (reps !== "" && reps !== undefined && reps !== null && Number.isFinite(Number(reps))) return true;
+    return Boolean(set.completed) && set.reps !== "" && set.reps !== undefined && set.reps !== null && Number.isFinite(Number(set.reps));
+  };
+  const hasEnteredValue = (set = {}) => hasWeight(set) || hasActualReps(set);
 
   for (const workout of ordered) {
     const candidates = (workout.exercises || []).filter((exercise) => exercise.exerciseId === exerciseId && (exercise.equipmentType || "standard") === targetEquipment);
@@ -52,7 +56,35 @@ function transformWorkoutDisplay(code, id) {
   return [];
 }`
 
-  return replaceRequired(code, oldFunction, newFunction, id)
+  let next = replaceRequired(code, oldFunction, newFunction, id)
+  next = replaceRequired(
+    next,
+    `export function previousRepsForExercise(workouts = [], target) {
+  const sets = previousSetsForExercise(workouts, target);
+  const reps = sets.flatMap((set, index) => {
+    const value = set.actualReps ?? set.rawReps ?? set.reps;
+    if (value === "" || value === undefined || value === null || !Number.isFinite(Number(value))) return [];
+    return [[Number(set.setNumber || index + 1), Number(value)]];
+  });
+  return reps.length ? Object.fromEntries(reps) : {};
+}`,
+    `export function previousRepsForExercise(workouts = [], target) {
+  const sets = previousSetsForExercise(workouts, target);
+  const reps = sets.flatMap((set, index) => {
+    const weight = set.weight ?? set.rawWeight;
+    const hasWeight = weight !== "" && weight !== undefined && weight !== null && Number.isFinite(Number(weight));
+    const enteredReps = set.actualReps ?? set.rawReps;
+    const value = enteredReps !== "" && enteredReps !== undefined && enteredReps !== null
+      ? enteredReps
+      : (set.completed || hasWeight ? set.reps : undefined);
+    if (value === "" || value === undefined || value === null || !Number.isFinite(Number(value))) return [];
+    return [[Number(set.setNumber || index + 1), Number(value)]];
+  });
+  return reps.length ? Object.fromEntries(reps) : {};
+}`,
+    id,
+  )
+  return next
 }
 
 export function latestPreviousPerformanceBuildPlugin() {

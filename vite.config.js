@@ -14,6 +14,7 @@ import { exerciseNotesBuildPlugin } from './src/exerciseNotesBuildPlugin.js'
 import { mobileInteractionFixesBuildPlugin } from './src/mobileInteractionFixesBuildPlugin.js'
 import { catchUpParityBuildPlugin } from './src/catchUpParityBuildPlugin.js'
 import { exerciseFlagBuildPlugin } from './src/exerciseFlagBuildPlugin.js'
+import { programmeCollapseBuildPlugin } from './src/programmeCollapseBuildPlugin.js'
 import { repeatedIntervalBlocksPlugin } from './src/repeatedIntervalBlocksPlugin.js'
 import { verticalIntervalWorkoutDisplayPlugin } from './src/verticalIntervalWorkoutDisplayPlugin.js'
 
@@ -33,6 +34,7 @@ export default defineConfig({
     mobileInteractionFixesBuildPlugin(),
     catchUpParityBuildPlugin(),
     exerciseFlagBuildPlugin(),
+    programmeCollapseBuildPlugin(),
     react(),
     tailwindcss(),
     VitePWA({

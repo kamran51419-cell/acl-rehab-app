@@ -466,14 +466,21 @@ export function nextPlanForSave(original, draft) {
   };
 }
 
+function prescriptionSideSummary(side) {
+  if (side === SIDE.LEFT) return "left";
+  if (side === SIDE.RIGHT) return "right";
+  if (side === SIDE.SEPARATE) return "left & right";
+  return "";
+}
+
 export function planPrescriptionSummary(exercise) {
   const type = exercise.exerciseType;
   if (type === EXERCISE_TYPE.STRENGTH || type === EXERCISE_TYPE.PLYOMETRIC) {
     const prescriptions = exercise.prescription?.blocks ? sortByOrder(exercise.prescription.blocks) : [exercise.prescription || {}];
     return prescriptions.map((block) => {
-      const side = block.side === SIDE.LEFT ? "left" : block.side === SIDE.RIGHT ? "right" : "both";
+      const side = prescriptionSideSummary(block.side);
       const reps = block.targetReps?.type === REP_TARGET_TYPE.RANGE ? `${block.targetReps.min}–${block.targetReps.max}` : block.targetReps?.value || "?";
-      return `${block.targetSets} × ${reps} ${side}`;
+      return `${block.targetSets} × ${reps}${side ? ` ${side}` : ""}`;
     }).join(" · ");
   }
   if (type === EXERCISE_TYPE.TIMED_HOLD || type === EXERCISE_TYPE.BALANCE) {
@@ -482,8 +489,8 @@ export function planPrescriptionSummary(exercise) {
       const reps = exercise.prescription?.targetReps?.type === REP_TARGET_TYPE.RANGE ? `${exercise.prescription.targetReps.min}–${exercise.prescription.targetReps.max}` : exercise.prescription?.targetReps?.value || "?";
       return `${exercise.prescription?.targetSets || 0} × ${reps}`;
     }
-    const side = exercise.prescription?.side === SIDE.LEFT ? "left" : exercise.prescription?.side === SIDE.RIGHT ? "right" : "both";
-    return `${exercise.prescription?.targetSets || 0} × ${durationSummary(exercise.prescription?.targetDurationSeconds, exercise.prescription?.durationUnit)} ${side}`;
+    const side = prescriptionSideSummary(exercise.prescription?.side);
+    return `${exercise.prescription?.targetSets || 0} × ${durationSummary(exercise.prescription?.targetDurationSeconds, exercise.prescription?.durationUnit)}${side ? ` ${side}` : ""}`;
   }
   if (type === EXERCISE_TYPE.CARDIO) {
     if (exercise.loggingMethod === EXERCISE_LOGGING_METHOD.INTERVALS) return `${asArray(exercise.prescription?.stages).length} intervals`;

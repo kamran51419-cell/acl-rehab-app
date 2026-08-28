@@ -11,19 +11,10 @@ function transformWorkoutScreen(code, id) {
   next = replaceRequired(
     next,
     'function AutoGrowTextarea({ className = "", onInput, style, ...props }) {\n  const ref = useRef(null);\n  const resize = useCallback(() => { const node = ref.current; if (!node) return; node.style.height = "36px"; if (String(node.value || "").includes("\\n") || node.scrollHeight > 36) node.style.height = Math.max(36, node.scrollHeight) + "px"; }, []);\n  useEffect(resize, [props.value, resize]);\n  return <textarea ref={ref} rows={1} {...props} style={{ height: 36, ...style }} onInput={(event) => { resize(); onInput?.(event); }} className={className} />;\n}',
-    'function AutoGrowTextarea({ className = "", onInput, style, ...props }) {\n  const ref = useRef(null);\n  const resize = useCallback(() => { const node = ref.current; if (!node) return; node.style.height = "0px"; node.style.height = Math.max(36, node.scrollHeight) + "px"; }, []);\n  useEffect(resize, [props.value, resize]);\n  return <textarea ref={ref} rows={1} {...props} style={{ height: 36, minHeight: 36, maxHeight: 180, overflowY: "hidden", ...style }} onInput={(event) => { resize(); onInput?.(event); }} className={className} />;\n}',
+    'function AutoGrowTextarea({ className = "", onInput, style, ...props }) {\n  const ref = useRef(null);\n  const resize = useCallback(() => { const node = ref.current; if (!node) return; node.style.height = "36px"; if (node.scrollHeight > node.clientHeight + 1) node.style.height = Math.min(180, node.scrollHeight) + "px"; }, []);\n  useEffect(resize, [props.value, resize]);\n  return <textarea ref={ref} rows={1} {...props} style={{ height: 36, minHeight: 36, maxHeight: 180, boxSizing: "border-box", overflowY: "hidden", ...style }} onInput={(event) => { resize(); onInput?.(event); }} className={className} />;\n}',
     id,
   )
   return next
-}
-
-function transformProgrammeControls(code, id) {
-  return replaceRequired(
-    code,
-    'export function Textarea(props) {\n  return <textarea className="min-h-20 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" {...props} />;\n}',
-    'export function Textarea({ onInput, style, ...props }) {\n  return <textarea rows={1} className="block h-9 min-h-9 w-full resize-none overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm leading-5" style={{ height: 36, minHeight: 36, maxHeight: 180, overflowY: "hidden", ...style }} {...props} onInput={(event) => { const node = event.currentTarget; node.style.height = "0px"; node.style.height = Math.max(36, node.scrollHeight) + "px"; onInput?.(event); }} />;\n}',
-    id,
-  )
 }
 
 export function catchUpParityBuildPlugin() {
@@ -33,7 +24,6 @@ export function catchUpParityBuildPlugin() {
     transform(code, id) {
       const cleanId = id.split('?')[0].replaceAll('\\\\', '/')
       if (cleanId.endsWith('/src/features/workout/WorkoutScreen.jsx')) return transformWorkoutScreen(code, id)
-      if (cleanId.endsWith('/src/features/plans/ProgrammeFormControls.jsx')) return transformProgrammeControls(code, id)
       return null
     },
   }

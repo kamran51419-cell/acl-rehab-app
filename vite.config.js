@@ -7,6 +7,7 @@ import { equipmentTrackingBuildPlugin } from './src/equipmentTrackingBuildPlugin
 import { workoutExerciseEditBuildPlugin } from './src/workoutExerciseEditBuildPlugin.js'
 import { workoutUiPolishBuildPlugin } from './src/workoutUiPolishBuildPlugin.js'
 import { exercisePickerConsistencyBuildPlugin } from './src/exercisePickerConsistencyBuildPlugin.js'
+import { reorderUxBuildPlugin } from './src/reorderUxBuildPlugin.js'
 import { repeatedIntervalBlocksPlugin } from './src/repeatedIntervalBlocksPlugin.js'
 import { verticalIntervalWorkoutDisplayPlugin } from './src/verticalIntervalWorkoutDisplayPlugin.js'
 
@@ -19,6 +20,7 @@ export default defineConfig({
     repeatedIntervalBlocksPlugin(),
     verticalIntervalWorkoutDisplayPlugin(),
     exercisePickerConsistencyBuildPlugin(),
+    reorderUxBuildPlugin(),
     react(),
     tailwindcss(),
     VitePWA({

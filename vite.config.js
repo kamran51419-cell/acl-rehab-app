@@ -11,6 +11,7 @@ import { exercisePickerConsistencyBuildPlugin } from './src/exercisePickerConsis
 import { reorderUxBuildPlugin } from './src/reorderUxBuildPlugin.js'
 import { wholeCardDragBuildPlugin } from './src/wholeCardDragBuildPlugin.js'
 import { exerciseNotesBuildPlugin } from './src/exerciseNotesBuildPlugin.js'
+import { mobileInteractionFixesBuildPlugin } from './src/mobileInteractionFixesBuildPlugin.js'
 import { repeatedIntervalBlocksPlugin } from './src/repeatedIntervalBlocksPlugin.js'
 import { verticalIntervalWorkoutDisplayPlugin } from './src/verticalIntervalWorkoutDisplayPlugin.js'
 
@@ -27,6 +28,7 @@ export default defineConfig({
     reorderUxBuildPlugin(),
     wholeCardDragBuildPlugin(),
     exerciseNotesBuildPlugin(),
+    mobileInteractionFixesBuildPlugin(),
     react(),
     tailwindcss(),
     VitePWA({

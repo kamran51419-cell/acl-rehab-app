@@ -106,9 +106,7 @@ button.workout-set-control {
   line-height: 1.25rem !important;
 }
 
-/* Generic exercise-card action layout.
-   The edit menu is always top-right. The flag is directly below it, at the same vertical
-   level as Equipment when Equipment exists. Without Equipment, reserve that same row. */
+/* The edit menu owns the top-right corner. */
 .workout-card-header {
   position: relative;
   padding-right: 2.5rem;
@@ -121,11 +119,21 @@ button.workout-set-control {
   z-index: 3;
 }
 
-.workout-card-header .workout-card-flag {
-  position: absolute !important;
-  top: calc(100% + 0.25rem) !important;
-  right: 0 !important;
-  z-index: 2;
+/* Strength cards: Equipment left, flag right, both in a real metadata row. */
+.mt-1.inline-flex.items-center.gap-1\.5 {
+  display: flex !important;
+  width: 100% !important;
+  min-height: 2rem !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 0.5rem !important;
+}
+
+.mt-1.inline-flex.items-center.gap-1\.5 > button[aria-pressed] {
+  position: static !important;
+  display: inline-flex !important;
+  margin-left: auto !important;
+  flex: 0 0 2rem !important;
   width: 2rem !important;
   height: 2rem !important;
   min-height: 2rem !important;
@@ -136,21 +144,37 @@ button.workout-set-control {
   color: rgb(148 163 184) !important;
 }
 
-/* When there is no Equipment row, keep an empty metadata row so the flag cannot overlap sets/content. */
-section.rounded-2xl.border.border-slate-200.bg-white:has(.workout-card-header .workout-card-flag):not(:has(.workout-equipment-select)) .workout-card-header {
-  margin-bottom: 2.25rem;
+/* Non-strength cards reserve the same metadata row, so the flag never overlaps sets/content. */
+.workout-card-flag-row {
+  width: 100% !important;
+  min-height: 2rem !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
 }
 
-.workout-card-header .workout-card-flag[aria-pressed='true'],
-.workout-card-header .workout-card-flag[aria-label='Remove exercise flag'] {
+.workout-card-flag-row .workout-card-flag {
+  position: static !important;
+  margin-left: auto !important;
+  flex: 0 0 2rem !important;
+  width: 2rem !important;
+  height: 2rem !important;
+  min-height: 2rem !important;
+  padding: 0 !important;
+  border: 1px solid rgb(226 232 240) !important;
+  border-radius: 9999px !important;
+  background: #fff !important;
+  color: rgb(148 163 184) !important;
+}
+
+.mt-1.inline-flex.items-center.gap-1\.5 > button[aria-pressed='true'],
+.workout-card-flag-row .workout-card-flag[aria-pressed='true'] {
   border-color: rgb(252 165 165) !important;
   background: rgb(254 226 226) !important;
   color: rgb(185 28 28) !important;
   box-shadow: 0 0 0 2px rgb(239 68 68 / 0.08) !important;
 }
 
-/* Paired L+R cards use the same two-row rule: ... at the far right of the header,
-   then Equipment (if any) + flag on one horizontal metadata row. */
+/* Paired L+R cards use the same two-row rule: ... in the header, Equipment + flag below. */
 section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pressed]) > div:first-child {
   align-items: flex-start !important;
 }
@@ -188,10 +212,4 @@ section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pre
   background: rgb(254 226 226) !important;
   color: rgb(185 28 28) !important;
   box-shadow: 0 0 0 2px rgb(239 68 68 / 0.08) !important;
-}
-
-/* Hide the older strength-only flag beside Equipment. The card-level flag is available for every exercise type. */
-.mt-1.inline-flex.items-center.gap-1\.5 > button[aria-label='Flag exercise as intentionally skipped'],
-.mt-1.inline-flex.items-center.gap-1\.5 > button[aria-label='Remove exercise flag'] {
-  display: none !important;
 }

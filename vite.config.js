@@ -19,6 +19,7 @@ import { leftRightWorkoutGroupingBuildPlugin } from './src/leftRightWorkoutGroup
 import { catchUpLeftRightGroupingBuildPlugin } from './src/catchUpLeftRightGroupingBuildPlugin.js'
 import { programmeWorkoutVisualPolishBuildPlugin } from './src/programmeWorkoutVisualPolishBuildPlugin.js'
 import { repeatedIntervalBlocksPlugin } from './src/repeatedIntervalBlocksPlugin.js'
+import { intervalSummaryGrammarBuildPlugin } from './src/intervalSummaryGrammarBuildPlugin.js'
 import { verticalIntervalWorkoutDisplayPlugin } from './src/verticalIntervalWorkoutDisplayPlugin.js'
 
 export default defineConfig({
@@ -29,6 +30,7 @@ export default defineConfig({
     workoutExerciseEditBuildPlugin(),
     workoutUiPolishBuildPlugin(),
     repeatedIntervalBlocksPlugin(),
+    intervalSummaryGrammarBuildPlugin(),
     verticalIntervalWorkoutDisplayPlugin(),
     exercisePickerConsistencyBuildPlugin(),
     reorderUxBuildPlugin(),

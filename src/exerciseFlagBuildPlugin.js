@@ -29,6 +29,53 @@ function transformExerciseProgress(code, id) {
   return next
 }
 
+function transformProgressScreen(code, id) {
+  let next = code
+  next = replaceRequired(
+    next,
+    'import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";',
+    'import { CartesianGrid, Legend, Line, LineChart, ReferenceDot, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";',
+    id,
+  )
+
+  next = replaceRequired(
+    next,
+    'function StrengthGraph({ entries, leftRight = false }) {\n  const points = useMemo(() => strengthGraphPoints(entries), [entries]);',
+    `function strengthGraphWithFlags(entries, flaggedEntries, leftRight) {\n  const points = strengthGraphPoints(entries).map((point) => ({ ...point }));\n  const byWorkout = new Map(points.map((point) => [point.workoutId, point]));\n  (flaggedEntries || []).forEach((flag) => {\n    if (!byWorkout.has(flag.workoutId)) {\n      const point = { workoutId: flag.workoutId, date: flag.date, displayDate: flag.displayDate };\n      points.push(point);\n      byWorkout.set(flag.workoutId, point);\n    }\n  });\n  points.sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.workoutId).localeCompare(String(b.workoutId)));\n  const markers = (flaggedEntries || []).flatMap((flag) => {\n    const key = leftRight ? (flag.side === SIDE.RIGHT ? "right" : "left") : "strength";\n    const index = points.findIndex((point) => point.workoutId === flag.workoutId);\n    if (index < 0) return [];\n    let y = points[index][key];\n    if (y === undefined || y === null) {\n      for (let cursor = index - 1; cursor >= 0; cursor -= 1) {\n        if (points[cursor][key] !== undefined && points[cursor][key] !== null) { y = points[cursor][key]; break; }\n      }\n    }\n    if (y === undefined || y === null) {\n      for (let cursor = index + 1; cursor < points.length; cursor += 1) {\n        if (points[cursor][key] !== undefined && points[cursor][key] !== null) { y = points[cursor][key]; break; }\n      }\n    }\n    return y === undefined || y === null ? [] : [{ ...flag, y }];\n  });\n  return { points, markers };\n}\n\nfunction StrengthGraph({ entries, flaggedEntries = [], leftRight = false }) {\n  const graph = useMemo(() => strengthGraphWithFlags(entries, flaggedEntries, leftRight), [entries, flaggedEntries, leftRight]);\n  const points = graph.points;\n  const flagMarkers = graph.markers;`,
+    id,
+  )
+
+  next = replaceRequired(
+    next,
+    '<Tooltip content={<StrengthTooltip />}/>{leftRight ?',
+    '<Tooltip content={<StrengthTooltip />}/>{flagMarkers.map((marker, index) => <ReferenceDot key={`${marker.workoutId}-${marker.side || "standard"}-${index}`} x={marker.displayDate} y={marker.y} r={5} fill="#dc2626" stroke="#dc2626" ifOverflow="extendDomain"/>)}{leftRight ?',
+    id,
+  )
+
+  next = replaceRequired(
+    next,
+    '<StrengthGraph entries={entries} leftRight/>',
+    '<StrengthGraph entries={entries} flaggedEntries={(group.flaggedEntries || []).filter((entry) => entry.sideMode === PROGRESS_SIDE_MODE.LEFT_RIGHT)} leftRight/>',
+    id,
+  )
+
+  next = replaceRequired(
+    next,
+    'const equipmentGroup = { ...group, entries: (group.entries || []).filter((entry) => (entry.equipmentType || "standard") === equipment) };',
+    'const equipmentGroup = { ...group, entries: (group.entries || []).filter((entry) => (entry.equipmentType || "standard") === equipment), flaggedEntries: (group.flaggedEntries || []).filter((entry) => (entry.equipmentType || "standard") === equipment) };',
+    id,
+  )
+
+  next = replaceRequired(
+    next,
+    '<StatsCards entries={selectedEntries}/><StrengthGraph entries={selectedEntries}/>',
+    '<StatsCards entries={selectedEntries}/><StrengthGraph entries={selectedEntries} flaggedEntries={(equipmentGroup.flaggedEntries || []).filter((entry) => entry.sideMode === mode)}/>',
+    id,
+  )
+
+  return next
+}
+
 export function exerciseFlagBuildPlugin() {
   return {
     name: 'exercise-flag',
@@ -38,6 +85,7 @@ export function exerciseFlagBuildPlugin() {
       if (cleanId.endsWith('/src/features/workout/WorkoutScreen.jsx')) return transformWorkoutScreen(code, id)
       if (cleanId.endsWith('/src/lib/domain/workoutSession.js')) return transformWorkoutSession(code, id)
       if (cleanId.endsWith('/src/lib/domain/exerciseProgress.js')) return transformExerciseProgress(code, id)
+      if (cleanId.endsWith('/src/features/progress/ProgressScreen.jsx')) return transformProgressScreen(code, id)
       return null
     },
   }

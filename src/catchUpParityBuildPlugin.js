@@ -1,7 +1,33 @@
+function replaceRequired(code, oldText, newText, id) {
+  if (!code.includes(oldText)) throw new Error(`Catch-up parity transform could not find expected source in ${id}`)
+  return code.replace(oldText, newText)
+}
+
 function transformWorkoutScreen(code, id) {
+  let next = code
   const oldDateClass = 'date-field-clip mt-1 block w-full max-w-full overflow-hidden rounded-xl border border-slate-200 bg-white'
-  if ((code.split(oldDateClass).length - 1) < 2) throw new Error(`Catch-up parity transform could not find both date fields in ${id}`)
-  return code.replaceAll(oldDateClass, 'date-field-clip mt-1 block w-[11.5rem] max-w-full overflow-hidden rounded-xl border border-slate-200 bg-white')
+  if ((next.split(oldDateClass).length - 1) < 2) throw new Error(`Catch-up parity transform could not find both date fields in ${id}`)
+  next = next.replaceAll(oldDateClass, 'date-field-clip mt-1 block w-[11.5rem] max-w-full overflow-hidden rounded-xl border border-slate-200 bg-white')
+
+  next = replaceRequired(
+    next,
+    'function AutoGrowTextarea({ className = "", onInput, style, ...props }) {\n  const ref = useRef(null);\n  const resize = useCallback(() => { const node = ref.current; if (!node) return; node.style.height = "36px"; if (String(node.value || "").includes("\\n") || node.scrollHeight > 36) node.style.height = Math.max(36, node.scrollHeight) + "px"; }, []);\n  useEffect(resize, [props.value, resize]);\n  return <textarea ref={ref} rows={1} {...props} style={{ height: 36, ...style }} onInput={(event) => { resize(); onInput?.(event); }} className={className} />;\n}',
+    'function AutoGrowTextarea({ className = "", onInput, style, ...props }) {\n  const ref = useRef(null);\n  const resize = useCallback(() => { const node = ref.current; if (!node) return; node.style.height = "0px"; node.style.height = Math.max(36, node.scrollHeight) + "px"; }, []);\n  useEffect(resize, [props.value, resize]);\n  return <textarea ref={ref} rows={1} {...props} style={{ height: 36, minHeight: 36, maxHeight: 180, overflowY: "hidden", ...style }} onInput={(event) => { resize(); onInput?.(event); }} className={className} />;\n}',
+    id,
+  )
+  return next
+}
+
+function transformProgrammeControls(code, id) {
+  let next = code
+  next = replaceRequired(next, 'import React, { useEffect, useMemo, useState } from "react";', 'import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";', id)
+  next = replaceRequired(
+    next,
+    'export function Textarea(props) {\n  return <textarea className="min-h-20 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" {...props} />;\n}',
+    'export function Textarea({ className = "", onInput, style, ...props }) {\n  const ref = useRef(null);\n  const resize = useCallback(() => { const node = ref.current; if (!node) return; node.style.height = "0px"; node.style.height = Math.max(36, node.scrollHeight) + "px"; }, []);\n  useEffect(resize, [props.value, resize]);\n  return <textarea ref={ref} rows={1} className={`block h-9 min-h-9 w-full resize-none overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm leading-5 ${className}`} style={{ height: 36, minHeight: 36, maxHeight: 180, overflowY: "hidden", ...style }} {...props} onInput={(event) => { resize(); onInput?.(event); }} />;\n}',
+    id,
+  )
+  return next
 }
 
 export function catchUpParityBuildPlugin() {
@@ -11,6 +37,7 @@ export function catchUpParityBuildPlugin() {
     transform(code, id) {
       const cleanId = id.split('?')[0].replaceAll('\\\\', '/')
       if (cleanId.endsWith('/src/features/workout/WorkoutScreen.jsx')) return transformWorkoutScreen(code, id)
+      if (cleanId.endsWith('/src/features/plans/ProgrammeFormControls.jsx')) return transformProgrammeControls(code, id)
       return null
     },
   }

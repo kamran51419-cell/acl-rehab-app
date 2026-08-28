@@ -85,6 +85,32 @@ function transformPlansScreen(code) {
   return next
 }
 
+function transformRoutineTaskTimeEditor(code) {
+  let next = code
+
+  next = next.replace(
+    'addCustom.className = "min-h-10 rounded-lg border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800";',
+    'addCustom.className = "min-h-10 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors duration-150 hover:bg-slate-50 active:bg-slate-100";',
+  )
+
+  next = next.replace(
+    '  const observer = new MutationObserver(() => requestAnimationFrame(enhance));\n  observer.observe(document.body, { childList: true, subtree: true });\n  return () => observer.disconnect();',
+    '  let enhanceFrame = 0;\n  const observer = new MutationObserver(() => { cancelAnimationFrame(enhanceFrame); enhanceFrame = requestAnimationFrame(enhance); });\n  observer.observe(document.body, { childList: true, subtree: true });\n  return () => { cancelAnimationFrame(enhanceFrame); observer.disconnect(); };',
+  )
+
+  return next
+}
+
+function transformBuilderUxEnhancements(code) {
+  return code.replace(
+    '  const observer = new MutationObserver(() => requestAnimationFrame(handleRender))\n  observer.observe(document.body, { childList: true, subtree: true })',
+    '  let renderFrame = 0\n  const observer = new MutationObserver(() => { cancelAnimationFrame(renderFrame); renderFrame = requestAnimationFrame(handleRender) })\n  observer.observe(document.body, { childList: true, subtree: true })',
+  ).replace(
+    '    observer.disconnect()\n    document.removeEventListener(\'click\', handleClick, true)',
+    '    cancelAnimationFrame(renderFrame)\n    observer.disconnect()\n    document.removeEventListener(\'click\', handleClick, true)',
+  )
+}
+
 function transformIndexCss(code) {
   return `${code}\n\n/* Mobile UI audit: one consistent date control across the app. */\ninput[type='date'] {\n  position: relative;\n  display: block;\n  box-sizing: border-box;\n  inline-size: 11.5rem;\n  width: 11.5rem;\n  min-inline-size: 0;\n  min-width: 0;\n  max-inline-size: 100%;\n  max-width: 100%;\n  block-size: 2.5rem;\n  height: 2.5rem;\n  margin: 0;\n  border: 1px solid rgb(226 232 240);\n  border-radius: 0.75rem;\n  background: white;\n  padding: 0 2.5rem;\n  color: rgb(15 23 42);\n  font-size: 0.875rem;\n  line-height: 1;\n  text-align: center;\n  overflow: hidden;\n}\n\ninput[type='date']::-webkit-date-and-time-value {\n  width: 100%;\n  min-width: 0;\n  margin: 0;\n  text-align: center;\n}\n\ninput[type='date']::-webkit-datetime-edit {\n  display: flex;\n  width: 100%;\n  min-width: 0;\n  justify-content: center;\n  padding: 0;\n}\n\ninput[type='date']::-webkit-calendar-picker-indicator {\n  position: absolute;\n  right: 0.75rem;\n  width: 1.1rem;\n  height: 1.1rem;\n  margin: 0;\n  padding: 0;\n  opacity: 0.65;\n}\n\n.date-field-clip {\n  box-sizing: border-box;\n  inline-size: 11.5rem !important;\n  width: 11.5rem !important;\n  min-inline-size: 0 !important;\n  min-width: 0 !important;\n  max-inline-size: 100% !important;\n  max-width: 100% !important;\n}\n\n@media (max-width: 639px) {\n  input[type='date'],\n  .date-field-clip {\n    max-inline-size: 100% !important;\n    max-width: 100% !important;\n  }\n\n  /* Buttons next to card/header copy should sit at the visual middle of the row. */\n  [data-programme-task-card='true'] > div:not(.space-y-3) {\n    align-items: center;\n  }\n}\n`
 }
@@ -97,6 +123,8 @@ export function mobileUiUxAuditBuildPlugin() {
       const cleanId = id.split('?')[0].replaceAll('\\\\', '/')
       if (cleanId.endsWith('/src/App.jsx')) return transformApp(code)
       if (cleanId.endsWith('/src/features/plans/PlansScreen.jsx')) return transformPlansScreen(code)
+      if (cleanId.endsWith('/src/routineTaskTimeEditor.js')) return transformRoutineTaskTimeEditor(code)
+      if (cleanId.endsWith('/src/builderUxEnhancements.js')) return transformBuilderUxEnhancements(code)
       if (cleanId.endsWith('/src/index.css')) return transformIndexCss(code)
       return null
     },

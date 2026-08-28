@@ -25,7 +25,7 @@ function transformWorkoutScreen(code, id) {
   )
 
   next = replaceAll(next, '<input autoFocus className="min-w-0 flex-1 outline-none" placeholder="Search exercises"', '<input className="min-w-0 flex-1 outline-none" placeholder="Search exercises"')
-  next = replaceAll(next, 'placeholder="Search exercises" value={query}', 'autoFocus placeholder="Search exercises" data-exercise-picker-search="true" value={query}')
+  next = replaceAll(next, 'placeholder="Search exercises" value={query}', 'placeholder="Search exercises" data-exercise-picker-search="true" value={query}')
   next = replaceAll(next, 'className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left hover:bg-slate-50"', 'className="exercise-picker-row flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left hover:bg-slate-50 sm:px-4 sm:py-3"')
   next = replaceAll(next, '<span className="text-xs font-medium text-blue-600">Use</span>', '<span className="exercise-picker-action">Select</span>')
   next = replaceAll(next, '<span className="text-sm font-medium text-blue-600">{replacing ? "Choose" : "Add"}</span>', '<span className="exercise-picker-action">{replacing ? "Select" : "Add"}</span>')
@@ -35,7 +35,7 @@ function transformWorkoutScreen(code, id) {
 function transformPlansScreen(code) {
   let next = code
   next = replaceAll(next, '<Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />', '<Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />')
-  next = replaceAll(next, 'className="h-12 rounded-xl pl-10 text-base" autoFocus aria-label="Search exercises"', 'className="exercise-picker-search h-12 rounded-xl pl-11 text-base" autoFocus aria-label="Search exercises"')
+  next = replaceAll(next, 'className="h-12 rounded-xl pl-10 text-base" autoFocus aria-label="Search exercises"', 'className="exercise-picker-search h-12 rounded-xl pl-11 text-base" aria-label="Search exercises"')
   next = replaceAll(next, 'className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3"', 'className="exercise-picker-row flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 sm:px-4 sm:py-3"')
   next = replaceAll(next, '{replaceTarget ? "Use" : selected ? "Selected" : "Add"}', '{replaceTarget ? "Select" : selected ? "Selected" : "Add"}')
   next = replaceAll(next, '<div className="max-w-xs">{methodField}</div>', '<div className="w-full">{methodField}</div>')
@@ -46,7 +46,7 @@ function transformPlansScreen(code) {
 function transformQuickWorkoutBuilder(code) {
   let next = code
   next = replaceAll(next, '<Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />', '<Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />')
-  next = replaceAll(next, 'className="h-12 rounded-xl pl-10 text-base" autoFocus aria-label="Search exercises"', 'className="exercise-picker-search h-12 rounded-xl pl-11 text-base" autoFocus aria-label="Search exercises"')
+  next = replaceAll(next, 'className="h-12 rounded-xl pl-10 text-base" autoFocus aria-label="Search exercises"', 'className="exercise-picker-search h-12 rounded-xl pl-11 text-base" aria-label="Search exercises"')
   next = replaceAll(next, 'className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3"', 'className="exercise-picker-row flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 sm:px-4 sm:py-3"')
   next = replaceAll(next, '{replaceIndex !== null ? "Use" : "Add"}', '{replaceIndex !== null ? "Select" : "Add"}')
   return next

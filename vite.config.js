@@ -6,6 +6,7 @@ import { timeWeightTrackingBuildPlugin } from './src/timeWeightTrackingBuildPlug
 import { equipmentTrackingBuildPlugin } from './src/equipmentTrackingBuildPlugin.js'
 import { workoutExerciseEditBuildPlugin } from './src/workoutExerciseEditBuildPlugin.js'
 import { workoutUiPolishBuildPlugin } from './src/workoutUiPolishBuildPlugin.js'
+import { exercisePickerConsistencyBuildPlugin } from './src/exercisePickerConsistencyBuildPlugin.js'
 import { repeatedIntervalBlocksPlugin } from './src/repeatedIntervalBlocksPlugin.js'
 import { verticalIntervalWorkoutDisplayPlugin } from './src/verticalIntervalWorkoutDisplayPlugin.js'
 
@@ -15,6 +16,7 @@ export default defineConfig({
     equipmentTrackingBuildPlugin(),
     workoutExerciseEditBuildPlugin(),
     workoutUiPolishBuildPlugin(),
+    exercisePickerConsistencyBuildPlugin(),
     repeatedIntervalBlocksPlugin(),
     verticalIntervalWorkoutDisplayPlugin(),
     react(),

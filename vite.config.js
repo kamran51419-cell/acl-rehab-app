@@ -16,9 +16,9 @@ export default defineConfig({
     equipmentTrackingBuildPlugin(),
     workoutExerciseEditBuildPlugin(),
     workoutUiPolishBuildPlugin(),
-    exercisePickerConsistencyBuildPlugin(),
     repeatedIntervalBlocksPlugin(),
     verticalIntervalWorkoutDisplayPlugin(),
+    exercisePickerConsistencyBuildPlugin(),
     react(),
     tailwindcss(),
     VitePWA({

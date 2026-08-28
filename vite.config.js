@@ -9,6 +9,7 @@ import { workoutUiPolishBuildPlugin } from './src/workoutUiPolishBuildPlugin.js'
 import { exercisePickerConsistencyBuildPlugin } from './src/exercisePickerConsistencyBuildPlugin.js'
 import { reorderUxBuildPlugin } from './src/reorderUxBuildPlugin.js'
 import { wholeCardDragBuildPlugin } from './src/wholeCardDragBuildPlugin.js'
+import { exerciseNotesBuildPlugin } from './src/exerciseNotesBuildPlugin.js'
 import { repeatedIntervalBlocksPlugin } from './src/repeatedIntervalBlocksPlugin.js'
 import { verticalIntervalWorkoutDisplayPlugin } from './src/verticalIntervalWorkoutDisplayPlugin.js'
 
@@ -23,6 +24,7 @@ export default defineConfig({
     exercisePickerConsistencyBuildPlugin(),
     reorderUxBuildPlugin(),
     wholeCardDragBuildPlugin(),
+    exerciseNotesBuildPlugin(),
     react(),
     tailwindcss(),
     VitePWA({

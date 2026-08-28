@@ -17,6 +17,13 @@ function transformWorkoutScreen(code, id) {
     '<div className="workout-card-meta-row mt-1 flex min-h-8 w-full items-center justify-between gap-2">',
   )
 
+  const equipmentSelectClass = 'className="h-7 max-w-32 rounded-full border border-transparent bg-slate-50 px-2 text-xs font-normal text-slate-500 hover:border-slate-200"'
+  if (!card.includes(equipmentSelectClass)) throw new Error(`Workout card alignment transform could not find equipment selector in ${id}`)
+  card = card.replace(
+    equipmentSelectClass,
+    'className="workout-equipment-select h-7 max-w-32 rounded-full border border-transparent bg-slate-50 px-2 text-xs font-normal text-slate-500 hover:border-slate-200"',
+  )
+
   card = card.replace(
     'className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-sm transition ${exercise.flaggedSkipped ?',
     'className={`workout-card-flag inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-sm transition ${exercise.flaggedSkipped ?',

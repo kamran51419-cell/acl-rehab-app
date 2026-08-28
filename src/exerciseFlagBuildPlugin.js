@@ -18,6 +18,17 @@ function transformWorkoutSession(code, id) {
   return replaceRequired(code, '    exercise.completed || (exercise.recordedSets || []).some((set) =>', '    exercise.flaggedSkipped || exercise.completed || (exercise.recordedSets || []).some((set) =>', id)
 }
 
+function transformExerciseProgress(code, id) {
+  let next = code
+  next = replaceRequired(next, 'weightedEntries: [] });', 'weightedEntries: [], flaggedEntries: [] });', id)
+  next = replaceRequired(next,
+    '      const date = exerciseDate(workout, exercise);\n      groups.get(exercise.exerciseId).performances.push({ workoutId: workout.id, date, displayDate: formatDate(date).replaceAll("-", "/"), exercise });',
+    '      const date = exerciseDate(workout, exercise);\n      const group = groups.get(exercise.exerciseId);\n      group.performances.push({ workoutId: workout.id, date, displayDate: formatDate(date).replaceAll("-", "/"), exercise });\n      if (exercise.flaggedSkipped) {\n        const side = resolveWorkoutExerciseSide(exercise);\n        const weightedExercises = (workout.exercises || []).filter((candidate) => candidate.exerciseId === exercise.exerciseId && candidate.loggingMethod === EXERCISE_LOGGING_METHOD.REPS_WEIGHT);\n        group.flaggedEntries.push({ workoutId: workout.id, date, displayDate: formatDate(date).replaceAll("-", "/"), side, sideMode: progressSideMode(exercise, weightedExercises), equipmentType: exercise.equipmentType || "standard", workoutNote: exercise.workoutNote || "" });\n      }',
+    id,
+  )
+  return next
+}
+
 export function exerciseFlagBuildPlugin() {
   return {
     name: 'exercise-flag',
@@ -26,6 +37,7 @@ export function exerciseFlagBuildPlugin() {
       const cleanId = id.split('?')[0].replaceAll('\\\\', '/')
       if (cleanId.endsWith('/src/features/workout/WorkoutScreen.jsx')) return transformWorkoutScreen(code, id)
       if (cleanId.endsWith('/src/lib/domain/workoutSession.js')) return transformWorkoutSession(code, id)
+      if (cleanId.endsWith('/src/lib/domain/exerciseProgress.js')) return transformExerciseProgress(code, id)
       return null
     },
   }

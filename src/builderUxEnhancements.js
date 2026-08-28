@@ -140,7 +140,7 @@ function installStyles() {
 
 function markRoutineTaskCards(root) {
   const heading = [...root.querySelectorAll('h2, h3')].find((element) =>
-    /^(Routine Tasks|Daily & Weekly Tasks)$/i.test(textOf(element)),
+    /^(Routine Tasks|Daily & Weekly Tasks|Daily tasks)$/i.test(textOf(element)),
   )
   const section = heading?.closest('section')
   if (!section) return

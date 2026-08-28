@@ -68,16 +68,16 @@ export function Select({ children, ...props }) {
   );
 }
 
-export function Textarea({ onInput, ...props }) {
+export function Textarea({ onInput, style, ...props }) {
   const ref = useRef(null);
   const resize = () => {
     const node = ref.current;
     if (!node) return;
     node.style.height = "auto";
-    node.style.height = `${node.scrollHeight}px`;
+    node.style.height = `${Math.max(40, node.scrollHeight)}px`;
   };
   useEffect(resize, [props.value]);
-  return <textarea ref={ref} rows={1} className="min-h-10 w-full resize-none overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" {...props} onInput={(event) => { resize(); onInput?.(event); }} />;
+  return <textarea ref={ref} rows={1} style={{ fieldSizing: "content", ...style }} className="min-h-10 w-full resize-none overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" {...props} onInput={(event) => { resize(); onInput?.(event); }} />;
 }
 
 export function DurationInput({ seconds, durationUnit, onChange }) {

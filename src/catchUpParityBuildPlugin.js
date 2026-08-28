@@ -17,6 +17,15 @@ function transformWorkoutScreen(code, id) {
   return next
 }
 
+function transformProgrammeControls(code, id) {
+  return replaceRequired(
+    code,
+    'export function Textarea(props) {\n  return <textarea className="min-h-20 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" {...props} />;\n}',
+    'export function Textarea({ onInput, style, ...props }) {\n  return <textarea rows={1} className="block h-9 min-h-9 w-full resize-none overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm leading-5" style={{ height: 36, minHeight: 36, maxHeight: 180, overflowY: "hidden", ...style }} {...props} onInput={(event) => { const node = event.currentTarget; node.style.height = "0px"; node.style.height = Math.max(36, node.scrollHeight) + "px"; onInput?.(event); }} />;\n}',
+    id,
+  )
+}
+
 export function catchUpParityBuildPlugin() {
   return {
     name: 'catch-up-parity',
@@ -24,6 +33,7 @@ export function catchUpParityBuildPlugin() {
     transform(code, id) {
       const cleanId = id.split('?')[0].replaceAll('\\\\', '/')
       if (cleanId.endsWith('/src/features/workout/WorkoutScreen.jsx')) return transformWorkoutScreen(code, id)
+      if (cleanId.endsWith('/src/features/plans/ProgrammeFormControls.jsx')) return transformProgrammeControls(code, id)
       return null
     },
   }

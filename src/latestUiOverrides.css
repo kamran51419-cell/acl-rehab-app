@@ -1,10 +1,50 @@
-/* Final phone/desktop alignment and workout-card polish. */
+/* Final phone/desktop alignment and workout-card consistency. */
 
-/* Date controls: one shared size with the browser's editable value centred in the actual control height. */
+/* Date controls: one surface, one weight, one size. The wrapper is layout-only. */
+span.date-field-clip {
+  width: 11.5rem !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+span.date-field-clip:focus-within {
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
 input[type='date'] {
   padding-left: 1.9rem !important;
   padding-right: 3.1rem !important;
   line-height: normal !important;
+  font-family: inherit !important;
+  font-size: 0.875rem !important;
+  font-weight: 400 !important;
+  letter-spacing: normal !important;
+  -webkit-text-fill-color: rgb(15 23 42) !important;
+}
+
+span.date-field-clip > input[type='date'] {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+}
+
+input[type='date']::-webkit-date-and-time-value,
+input[type='date']::-webkit-datetime-edit,
+input[type='date']::-webkit-datetime-edit-fields-wrapper,
+input[type='date']::-webkit-datetime-edit-day-field,
+input[type='date']::-webkit-datetime-edit-month-field,
+input[type='date']::-webkit-datetime-edit-year-field {
+  font-family: inherit !important;
+  font-size: inherit !important;
+  font-weight: 400 !important;
+  letter-spacing: normal !important;
 }
 
 input[type='date']::-webkit-date-and-time-value,
@@ -20,13 +60,7 @@ input[type='date']::-webkit-datetime-edit {
   text-align: center !important;
 }
 
-input[type='date']::-webkit-date-and-time-value {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  transform: translateX(-2px);
-}
-
+input[type='date']::-webkit-date-and-time-value,
 input[type='date']::-webkit-datetime-edit {
   display: flex !important;
   align-items: center !important;
@@ -46,26 +80,24 @@ input[type='date']::-webkit-datetime-edit {
   }
 }
 
-/* Add/remove set: compact, but not undersized. */
+/* Add/remove set: compact, equal halves, full card width. */
 button.workout-set-control {
+  width: 100% !important;
   height: 2rem !important;
   min-height: 2rem !important;
   padding-top: 0 !important;
   padding-bottom: 0 !important;
+  line-height: 1 !important;
 }
 
-/* Keep completion ticks and the literal 'reps' label aligned to the 40px reps control,
-   regardless of whether Prev. text adds a second line below it. */
+/* Measurement rows share the same 40px control baseline. Prev. text must not move labels/ticks. */
 .rounded-xl.bg-slate-50:has(button[aria-label^='Toggle set']) {
   align-items: start !important;
 }
 
 .rounded-xl.bg-slate-50:has(button[aria-label^='Toggle set']) > span:first-child {
   padding-top: 0.625rem;
-}
-
-.rounded-xl.bg-slate-50:has(button[aria-label^='Toggle set']) span:last-child:not([class*='text-[11px]']) {
-  align-self: flex-start;
+  line-height: 1.25rem;
 }
 
 .rounded-xl.bg-slate-50:has(button[aria-label^='Toggle set']) > button[aria-label^='Toggle set'] {
@@ -73,24 +105,32 @@ button.workout-set-control {
   margin-top: 0.25rem;
 }
 
-/* Exercise card status/action area: edit menu stays top-right; flag sits directly underneath. */
-section.rounded-2xl.border.border-slate-200.bg-white:has(button[aria-label='Flag exercise as intentionally skipped']),
-section.rounded-2xl.border.border-slate-200.bg-white:has(button[aria-label='Remove exercise flag']),
-section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pressed]) {
+.rounded-xl.bg-slate-50:has(button[aria-label^='Toggle set']) .pt-2\.5 {
+  padding-top: 0.625rem !important;
+  line-height: 1.25rem !important;
+}
+
+/* Generic exercise cards reserve a real action rail so the flag never overlaps content. */
+.workout-card-header {
   position: relative;
 }
 
-/* Hide the older strength-only flag beside Equipment. The card-level flag is available for every exercise type. */
-.mt-1.inline-flex.items-center.gap-1\.5 > button[aria-label='Flag exercise as intentionally skipped'],
-.mt-1.inline-flex.items-center.gap-1\.5 > button[aria-label='Remove exercise flag'] {
-  display: none !important;
+.workout-card-header:has(.workout-card-flag) {
+  padding-right: 2.5rem;
 }
 
-button.workout-card-flag,
-section.rounded-2xl.border.border-slate-200.bg-white:has(button[aria-label^='Edit ']) > .mt-2 button[aria-pressed] {
+.workout-card-header:has(.workout-card-flag):has(button[aria-label^='Edit ']) {
+  min-height: 4.75rem;
+}
+
+.workout-card-header:has(.workout-card-flag):not(:has(button[aria-label^='Edit '])) {
+  min-height: 2rem;
+}
+
+.workout-card-header .workout-card-flag {
   position: absolute !important;
-  top: 3rem;
-  right: 0.75rem;
+  top: 0 !important;
+  right: 0 !important;
   z-index: 2;
   width: 2rem !important;
   height: 2rem !important;
@@ -101,11 +141,53 @@ section.rounded-2xl.border.border-slate-200.bg-white:has(button[aria-label^='Edi
   color: rgb(148 163 184) !important;
 }
 
-button.workout-card-flag[aria-pressed='true'],
-button.workout-card-flag[aria-label='Remove exercise flag'],
-section.rounded-2xl.border.border-slate-200.bg-white:has(button[aria-label^='Edit ']) > .mt-2 button[aria-pressed='true'] {
+.workout-card-header:has(button[aria-label^='Edit ']) .workout-card-flag {
+  top: 2.5rem !important;
+}
+
+.workout-card-header .workout-card-flag[aria-pressed='true'],
+.workout-card-header .workout-card-flag[aria-label='Remove exercise flag'] {
   border-color: rgb(252 165 165) !important;
   background: rgb(254 226 226) !important;
   color: rgb(185 28 28) !important;
   box-shadow: 0 0 0 2px rgb(239 68 68 / 0.08) !important;
+}
+
+/* Paired L+R cards use the same top-right action rail. Their flag currently lives in the row below the header,
+   so reserve header space for it rather than allowing it to overlap the first set/equipment row. */
+section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pressed]) {
+  position: relative;
+}
+
+section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pressed]) > div:first-child {
+  min-height: 4.75rem;
+  padding-right: 2.5rem;
+}
+
+section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pressed]) > .mt-2 button[aria-pressed] {
+  position: absolute !important;
+  top: 3rem !important;
+  right: 0.75rem !important;
+  z-index: 2;
+  width: 2rem !important;
+  height: 2rem !important;
+  min-height: 2rem !important;
+  padding: 0 !important;
+  border: 1px solid rgb(226 232 240) !important;
+  border-radius: 9999px !important;
+  background: #fff !important;
+  color: rgb(148 163 184) !important;
+}
+
+section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pressed='true']) > .mt-2 button[aria-pressed='true'] {
+  border-color: rgb(252 165 165) !important;
+  background: rgb(254 226 226) !important;
+  color: rgb(185 28 28) !important;
+  box-shadow: 0 0 0 2px rgb(239 68 68 / 0.08) !important;
+}
+
+/* Hide the older strength-only flag beside Equipment. The card-level flag is available for every exercise type. */
+.mt-1.inline-flex.items-center.gap-1\.5 > button[aria-label='Flag exercise as intentionally skipped'],
+.mt-1.inline-flex.items-center.gap-1\.5 > button[aria-label='Remove exercise flag'] {
+  display: none !important;
 }

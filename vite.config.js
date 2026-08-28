@@ -13,6 +13,7 @@ import { wholeCardDragBuildPlugin } from './src/wholeCardDragBuildPlugin.js'
 import { exerciseNotesBuildPlugin } from './src/exerciseNotesBuildPlugin.js'
 import { mobileInteractionFixesBuildPlugin } from './src/mobileInteractionFixesBuildPlugin.js'
 import { catchUpParityBuildPlugin } from './src/catchUpParityBuildPlugin.js'
+import { exerciseFlagBuildPlugin } from './src/exerciseFlagBuildPlugin.js'
 import { repeatedIntervalBlocksPlugin } from './src/repeatedIntervalBlocksPlugin.js'
 import { verticalIntervalWorkoutDisplayPlugin } from './src/verticalIntervalWorkoutDisplayPlugin.js'
 
@@ -31,6 +32,7 @@ export default defineConfig({
     exerciseNotesBuildPlugin(),
     mobileInteractionFixesBuildPlugin(),
     catchUpParityBuildPlugin(),
+    exerciseFlagBuildPlugin(),
     react(),
     tailwindcss(),
     VitePWA({

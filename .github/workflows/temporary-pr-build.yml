@@ -1,9 +1,7 @@
 name: Temporary PR build
 
 on:
-  push:
-    branches:
-      - agent/fix-catchup-parity-date-notes
+  pull_request:
 
 jobs:
   build:

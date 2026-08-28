@@ -106,72 +106,78 @@ button.workout-set-control {
   line-height: 1.25rem !important;
 }
 
-/* One shared action axis for every workout card.
-   The actual edit-menu wrapper and the flag slot use the exact same width and right inset,
-   so their visual centres cannot drift depending on equipment or description markup. */
+/*
+ * Workout card header/meta geometry.
+ * There is one 2rem action column at the right edge of the card's CONTENT box.
+ * Card padding already keeps this comfortably inside the card border.
+ * Equipment/description never determines the flag's horizontal position.
+ */
 .workout-card-header {
-  --workout-action-inset: 0.25rem;
-  --workout-action-size: 2rem;
   position: relative !important;
-  padding-right: calc(var(--workout-action-size) + var(--workout-action-inset) + 0.5rem) !important;
+  width: 100% !important;
+  padding-right: 2.5rem !important;
+  box-sizing: border-box !important;
 }
 
-/* Some cards render Edit directly; others render it inside a relative menu wrapper. Control both. */
+/* Normal cards may render the edit button directly or inside a relative wrapper.
+   Position the thing that actually owns layout, then normalise the button inside it. */
 .workout-card-header > button[aria-label^='Edit '],
 .workout-card-header > .relative:has(> button[aria-label^='Edit ']) {
   position: absolute !important;
   top: 0 !important;
-  right: var(--workout-action-inset) !important;
-  width: var(--workout-action-size) !important;
-  height: var(--workout-action-size) !important;
-  min-width: var(--workout-action-size) !important;
-  min-height: var(--workout-action-size) !important;
+  right: 0 !important;
+  width: 2rem !important;
+  height: 2rem !important;
+  min-width: 2rem !important;
+  min-height: 2rem !important;
   margin: 0 !important;
   padding: 0 !important;
-  z-index: 3;
+  z-index: 4;
 }
 
-.workout-card-header > .relative:has(> button[aria-label^='Edit ']) > button[aria-label^='Edit '] {
-  display: inline-flex !important;
-  width: var(--workout-action-size) !important;
-  height: var(--workout-action-size) !important;
-  min-width: var(--workout-action-size) !important;
-  min-height: var(--workout-action-size) !important;
+.workout-card-header > .relative:has(> button[aria-label^='Edit ']) > button[aria-label^='Edit '],
+.workout-card-header > button[aria-label^='Edit '] {
+  width: 2rem !important;
+  height: 2rem !important;
+  min-width: 2rem !important;
+  min-height: 2rem !important;
   margin: 0 !important;
   padding: 0 !important;
+  display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
 }
 
+/* Every normal card uses this same real metadata row after the full title/description block.
+   It always reserves the right action slot, even when there is no equipment selector. */
 .workout-card-meta-row {
-  --workout-action-inset: 0.25rem;
-  --workout-action-size: 2rem;
-  display: grid !important;
-  grid-template-columns: minmax(0, 1fr) var(--workout-action-size) !important;
+  position: relative !important;
+  display: flex !important;
   width: 100% !important;
-  min-height: var(--workout-action-size) !important;
-  align-items: center !important;
-  column-gap: 0.5rem !important;
-  padding-right: var(--workout-action-inset) !important;
+  min-height: 2rem !important;
+  margin-top: 0.5rem !important;
+  padding-right: 2.5rem !important;
   box-sizing: border-box !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 0.5rem !important;
 }
 
-.workout-card-meta-row > label,
-.workout-card-meta-row > div:not(.workout-card-flag) {
-  grid-column: 1 !important;
-  justify-self: start !important;
+.workout-card-meta-row > label {
+  flex: 0 1 auto !important;
+  margin: 0 !important;
 }
 
 .workout-card-meta-row .workout-card-flag {
-  grid-column: 2 !important;
-  justify-self: stretch !important;
-  position: static !important;
+  position: absolute !important;
+  top: 0 !important;
+  right: 0 !important;
   display: inline-flex !important;
+  width: 2rem !important;
+  height: 2rem !important;
+  min-width: 2rem !important;
+  min-height: 2rem !important;
   margin: 0 !important;
-  width: var(--workout-action-size) !important;
-  height: var(--workout-action-size) !important;
-  min-width: var(--workout-action-size) !important;
-  min-height: var(--workout-action-size) !important;
   padding: 0 !important;
   align-items: center !important;
   justify-content: center !important;
@@ -188,37 +194,43 @@ button.workout-set-control {
   box-shadow: 0 0 0 2px rgb(239 68 68 / 0.08) !important;
 }
 
-/* Paired L+R cards use the same physical 2rem action axis. */
-section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pressed]) {
-  --workout-action-inset: 0.25rem;
-  --workout-action-size: 2rem;
+/* Strength equipment selector is vertically centred in the same 2rem metadata row. */
+.workout-card-meta-row .workout-equipment-select {
+  margin: 0 !important;
+  vertical-align: middle !important;
 }
 
+/*
+ * L+R wrapper still comes from a separate render path, so give it the exact same geometry:
+ * menu slot = right:0, metadata row = 2rem high, flag slot = right:0.
+ */
 section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pressed]) > div:first-child {
   position: relative !important;
-  padding-right: calc(var(--workout-action-size) + var(--workout-action-inset) + 0.5rem) !important;
+  width: 100% !important;
+  padding-right: 2.5rem !important;
+  box-sizing: border-box !important;
   align-items: flex-start !important;
 }
 
 section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pressed]) > div:first-child > .relative {
   position: absolute !important;
   top: 0 !important;
-  right: var(--workout-action-inset) !important;
-  width: var(--workout-action-size) !important;
-  height: var(--workout-action-size) !important;
-  min-width: var(--workout-action-size) !important;
-  min-height: var(--workout-action-size) !important;
+  right: 0 !important;
+  width: 2rem !important;
+  height: 2rem !important;
+  min-width: 2rem !important;
+  min-height: 2rem !important;
   margin: 0 !important;
   padding: 0 !important;
-  z-index: 3;
+  z-index: 4;
 }
 
 section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pressed]) > div:first-child > .relative > button[aria-label^='Edit '] {
   display: inline-flex !important;
-  width: var(--workout-action-size) !important;
-  height: var(--workout-action-size) !important;
-  min-width: var(--workout-action-size) !important;
-  min-height: var(--workout-action-size) !important;
+  width: 2rem !important;
+  height: 2rem !important;
+  min-width: 2rem !important;
+  min-height: 2rem !important;
   margin: 0 !important;
   padding: 0 !important;
   align-items: center !important;
@@ -226,31 +238,33 @@ section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pre
 }
 
 section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pressed]) > .mt-2 {
-  display: grid !important;
-  grid-template-columns: minmax(0, 1fr) var(--workout-action-size) !important;
-  min-height: var(--workout-action-size) !important;
+  position: relative !important;
+  display: flex !important;
   width: 100% !important;
-  align-items: center !important;
-  column-gap: 0.5rem !important;
-  padding-right: var(--workout-action-inset) !important;
+  min-height: 2rem !important;
+  margin-top: 0.5rem !important;
+  padding-right: 2.5rem !important;
   box-sizing: border-box !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 0.5rem !important;
 }
 
 section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pressed]) > .mt-2 > label {
-  grid-column: 1 !important;
-  justify-self: start !important;
+  flex: 0 1 auto !important;
+  margin: 0 !important;
 }
 
 section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pressed]) > .mt-2 button[aria-pressed] {
-  grid-column: 2 !important;
-  justify-self: stretch !important;
-  position: static !important;
+  position: absolute !important;
+  top: 0 !important;
+  right: 0 !important;
   display: inline-flex !important;
+  width: 2rem !important;
+  height: 2rem !important;
+  min-width: 2rem !important;
+  min-height: 2rem !important;
   margin: 0 !important;
-  width: var(--workout-action-size) !important;
-  height: var(--workout-action-size) !important;
-  min-width: var(--workout-action-size) !important;
-  min-height: var(--workout-action-size) !important;
   padding: 0 !important;
   align-items: center !important;
   justify-content: center !important;

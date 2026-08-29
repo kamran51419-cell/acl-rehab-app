@@ -22,11 +22,11 @@
     bottom: auto !important;
     left: 0 !important;
     z-index: 2 !important;
-    display: flex !important;
-    width: 100% !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: auto !important;
     max-width: none !important;
     overflow: visible !important;
-    justify-content: stretch;
     gap: 0.35rem;
     margin: 0 !important;
     padding: 0 !important;
@@ -34,13 +34,14 @@
     border-radius: 0 !important;
     background: transparent !important;
     box-shadow: none !important;
+    box-sizing: border-box;
   }
 
   button[aria-label^='Edit '] + div > button {
     display: inline-flex !important;
+    width: auto !important;
     min-width: 0 !important;
     min-height: 1.9rem !important;
-    flex: 1 1 0 !important;
     align-items: center;
     justify-content: center;
     margin: 0 !important;
@@ -54,6 +55,7 @@
     line-height: 1rem !important;
     text-align: center;
     white-space: nowrap;
+    box-sizing: border-box;
   }
 
   button[aria-label^='Edit '] + div > button:active {

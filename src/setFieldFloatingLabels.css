@@ -81,13 +81,15 @@
   pointer-events: none;
 }
 
-/* Give every measurement label the same deliberate inset from the left curve.
-   Prev. keeps the right-side position that already reads correctly. */
-.workout-field-topline > .workout-border-label:first-of-type {
-  left: 1.1rem;
+/* The hidden border-segment spans come before/between the labels in the DOM,
+   so :first-of-type does not identify the left label. Anchor each label to its
+   neighbouring segment instead. Both sides use the exact same 0.94rem inset. */
+.workout-field-topline > .workout-topline-start + .workout-border-label {
+  left: 0.94rem;
+  right: auto;
 }
 
-.workout-field-topline > .workout-border-label ~ .workout-border-label {
+.workout-field-topline > .workout-topline-middle + .workout-border-label {
   right: 0.94rem;
   left: auto;
 }

@@ -13,27 +13,19 @@ function transformWorkoutScreen(code) {
     '{side ? <p className={hideExerciseName ? "text-sm font-semibold text-slate-700" : "text-xs text-slate-500"}>{side}</p> : null}{prescriptionMeasureSummary ? <p className="workout-prescription-summary mt-1 text-xs font-semibold text-slate-700">{prescriptionMeasureSummary}</p> : null}{exercise.programmeNoteSnapshot ?',
   )
 
-  // Make the programme description visually independent from prescription metadata.
-  next = next.replaceAll(
-    '<p className="mt-1 text-xs text-slate-500">{exercise.programmeNoteSnapshot}</p>',
-    '<p className="workout-programme-description mt-1 text-xs text-slate-500">{exercise.programmeNoteSnapshot}</p>',
-  )
-
-  // Reps fields (fixed and range) use one identical outlined control. The
-  // input/select lives in its own centred layer so fieldset legend layout cannot
-  // push the current value down.
+  // Fixed reps and rep ranges share the exact same outer field treatment. The
+  // actual control sits in its own centring layer so fieldset/legend browser
+  // layout can never push the value downward.
   next = next.replaceAll(
     '<div className="min-w-0"><RepsInput exercise={exercise} set={set} onChange={onChange}/></div>',
     '<fieldset className="workout-floating-field min-w-0"><legend className="workout-floating-label">Reps</legend>{set.previousReps !== undefined && set.previousReps !== "" ? <span className="workout-field-previous">Prev. {set.previousReps}</span> : null}<div className="workout-field-control"><RepsInput exercise={exercise} set={set} onChange={onChange}/></div></fieldset>',
   )
 
-  // Weight uses the same centred layer and matching-set previous reference.
   next = next.replaceAll(
     '<div className="min-w-0"><input inputMode="decimal" className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3" value={set.rawWeight ?? set.weight ?? ""} onFocus={(event) => event.currentTarget.select()} onChange={(event) => onChange(exercise.id, set.id, "weight", event.target.value)}/>{set.previousWeight !== undefined && set.previousWeight !== "" ? <span className="mt-1 block text-[11px] font-normal text-slate-400">Prev. {set.previousWeight}</span> : null}</div>',
     '<fieldset className="workout-floating-field min-w-0"><legend className="workout-floating-label">Weight (kg)</legend>{set.previousWeight !== undefined && set.previousWeight !== "" ? <span className="workout-field-previous">Prev. {set.previousWeight}</span> : null}<div className="workout-field-control"><input inputMode="decimal" className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3" value={set.rawWeight ?? set.weight ?? ""} onFocus={(event) => event.currentTarget.select()} onChange={(event) => onChange(exercise.id, set.id, "weight", event.target.value)}/></div></fieldset>',
   )
 
-  // Time-only weighted fields.
   next = next.replaceAll(
     '<div className="min-w-0"><input aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} time`} inputMode="decimal" className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3"',
     '<fieldset className="workout-floating-field min-w-0"><legend className="workout-floating-label">Time ({durationUnitLabel})</legend>{set.previousDurationSeconds !== undefined && set.previousDurationSeconds !== "" ? <span className="workout-field-previous">Prev. {Number(set.previousDurationSeconds) / durationScale}</span> : null}<div className="workout-field-control"><input aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} time`} inputMode="decimal" className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3"',
@@ -43,7 +35,6 @@ function transformWorkoutScreen(code) {
     'onChange={(event) => onChange(exercise.id, set.id, "durationSeconds", event.target.value === "" ? "" : Number(event.target.value) * durationScale)}/></div></fieldset>',
   )
 
-  // Time/distance tick rows use the same centred field-control layer.
   next = next.replaceAll(
     '{fields.time ? <input aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} time`}',
     '{fields.time ? <fieldset className="workout-floating-field min-w-0"><legend className="workout-floating-label">Time ({durationUnitLabel})</legend>{set.previousDurationSeconds !== undefined && set.previousDurationSeconds !== "" ? <span className="workout-field-previous">Prev. {Number(set.previousDurationSeconds) / durationScale}</span> : null}<div className="workout-field-control"><input aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} time`}',
@@ -61,14 +52,13 @@ function transformWorkoutScreen(code) {
     'onChange={(event) => onChange(exercise.id, set.id, "distance", event.target.value)}/></div></fieldset> : null}</div>',
   )
 
-  // RepsInput owns both fixed-rep inputs and range selects. Remove its legacy
-  // previous-value line because the fieldset owns that reference for both.
+  // RepsInput owns both fixed-rep inputs and range selects. The field wrapper
+  // now owns previous-performance display for both, so suppress the legacy line.
   next = next.replace(
     'return <>{input}{set.previousReps !== undefined && set.previousReps !== "" ? <span className="mt-1 block text-[11px] font-normal text-slate-400">Prev. {set.previousReps}</span> : null}</>;',
     'return input;',
   )
 
-  // Give every set number the same fixed-height alignment container.
   next = next.replaceAll(
     '<span className="text-sm font-medium">Set {set.setNumber}</span>',
     '<div className="workout-set-label"><span className="workout-set-number">Set {set.setNumber}</span></div>',

@@ -19,37 +19,35 @@ function replaceContinueSelection(code) {
 
 const ACTION_MENU_CLASS = 'absolute right-0 top-10 z-30 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg'
 
-function addMobileActionRow(block, openState, headerClass) {
-  let next = block.replace(
-    headerClass,
-    headerClass.replace('className="', 'className="workout-exercise-header '),
-  )
-
-  const triggerStart = next.indexOf('<div className="relative"><button type="button" aria-label={`Edit ')
-  if (triggerStart < 0) return next
+function addMobileActionRow(block, openState) {
+  const triggerStart = block.indexOf('<div className="relative"><button type="button" aria-label={`Edit ')
+  if (triggerStart < 0) return block
 
   const menuPrefix = `{${openState} ? <div className="${ACTION_MENU_CLASS}">`
-  const menuStart = next.indexOf(menuPrefix, triggerStart)
-  if (menuStart < 0) return next
+  const menuStart = block.indexOf(menuPrefix, triggerStart)
+  if (menuStart < 0) return block
 
   const menuInnerStart = menuStart + menuPrefix.length
   const menuSuffix = '</div> : null}'
-  const menuEnd = next.indexOf(menuSuffix, menuInnerStart)
-  if (menuEnd < 0) return next
+  const menuEnd = block.indexOf(menuSuffix, menuInnerStart)
+  if (menuEnd < 0) return block
 
-  const wrapperEnd = menuEnd + menuSuffix.length
-  if (next.slice(wrapperEnd, wrapperEnd + 6) !== '</div>') return next
-  const wrapperCloseEnd = wrapperEnd + 6
+  const menuConditionalEnd = menuEnd + menuSuffix.length
+  if (block.slice(menuConditionalEnd, menuConditionalEnd + 6) !== '</div>') return block
+  const wrapperCloseEnd = menuConditionalEnd + 6
 
-  const menuInner = next.slice(menuInnerStart, menuEnd)
+  /* The action wrapper is the truthy branch of the header ternary. The next
+     closing div after that wrapper is the header itself. Insert the mobile row
+     after the header, so it cannot shrink the title or move the ellipsis. */
+  const headerEnd = block.indexOf('</div>', wrapperCloseEnd)
+  if (headerEnd < 0) return block
+  const headerCloseEnd = headerEnd + 6
+
+  const menuInner = block.slice(menuInnerStart, menuEnd)
   const desktopConditional = `{${openState} ? <div className="workout-exercise-actions-desktop ${ACTION_MENU_CLASS}">${menuInner}</div> : null}`
   const mobileConditional = `{${openState} ? <div className="workout-exercise-actions-mobile">${menuInner}</div> : null}`
-  const transformedWrapper = `${next.slice(triggerStart, menuStart)}${desktopConditional}${next.slice(menuEnd + menuSuffix.length, wrapperCloseEnd)}`
 
-  /* The wrapper is the truthy branch of an existing ternary. A fragment keeps
-     the trigger and mobile row inside that one branch while rendering both as
-     direct flex children of the header. */
-  return `${next.slice(0, triggerStart)}<>${transformedWrapper}${mobileConditional}</>${next.slice(wrapperCloseEnd)}`
+  return `${block.slice(0, menuStart)}${desktopConditional}${block.slice(menuConditionalEnd, headerCloseEnd)}${mobileConditional}${block.slice(headerCloseEnd)}`
 }
 
 function addMobileActionRows(code) {
@@ -58,22 +56,14 @@ function addMobileActionRows(code) {
   const cardStart = next.indexOf('export function ExerciseCard(')
   const cardEnd = cardStart >= 0 ? next.indexOf('\nfunction changeWorkout', cardStart) : -1
   if (cardStart >= 0 && cardEnd > cardStart) {
-    const card = addMobileActionRow(
-      next.slice(cardStart, cardEnd),
-      'actionsOpen',
-      'className="flex items-start gap-2"',
-    )
+    const card = addMobileActionRow(next.slice(cardStart, cardEnd), 'actionsOpen')
     next = `${next.slice(0, cardStart)}${card}${next.slice(cardEnd)}`
   }
 
   const pairStart = next.indexOf('function WorkoutExerciseDisplay(')
   const pairEnd = pairStart >= 0 ? next.indexOf('\n\nexport function WorkoutForm(', pairStart) : -1
   if (pairStart >= 0 && pairEnd > pairStart) {
-    const pair = addMobileActionRow(
-      next.slice(pairStart, pairEnd),
-      'sharedActionsOpen',
-      'className="flex items-start justify-between gap-3"',
-    )
+    const pair = addMobileActionRow(next.slice(pairStart, pairEnd), 'sharedActionsOpen')
     next = `${next.slice(0, pairStart)}${pair}${next.slice(pairEnd)}`
   }
 

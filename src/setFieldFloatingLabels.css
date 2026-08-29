@@ -212,24 +212,28 @@
    measurements. Give that space back to the fields and tuck the floating labels
    closer to their corners. Desktop geometry stays unchanged. */
 @media (max-width: 639px) {
+  .rounded-xl.bg-slate-50:has(> .workout-set-label + .workout-field-shell) {
+    column-gap: 0.5rem !important;
+  }
+
   .rounded-xl.bg-slate-50:has(> .workout-set-label + .workout-field-shell + .workout-field-shell) {
-    grid-template-columns: 2.35rem minmax(0, 1fr) minmax(0, 1fr) !important;
+    grid-template-columns: 2.1rem minmax(0, 1fr) minmax(0, 1fr) !important;
   }
 
   .rounded-xl.bg-slate-50:has(> .workout-set-label + .workout-field-shell):not(:has(> .workout-field-shell + .workout-field-shell)):not(:has(> button[aria-label^='Toggle set'])) {
-    grid-template-columns: 2.35rem minmax(0, 1fr) !important;
+    grid-template-columns: 2.1rem minmax(0, 1fr) !important;
   }
 
   .rounded-xl.bg-slate-50:has(> .workout-set-label + .workout-field-shell):has(> button[aria-label^='Toggle set']) {
-    grid-template-columns: 2.35rem minmax(0, 1fr) 2rem !important;
+    grid-template-columns: 2.1rem minmax(0, 1fr) 2rem !important;
   }
 
   .workout-field-topline > .workout-topline-start + .workout-border-label {
-    left: 0.55rem;
+    left: 0.45rem;
   }
 
   .workout-border-label-previous {
-    right: 0.55rem;
-    max-width: calc(100% - 1.1rem);
+    right: 0.45rem;
+    max-width: calc(100% - 0.9rem);
   }
 }

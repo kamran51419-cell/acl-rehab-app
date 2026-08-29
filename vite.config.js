@@ -24,7 +24,6 @@ import { mobileUiUxAuditBuildPlugin } from './src/mobileUiUxAuditBuildPlugin.js'
 import { seamlessTabsBuildPlugin } from './src/seamlessTabsBuildPlugin.js'
 import { workoutCardAlignmentBuildPlugin } from './src/workoutCardAlignmentBuildPlugin.js'
 import { setFieldFloatingLabelsBuildPlugin } from './src/setFieldFloatingLabelsBuildPlugin.js'
-import { workoutFieldLabelFinishBuildPlugin } from './src/workoutFieldLabelFinishBuildPlugin.js'
 import { exerciseMetaHierarchyBuildPlugin } from './src/exerciseMetaHierarchyBuildPlugin.js'
 import { repeatedIntervalBlocksPlugin } from './src/repeatedIntervalBlocksPlugin.js'
 import { intervalSummaryGrammarBuildPlugin } from './src/intervalSummaryGrammarBuildPlugin.js'
@@ -57,7 +56,6 @@ export default defineConfig({
     seamlessTabsBuildPlugin(),
     workoutCardAlignmentBuildPlugin(),
     setFieldFloatingLabelsBuildPlugin(),
-    workoutFieldLabelFinishBuildPlugin(),
     exerciseMetaHierarchyBuildPlugin(),
     react(),
     tailwindcss(),

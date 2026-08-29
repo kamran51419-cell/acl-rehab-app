@@ -7,7 +7,6 @@ import { equipmentTrackingBuildPlugin } from './src/equipmentTrackingBuildPlugin
 import { latestPreviousPerformanceBuildPlugin } from './src/latestPreviousPerformanceBuildPlugin.js'
 import { timedPreviousPerformanceBuildPlugin } from './src/timedPreviousPerformanceBuildPlugin.js'
 import { workoutExerciseEditBuildPlugin } from './src/workoutExerciseEditBuildPlugin.js'
-import { workoutActionsSheetBuildPlugin } from './src/workoutActionsSheetBuildPlugin.js'
 import { workoutUiPolishBuildPlugin } from './src/workoutUiPolishBuildPlugin.js'
 import { exercisePickerConsistencyBuildPlugin } from './src/exercisePickerConsistencyBuildPlugin.js'
 import { reorderUxBuildPlugin } from './src/reorderUxBuildPlugin.js'
@@ -25,6 +24,7 @@ import { seamlessTabsBuildPlugin } from './src/seamlessTabsBuildPlugin.js'
 import { workoutCardAlignmentBuildPlugin } from './src/workoutCardAlignmentBuildPlugin.js'
 import { setFieldFloatingLabelsBuildPlugin } from './src/setFieldFloatingLabelsBuildPlugin.js'
 import { exerciseMetaHierarchyBuildPlugin } from './src/exerciseMetaHierarchyBuildPlugin.js'
+import { workoutActionTextBuildPlugin } from './src/workoutActionTextBuildPlugin.js'
 import { repeatedIntervalBlocksPlugin } from './src/repeatedIntervalBlocksPlugin.js'
 import { intervalSummaryGrammarBuildPlugin } from './src/intervalSummaryGrammarBuildPlugin.js'
 import { verticalIntervalWorkoutDisplayPlugin } from './src/verticalIntervalWorkoutDisplayPlugin.js'
@@ -32,7 +32,6 @@ import { verticalIntervalWorkoutDisplayPlugin } from './src/verticalIntervalWork
 export default defineConfig({
   plugins: [
     timeWeightTrackingBuildPlugin(),
-    workoutActionsSheetBuildPlugin(),
     equipmentTrackingBuildPlugin(),
     latestPreviousPerformanceBuildPlugin(),
     timedPreviousPerformanceBuildPlugin(),
@@ -57,6 +56,7 @@ export default defineConfig({
     workoutCardAlignmentBuildPlugin(),
     setFieldFloatingLabelsBuildPlugin(),
     exerciseMetaHierarchyBuildPlugin(),
+    workoutActionTextBuildPlugin(),
     react(),
     tailwindcss(),
     VitePWA({
@@ -77,7 +77,7 @@ export default defineConfig({
           },
           {
             src: '/pwa-512.png',
-            sizes: '512x512',
+            sizes: '192x192',
             type: 'image/png'
           }
         ]

@@ -5,6 +5,8 @@
 
 /* One coordinate system for the outline, labels and editable control. */
 .workout-field-shell {
+  --workout-field-border: rgb(203 213 225);
+  --workout-field-border-focus: rgb(148 163 184);
   position: relative;
   min-width: 0;
   height: 2.75rem;
@@ -21,16 +23,15 @@
   min-width: 0;
   margin: 0;
   padding: 0;
-  border: 1px solid rgb(203 213 225);
+  border: 1px solid var(--workout-field-border);
   border-top: 0;
   border-radius: 0.75rem;
   background: #fff;
   overflow: hidden;
 }
 
-/* One real top-border rail. Its line segments stop before each label and resume
-   after it; the labels themselves have no background or mask. The rail slightly
-   overlaps the rounded-corner tangent to avoid rasterised white seams. */
+/* One real top-border rail. It slightly overlaps the rounded-corner tangent so
+   the join stays continuous on different device pixel ratios. */
 .workout-field-topline {
   position: absolute;
   top: 0;
@@ -44,17 +45,22 @@
   pointer-events: none;
 }
 
+/* Use an actual border stroke rather than a filled 1px rectangle. This matches
+   the rasterisation of the native outline much more closely on mobile screens. */
 .workout-topline-segment {
   display: block !important;
-  height: 1px;
+  height: 0;
   flex: 0 0 auto;
-  background: rgb(203 213 225);
+  border-top: 1px solid var(--workout-field-border);
 }
 
-/* A short lead-in keeps the measurement label away from the rounded corner
-   without pushing it too far toward the centre. The same spacing is mirrored
-   at the right for Prev. */
-.workout-topline-start,
+/* Optical spacing: the left measurement label sits a touch nearer its corner
+   than the right previous-value label. This reads more balanced even though the
+   label lengths differ. */
+.workout-topline-start {
+  width: 0.14rem;
+}
+
 .workout-topline-end {
   width: 0.22rem;
 }
@@ -136,13 +142,13 @@
 }
 
 .workout-field-shell:focus-within .workout-floating-field {
-  border-color: rgb(148 163 184);
+  border-color: var(--workout-field-border-focus);
   border-top: 0;
   box-shadow: 0 0 0 1px rgb(148 163 184 / 0.08);
 }
 
 .workout-field-shell:focus-within .workout-topline-segment {
-  background: rgb(148 163 184);
+  border-top-color: var(--workout-field-border-focus);
 }
 
 /* Suppress any old per-input previous line from legacy markup. */

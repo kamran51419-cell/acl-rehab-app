@@ -7,6 +7,7 @@ import { equipmentTrackingBuildPlugin } from './src/equipmentTrackingBuildPlugin
 import { latestPreviousPerformanceBuildPlugin } from './src/latestPreviousPerformanceBuildPlugin.js'
 import { timedPreviousPerformanceBuildPlugin } from './src/timedPreviousPerformanceBuildPlugin.js'
 import { workoutExerciseEditBuildPlugin } from './src/workoutExerciseEditBuildPlugin.js'
+import { workoutActionsSheetBuildPlugin } from './src/workoutActionsSheetBuildPlugin.js'
 import { workoutUiPolishBuildPlugin } from './src/workoutUiPolishBuildPlugin.js'
 import { exercisePickerConsistencyBuildPlugin } from './src/exercisePickerConsistencyBuildPlugin.js'
 import { reorderUxBuildPlugin } from './src/reorderUxBuildPlugin.js'
@@ -35,6 +36,7 @@ export default defineConfig({
     latestPreviousPerformanceBuildPlugin(),
     timedPreviousPerformanceBuildPlugin(),
     workoutExerciseEditBuildPlugin(),
+    workoutActionsSheetBuildPlugin(),
     workoutUiPolishBuildPlugin(),
     repeatedIntervalBlocksPlugin(),
     intervalSummaryGrammarBuildPlugin(),

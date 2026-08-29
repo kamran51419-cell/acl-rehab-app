@@ -28,22 +28,25 @@
   overflow: hidden;
 }
 
-/* The old segmented rail remains in transformed markup only as a positioning
-   layer. The native border is no longer erased or rebuilt. */
-.workout-field-topline {
+/* These positioning layers sit over the native border without intercepting taps. */
+.workout-field-topline,
+.workout-field-bottomline {
   position: absolute;
   inset: 0;
   z-index: 5;
-  height: 0;
   pointer-events: none;
+}
+
+.workout-field-topline {
+  height: 0;
 }
 
 .workout-topline-segment {
   display: none !important;
 }
 
-/* Reps/Weight/Time/Distance and Prev. are positioned directly on the native
-   top border. The text itself has no background. */
+/* Measurement labels float on the top border. Previous-performance labels use
+   the same treatment on the bottom-right border. */
 .workout-border-label {
   position: absolute;
   top: 0;
@@ -81,17 +84,20 @@
   pointer-events: none;
 }
 
-/* The hidden border-segment spans come before/between the labels in the DOM,
-   so :first-of-type does not identify the left label. Anchor each label to its
-   neighbouring segment instead. Both sides use the exact same 0.94rem inset. */
+/* Main measurement label: top-left. */
 .workout-field-topline > .workout-topline-start + .workout-border-label {
   left: 0.94rem;
   right: auto;
 }
 
-.workout-field-topline > .workout-topline-middle + .workout-border-label {
+/* Previous value: bottom-right, mirroring the label inset on the opposite edge. */
+.workout-border-label-previous {
+  top: auto;
   right: 0.94rem;
+  bottom: 0;
   left: auto;
+  max-width: calc(100% - 1.88rem);
+  transform: translateY(50%);
 }
 
 /* The editable control is independent of the border labels. */

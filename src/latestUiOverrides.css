@@ -148,8 +148,7 @@ button.workout-set-control {
   justify-content: center !important;
 }
 
-/* Every normal card uses this same real metadata row after the full title/description block.
-   It always reserves the right action slot, even when there is no equipment selector. */
+/* Every normal card uses the same metadata row after the full title/description block. */
 .workout-card-meta-row {
   position: relative !important;
   display: flex !important;
@@ -166,12 +165,18 @@ button.workout-set-control {
 .workout-card-meta-row > label {
   flex: 0 1 auto !important;
   margin: 0 !important;
+  align-self: center !important;
 }
 
-.workout-card-meta-row .workout-card-flag {
+/* One vertical rule for every flag: centre it in the metadata row.
+   This removes selector/no-selector height drift entirely. */
+.workout-card-meta-row .workout-card-flag,
+.workout-card-meta-row > button[aria-label='Flag exercise as intentionally skipped'],
+.workout-card-meta-row > button[aria-label='Remove exercise flag'] {
   position: absolute !important;
-  top: 0 !important;
+  top: 50% !important;
   right: 0 !important;
+  transform: translateY(-50%) !important;
   display: inline-flex !important;
   width: 2rem !important;
   height: 2rem !important;
@@ -187,15 +192,17 @@ button.workout-set-control {
   color: rgb(148 163 184) !important;
 }
 
-.workout-card-meta-row .workout-card-flag[aria-pressed='true'] {
+.workout-card-meta-row .workout-card-flag[aria-pressed='true'],
+.workout-card-meta-row > button[aria-pressed='true'] {
   border-color: rgb(252 165 165) !important;
   background: rgb(254 226 226) !important;
   color: rgb(185 28 28) !important;
   box-shadow: 0 0 0 2px rgb(239 68 68 / 0.08) !important;
 }
 
-/* Strength equipment selector is vertically centred in the same 2rem metadata row. */
-.workout-card-meta-row .workout-equipment-select {
+/* Strength equipment selector is vertically centred in the same metadata row. */
+.workout-card-meta-row .workout-equipment-select,
+.workout-card-meta-row select[aria-label$=' equipment'] {
   margin: 0 !important;
   vertical-align: middle !important;
 }
@@ -253,12 +260,14 @@ section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pre
 section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pressed]) > .mt-2 > label {
   flex: 0 1 auto !important;
   margin: 0 !important;
+  align-self: center !important;
 }
 
 section.rounded-2xl.border.border-slate-200.bg-white:has(> .mt-2 button[aria-pressed]) > .mt-2 button[aria-pressed] {
   position: absolute !important;
-  top: 0 !important;
+  top: 50% !important;
   right: 0 !important;
+  transform: translateY(-50%) !important;
   display: inline-flex !important;
   width: 2rem !important;
   height: 2rem !important;

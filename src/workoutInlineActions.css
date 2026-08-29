@@ -4,9 +4,9 @@
     position: relative;
   }
 
-  /* Reserve a small row below the header only while the actions are open. */
+  /* Reserve one compact action row below the lowest header metadata line. */
   section > div:has(> div > button[aria-label^='Edit '] + div) {
-    margin-bottom: 2.35rem;
+    margin-bottom: 2.45rem;
   }
 
   /* Let the open menu position against the whole header instead of the tiny
@@ -17,17 +17,17 @@
 
   button[aria-label^='Edit '] + div {
     position: absolute !important;
-    top: calc(100% + 0.25rem) !important;
+    top: calc(100% + 0.3rem) !important;
     right: 0 !important;
     bottom: auto !important;
-    left: auto !important;
+    left: 0 !important;
     z-index: 2 !important;
     display: flex !important;
-    width: max-content !important;
-    max-width: 100% !important;
+    width: 100% !important;
+    max-width: none !important;
     overflow: visible !important;
-    justify-content: flex-end;
-    gap: 0.25rem;
+    justify-content: stretch;
+    gap: 0.35rem;
     margin: 0 !important;
     padding: 0 !important;
     border: 0 !important;
@@ -38,9 +38,9 @@
 
   button[aria-label^='Edit '] + div > button {
     display: inline-flex !important;
-    min-width: max-content !important;
+    min-width: 0 !important;
     min-height: 1.9rem !important;
-    flex: 0 0 auto !important;
+    flex: 1 1 0 !important;
     align-items: center;
     justify-content: center;
     margin: 0 !important;

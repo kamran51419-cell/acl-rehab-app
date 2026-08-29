@@ -7,14 +7,13 @@
 .workout-field-shell {
   --workout-field-border: rgb(203 213 225);
   --workout-field-border-focus: rgb(148 163 184);
-  --workout-topline-inset: 0.8rem;
   position: relative;
   min-width: 0;
   height: 2.75rem;
 }
 
-/* Keep the browser's complete rounded outline so the corner arcs, sides and
-   bottom always render at exactly the same weight. */
+/* Keep one normal browser-rendered rounded border. This preserves identical
+   weight through the corners, sides, top and bottom. */
 .workout-floating-field {
   position: absolute;
   inset: 0;
@@ -29,65 +28,31 @@
   overflow: hidden;
 }
 
-/* Cut only the flat top stroke. CSS borders sit across the element edge, so the
-   eraser must straddle that edge rather than sit inside the field. It begins a
-   little inside the rail endpoints; the replacement rail overlaps it there,
-   preventing pale/white joins while still leaving both rounded corners native. */
-.workout-floating-field::before {
-  content: "";
-  position: absolute;
-  top: -1px;
-  left: calc(var(--workout-topline-inset) + 0.08rem);
-  right: calc(var(--workout-topline-inset) + 0.08rem);
-  z-index: 2;
-  height: 2px;
-  background: #fff;
-  pointer-events: none;
-}
-
-/* The replacement flat top stroke. Segments genuinely stop around each label,
-   so there is no line underneath the text and the labels need no background. */
+/* The old segmented rail remains in transformed markup only as a positioning
+   layer. The native border is no longer erased or rebuilt. */
 .workout-field-topline {
   position: absolute;
-  top: 0;
-  left: var(--workout-topline-inset);
-  right: var(--workout-topline-inset);
+  inset: 0;
   z-index: 5;
-  display: flex;
-  height: 1px;
-  min-width: 0;
-  align-items: flex-start;
+  height: 0;
   pointer-events: none;
 }
 
 .workout-topline-segment {
-  display: block !important;
-  height: 0;
-  flex: 0 0 auto;
-  border-top: 1px solid var(--workout-field-border);
+  display: none !important;
 }
 
-/* Optical positioning shared by Reps, Weight, Time and Distance. */
-.workout-topline-start {
-  width: 0.08rem;
-}
-
-.workout-topline-end {
-  width: 0.14rem;
-}
-
-.workout-topline-middle {
-  min-width: 0.5rem;
-  flex: 1 1 auto;
-}
-
+/* Reps/Weight/Time/Distance and Prev. are positioned directly on the native
+   top border. The text itself has no background. */
 .workout-border-label {
+  position: absolute;
+  top: 0;
+  z-index: 1;
   display: block;
-  flex: 0 0 auto;
   max-width: 44%;
   margin: 0;
   padding: 0 0.16rem;
-  overflow: hidden;
+  overflow: visible;
   color: rgb(100 116 139);
   background: transparent;
   font-size: 0.5625rem;
@@ -97,6 +62,33 @@
   white-space: nowrap;
   text-overflow: ellipsis;
   transform: translateY(-50%);
+  isolation: isolate;
+}
+
+/* This is the actual border cut: only a very thin stripe centred on the 1px
+   border is painted white. It sits behind the glyphs but above the field border,
+   so there is no rectangle/tab around the text and no line can show through it. */
+.workout-border-label::before {
+  content: "";
+  position: absolute;
+  left: 0.04rem;
+  right: 0.04rem;
+  top: 50%;
+  z-index: -1;
+  height: 3px;
+  transform: translateY(-50%);
+  background: #fff;
+  pointer-events: none;
+}
+
+/* Preserve the optical positions from the previous version. */
+.workout-field-topline > .workout-border-label:first-of-type {
+  left: 0.88rem;
+}
+
+.workout-field-topline > .workout-border-label ~ .workout-border-label {
+  right: 0.94rem;
+  left: auto;
 }
 
 /* The editable control is independent of the border labels. */
@@ -156,14 +148,6 @@
 .workout-field-shell:focus-within .workout-floating-field {
   border-color: var(--workout-field-border-focus);
   box-shadow: 0 0 0 1px rgb(148 163 184 / 0.08);
-}
-
-.workout-field-shell:focus-within .workout-topline-segment {
-  border-top-color: var(--workout-field-border-focus);
-}
-
-.workout-field-shell:focus-within .workout-floating-field::before {
-  background: #fff;
 }
 
 /* Suppress any old per-input previous line from legacy markup. */

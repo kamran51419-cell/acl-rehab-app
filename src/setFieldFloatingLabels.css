@@ -31,21 +31,21 @@
   white-space: nowrap;
 }
 
-/* Previous performance is a compact reference in the opposite top corner. It
-   never changes the control or row height and only exists when that exact set
-   has a matching previous value. */
+/* Previous performance reads as a second tiny legend on the top-right border.
+   The split background blends into the slate row above and white field below,
+   avoiding the visible rectangular patch from the earlier versions. */
 .workout-field-previous {
   position: absolute !important;
-  top: -0.08rem !important;
+  top: -0.375rem !important;
   right: 0.65rem !important;
   z-index: 3;
   display: block !important;
   max-width: 42%;
   overflow: hidden;
   margin: 0 !important;
-  padding: 0 0.18rem !important;
+  padding: 0 0.22rem !important;
   color: rgb(148 163 184) !important;
-  background: #fff;
+  background: linear-gradient(to bottom, rgb(248 250 252) 0 50%, #fff 50% 100%);
   font-size: 0.5625rem !important;
   font-weight: 400 !important;
   line-height: 0.75rem !important;
@@ -54,8 +54,8 @@
   pointer-events: none;
 }
 
-/* The entered/current value is centred against the full 44px control. The
-   legend and previous reference are overlays and cannot push it vertically. */
+/* Let the browser vertically centre the value in the full 44px control. The
+   legends are overlays and do not participate in the control's layout. */
 .workout-floating-field > input,
 .workout-floating-field > select {
   position: absolute !important;
@@ -71,30 +71,16 @@
   background-color: transparent !important;
   box-shadow: none !important;
   outline: none !important;
-  line-height: 2.75rem !important;
+  line-height: normal !important;
 }
 
-/* Range reps use one deliberately drawn chevron. Hiding the native affordance
-   prevents the double-arrow shown by some mobile/desktop browsers. */
+/* Use the single native dropdown affordance for rep ranges. The extra custom
+   chevron was what produced the double-arrow shown in the workout screen. */
 .workout-floating-field > select {
-  appearance: none !important;
-  -webkit-appearance: none !important;
-  padding-right: 2.5rem !important;
+  appearance: auto !important;
+  -webkit-appearance: menulist !important;
+  padding-right: 2rem !important;
   cursor: pointer;
-}
-
-.workout-floating-field:has(> select)::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  right: 0.9rem;
-  z-index: 2;
-  width: 0.5rem;
-  height: 0.5rem;
-  border-right: 2px solid rgb(100 116 139);
-  border-bottom: 2px solid rgb(100 116 139);
-  transform: translateY(-68%) rotate(45deg);
-  pointer-events: none;
 }
 
 .workout-floating-field:focus-within {
@@ -102,10 +88,16 @@
   box-shadow: 0 0 0 1px rgb(148 163 184 / 0.08);
 }
 
-/* Any old per-input previous text is suppressed; the corner reference above is
+/* Any old per-input previous text is suppressed; the border reference above is
    the single previous-value treatment. */
 .workout-floating-field > span:not(.workout-floating-label):not(.workout-field-previous) {
   display: none !important;
+}
+
+/* Prescription metadata is deliberately stronger than the programme note so
+   prescribed measurements cannot be mistaken for the user's description. */
+.workout-prescription-summary {
+  letter-spacing: 0.005em;
 }
 
 /* Set labels use the exact same 44px vertical box as the editable control. */

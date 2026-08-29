@@ -1,0 +1,54 @@
+.workout-exercise-actions-mobile {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  /* Keep the original header and ellipsis layout completely untouched. */
+  .workout-exercise-actions-desktop {
+    display: none !important;
+  }
+
+  /* This row is rendered after the header, so it naturally sits beneath the
+     title/prescription/notes and spans the exercise card's full inner width. */
+  .workout-exercise-actions-mobile {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    gap: 0.5rem !important;
+    margin: 0.5rem 0 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .workout-exercise-actions-mobile > button {
+    display: inline-flex !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 !important;
+    padding: 0.5rem 0.75rem !important;
+    overflow: hidden !important;
+    border: 1px solid rgb(226 232 240) !important;
+    border-radius: 0.5rem !important;
+    background: #fff !important;
+    color: rgb(51 65 85) !important;
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+    line-height: 1.25rem !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+    box-sizing: border-box !important;
+  }
+
+  .workout-exercise-actions-mobile > button:active {
+    background: rgb(248 250 252) !important;
+  }
+
+  .workout-exercise-actions-mobile > button:last-child {
+    color: rgb(220 38 38) !important;
+  }
+}

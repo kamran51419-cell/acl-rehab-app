@@ -3,24 +3,18 @@
 }
 
 @media (max-width: 639px) {
-  /* Keep the original ellipsis wrapper as a normal first-row flex item. */
-  .workout-exercise-header {
-    flex-wrap: wrap !important;
-  }
-
-  /* The desktop dropdown remains available on larger screens only. */
+  /* Keep the original header and ellipsis layout completely untouched. */
   .workout-exercise-actions-desktop {
     display: none !important;
   }
 
-  /* A dedicated full-width second flex row avoids any absolute positioning,
-     overlap with notes/equipment, or dependence on the ellipsis wrapper size. */
+  /* This row is rendered after the header, so it naturally sits beneath the
+     title/prescription/notes and spans the exercise card's full inner width. */
   .workout-exercise-actions-mobile {
     display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    flex: 0 0 100% !important;
     width: 100% !important;
-    min-width: 100% !important;
+    min-width: 0 !important;
     max-width: 100% !important;
     gap: 0.5rem !important;
     margin: 0.5rem 0 0 !important;

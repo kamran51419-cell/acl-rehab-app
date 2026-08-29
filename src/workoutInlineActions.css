@@ -1,34 +1,45 @@
 @media (max-width: 639px) {
-  /* The header is the sizing/positioning reference for the mobile action row.
-     The ellipsis itself keeps its normal wrapper and normal flex position. */
-  .workout-exercise-header {
-    position: relative;
-  }
-
-  .workout-exercise-header.workout-actions-open {
-    margin-bottom: 2.75rem;
-  }
-
-  /* Remove only the dropdown wrapper's positioning context. This does not move
-     the ellipsis; it lets the open row size against the whole exercise header. */
-  .workout-exercise-actions {
-    position: static !important;
-  }
-
-  .workout-exercise-actions-menu {
-    position: absolute !important;
-    top: calc(100% + 0.25rem) !important;
-    right: 0 !important;
-    bottom: auto !important;
-    left: 0 !important;
-    z-index: 2 !important;
+  /* Use a two-column header grid: metadata takes the left column and the
+     ellipsis stays in the natural top-right column. When the menu opens, its
+     wrapper is flattened so the action row can occupy a new full-width row. */
+  section > div:has(button[aria-label^='Edit ']) {
     display: grid !important;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
-    width: auto !important;
-    min-width: 0 !important;
-    max-width: none !important;
-    gap: 0.5rem !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    align-items: start !important;
+    column-gap: 0.5rem !important;
+    row-gap: 0 !important;
+  }
+
+  section > div:has(button[aria-label^='Edit ']) > div:first-child {
+    grid-column: 1;
+    min-width: 0;
+  }
+
+  div:has(> button[aria-label^='Edit ']) {
+    display: contents !important;
+  }
+
+  button[aria-label^='Edit '] {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: start;
+    justify-self: end;
     margin: 0 !important;
+  }
+
+  button[aria-label^='Edit '] + div {
+    position: static !important;
+    inset: auto !important;
+    z-index: auto !important;
+    grid-column: 1 / -1 !important;
+    grid-row: 2 !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    gap: 0.5rem !important;
+    margin: 0.25rem 0 0 !important;
     padding: 0 !important;
     overflow: visible !important;
     border: 0 !important;
@@ -38,8 +49,8 @@
     box-sizing: border-box !important;
   }
 
-  /* Match the existing Add set / Remove set controls. */
-  .workout-exercise-actions-menu > button {
+  /* Same dimensions and visual treatment as the Add set / Remove set controls. */
+  button[aria-label^='Edit '] + div > button {
     display: inline-flex !important;
     width: 100% !important;
     min-width: 0 !important;
@@ -49,7 +60,7 @@
     justify-content: center !important;
     margin: 0 !important;
     padding: 0.5rem 0.75rem !important;
-    overflow: visible !important;
+    overflow: hidden !important;
     border: 1px solid rgb(226 232 240) !important;
     border-radius: 0.5rem !important;
     background: #fff !important;
@@ -62,11 +73,11 @@
     box-sizing: border-box !important;
   }
 
-  .workout-exercise-actions-menu > button:active {
+  button[aria-label^='Edit '] + div > button:active {
     background: rgb(248 250 252) !important;
   }
 
-  .workout-exercise-actions-menu > button:last-child {
+  button[aria-label^='Edit '] + div > button:last-child {
     color: rgb(220 38 38) !important;
   }
 }

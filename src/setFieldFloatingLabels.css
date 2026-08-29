@@ -21,6 +21,7 @@
 .workout-field-previous {
   color: rgb(100 116 139);
   font-size: 0.5625rem;
+  font-weight: 600;
   line-height: 0.75rem;
   letter-spacing: 0.015em;
   white-space: nowrap;
@@ -35,25 +36,27 @@
   width: auto;
   margin-left: 0.55rem;
   padding: 0 0.12rem;
-  font-weight: 600;
   background: transparent;
 }
 
-/* Previous performance uses the same visual baseline as the legend. It does
-   not have a background block: only the single border pixel behind the text is
-   erased, leaving the rest of the field continuously white. */
+/* Mirror the left legend on the right: same type, same baseline, same tiny
+   spacing. Only the single border pixel behind the text is removed, so there is
+   no visible background tab or rectangle. */
 .workout-field-previous {
   position: absolute !important;
   top: -0.375rem !important;
-  right: 0.65rem !important;
+  right: 0.55rem !important;
   z-index: 4;
   display: block !important;
   max-width: 42%;
   overflow: visible;
   margin: 0 !important;
   padding: 0 0.12rem !important;
-  color: rgb(148 163 184) !important;
-  font-weight: 400 !important;
+  color: rgb(100 116 139) !important;
+  font-size: 0.5625rem !important;
+  font-weight: 600 !important;
+  line-height: 0.75rem !important;
+  letter-spacing: 0.015em !important;
   text-overflow: ellipsis;
 }
 

@@ -1,23 +1,22 @@
 @media (max-width: 639px) {
-  /* Make the header itself own the inline action row. This avoids sizing the
-     row against the tiny ellipsis wrapper, which caused the buttons to bunch on
-     the right in mobile Safari. */
+  /* Make the header itself own the inline action row. */
   section > div:has(> div > button[aria-label^='Edit ']) {
     flex-wrap: wrap;
   }
 
-  /* Remove only the ellipsis wrapper's layout box on mobile. The ellipsis button
-     remains a normal header flex item in the same visual order, while the open
-     actions become a full-width flex row beneath the metadata. */
+  /* Remove only the ellipsis wrapper's layout box on mobile so the open actions
+     can use the full header width. */
   div:has(> button[aria-label^='Edit ']) {
     display: contents !important;
   }
 
+  /* Keep the ellipsis pinned to the far right of the header. */
   button[aria-label^='Edit '] {
     flex: 0 0 auto;
-    margin-left: 0;
+    margin-left: auto !important;
   }
 
+  /* Full-width action row immediately below whichever metadata line is lowest. */
   button[aria-label^='Edit '] + div {
     position: static !important;
     inset: auto !important;
@@ -30,7 +29,7 @@
     max-width: 100% !important;
     overflow: visible !important;
     gap: 0.35rem !important;
-    margin: 0.45rem 0 0 !important;
+    margin: 0.2rem 0 0 !important;
     padding: 0 !important;
     border: 0 !important;
     border-radius: 0 !important;
@@ -39,19 +38,21 @@
     box-sizing: border-box !important;
   }
 
+  /* Give the actions a subtle outline so they read as real controls without
+     bringing back the white action-sheet background. */
   button[aria-label^='Edit '] + div > button {
     display: inline-flex !important;
     width: 100% !important;
     min-width: 0 !important;
     max-width: 100% !important;
-    min-height: 1.9rem !important;
+    min-height: 1.95rem !important;
     align-items: center !important;
     justify-content: center !important;
     margin: 0 !important;
-    padding: 0.25rem 0.35rem !important;
+    padding: 0.3rem 0.45rem !important;
     overflow: hidden !important;
-    border: 0 !important;
-    border-radius: 0.45rem !important;
+    border: 1px solid rgb(203 213 225) !important;
+    border-radius: 0.55rem !important;
     background: transparent !important;
     color: rgb(71 85 105) !important;
     font-size: 0.75rem !important;
@@ -67,6 +68,7 @@
   }
 
   button[aria-label^='Edit '] + div > button:last-child {
+    border-color: rgb(254 202 202) !important;
     color: rgb(220 38 38) !important;
   }
 }

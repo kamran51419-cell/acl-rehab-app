@@ -8,23 +8,53 @@
   min-width: 0;
 }
 
+/* Let the label cut naturally through the field outline instead of looking
+   like a separate white rectangle sitting on top of it. */
 .workout-floating-label {
   position: absolute;
-  top: -0.45rem;
-  left: 0.6rem;
+  top: -0.42rem;
+  left: 0.7rem;
   z-index: 2;
-  padding: 0 0.22rem;
-  background: #fff;
+  padding: 0 0.3rem;
+  background: rgb(248 250 252);
   color: rgb(100 116 139);
   font-size: 0.625rem;
   font-weight: 500;
-  line-height: 0.9rem;
+  line-height: 0.85rem;
+  letter-spacing: 0.01em;
   pointer-events: none;
   white-space: nowrap;
 }
 
-/* The circle follows the 40px input baseline, never the optional Prev. line. */
-.workout-set-tick-row > button[aria-label^='Toggle set'] {
+.workout-floating-field > input,
+.workout-floating-field > select {
+  border-radius: 0.75rem !important;
+  border-color: rgb(203 213 225) !important;
+  background: #fff !important;
+}
+
+/* RepsInput can render either an input or a select directly inside the field. */
+.workout-floating-field > input:focus,
+.workout-floating-field > select:focus {
+  border-color: rgb(148 163 184) !important;
+  outline: none !important;
+}
+
+/* Set number, editable control and completion circle always share the same
+   40px control baseline. Optional Prev. text underneath never changes it. */
+.rounded-xl.bg-slate-50:has(.workout-floating-field) {
+  align-items: start !important;
+}
+
+.rounded-xl.bg-slate-50:has(.workout-floating-field) > span:first-child {
+  align-self: start !important;
+  margin: 0 !important;
+  padding-top: 0.625rem !important;
+  line-height: 1.25rem !important;
+}
+
+.workout-set-tick-row > button[aria-label^='Toggle set'],
+.rounded-xl.bg-slate-50:has(.workout-floating-field) > button[aria-label^='Toggle set'] {
   align-self: start !important;
   margin-top: 0.25rem !important;
 }

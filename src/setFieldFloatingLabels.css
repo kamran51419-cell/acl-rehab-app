@@ -3,20 +3,23 @@
   display: none !important;
 }
 
+/* The fieldset owns the outline. Its legend creates a real gap in that outline,
+   so the label never needs a painted white/grey background. */
 .workout-floating-field {
   position: relative;
   min-width: 0;
+  height: 2.75rem;
+  margin: 0;
+  padding: 0;
+  border: 1px solid rgb(203 213 225);
+  border-radius: 0.75rem;
+  background: #fff;
 }
 
-/* Keep the label inside the control rather than cutting a coloured patch
-   through the border. The field stays one clean rounded shape. */
 .workout-floating-label {
-  position: absolute;
-  top: 0.28rem;
-  left: 0.75rem;
-  z-index: 2;
-  padding: 0;
-  background: transparent;
+  width: auto;
+  margin-left: 0.55rem;
+  padding: 0 0.2rem;
   color: rgb(100 116 139);
   font-size: 0.5625rem;
   font-weight: 600;
@@ -26,35 +29,48 @@
   white-space: nowrap;
 }
 
+/* RepsInput, weight, time and distance controls become the value area inside
+   the outlined fieldset instead of drawing a second rectangle of their own. */
 .workout-floating-field > input,
 .workout-floating-field > select {
-  height: 2.75rem !important;
-  border-radius: 0.75rem !important;
-  border-color: rgb(203 213 225) !important;
-  background: #fff !important;
-  padding-top: 0.72rem !important;
-}
-
-/* RepsInput can render either an input or a select directly inside the field. */
-.workout-floating-field > input:focus,
-.workout-floating-field > select:focus {
-  border-color: rgb(148 163 184) !important;
+  display: block !important;
+  width: 100% !important;
+  height: 2rem !important;
+  margin: 0 !important;
+  padding: 0 0.75rem !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
   outline: none !important;
 }
 
-/* Previous performance is reference information, not a second field value. */
-.workout-floating-field > span:not(.workout-floating-label) {
-  display: block !important;
-  margin-top: 0.2rem !important;
-  padding-left: 0.25rem !important;
-  color: rgb(148 163 184) !important;
-  font-size: 0.625rem !important;
-  font-weight: 400 !important;
-  line-height: 0.8rem !important;
+.workout-floating-field:focus-within {
+  border-color: rgb(148 163 184);
+  box-shadow: 0 0 0 1px rgb(148 163 184 / 0.08);
 }
 
-/* Set number, editable control and completion circle always share the same
-   44px control baseline. Optional previous text underneath never changes it. */
+/* Previous performance sits inside the control, not below it, so the row
+   remains exactly the same height whether previous data exists or not. */
+.workout-prev-value,
+.workout-floating-field > span:not(.workout-floating-label) {
+  position: absolute !important;
+  top: 0.08rem !important;
+  right: 0.55rem !important;
+  z-index: 2;
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  color: rgb(148 163 184) !important;
+  font-size: 0.5625rem !important;
+  font-weight: 400 !important;
+  line-height: 0.75rem !important;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* Set number, editable control and completion circle share the same fixed
+   44px field baseline. Previous data can never change their position. */
 .rounded-xl.bg-slate-50:has(.workout-floating-field) {
   align-items: start !important;
 }

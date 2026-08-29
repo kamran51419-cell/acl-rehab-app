@@ -29,20 +29,23 @@
   white-space: nowrap;
 }
 
-/* RepsInput, weight, time and distance controls become the value area inside
-   the outlined fieldset instead of drawing a second rectangle of their own. */
+/* The actual editable value is centred in the whole 44px field independently
+   of the legend, so the label gap never pushes the number downward. */
 .workout-floating-field > input,
 .workout-floating-field > select {
+  position: absolute !important;
+  inset: 0 !important;
   display: block !important;
   width: 100% !important;
-  height: 2rem !important;
+  height: 100% !important;
   margin: 0 !important;
   padding: 0 0.75rem !important;
   border: 0 !important;
-  border-radius: 0 !important;
+  border-radius: 0.75rem !important;
   background: transparent !important;
   box-shadow: none !important;
   outline: none !important;
+  line-height: 2.75rem !important;
 }
 
 .workout-floating-field:focus-within {
@@ -50,27 +53,52 @@
   box-shadow: 0 0 0 1px rgb(148 163 184 / 0.08);
 }
 
-/* Previous performance sits inside the control, not below it, so the row
-   remains exactly the same height whether previous data exists or not. */
-.workout-prev-value,
+/* RepsInput may still emit its legacy previous-value span. It is hidden here
+   because previous performance now lives in the fixed-height Set column. */
 .workout-floating-field > span:not(.workout-floating-label) {
-  position: absolute !important;
-  top: 0.08rem !important;
-  right: 0.55rem !important;
-  z-index: 2;
-  display: block !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  color: rgb(148 163 184) !important;
-  font-size: 0.5625rem !important;
-  font-weight: 400 !important;
-  line-height: 0.75rem !important;
-  pointer-events: none;
+  display: none !important;
+}
+
+/* Fixed-height left column: Set number never moves, and a matching previous set
+   can appear underneath without changing the row height. */
+.workout-set-label {
+  position: relative;
+  align-self: start;
+  height: 2.75rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.workout-set-number {
+  position: absolute;
+  top: 0.35rem;
+  left: 0;
+  display: block;
+  color: rgb(15 23 42);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.25rem;
   white-space: nowrap;
 }
 
-/* Set number, editable control and completion circle share the same fixed
-   44px field baseline. Previous data can never change their position. */
+.workout-set-previous {
+  position: absolute;
+  top: 1.62rem;
+  left: 0;
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: rgb(148 163 184);
+  font-size: 0.5625rem;
+  font-weight: 400;
+  line-height: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Set column, editable control and completion circle all use the same fixed
+   field baseline. Previous data never changes any of their positions. */
 .rounded-xl.bg-slate-50:has(.workout-floating-field) {
   align-items: start !important;
 }

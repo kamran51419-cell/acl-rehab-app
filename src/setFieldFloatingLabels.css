@@ -18,7 +18,7 @@
 
 .workout-floating-label {
   position: relative;
-  z-index: 2;
+  z-index: 3;
   width: auto;
   margin-left: 0.55rem;
   padding: 0 0.2rem;
@@ -31,18 +31,39 @@
   white-space: nowrap;
 }
 
-/* Centre the editable value against the full 44px field rather than against
-   the fieldset content box created by the legend. */
+/* Previous performance is a compact reference in the opposite top corner. It
+   never changes the control or row height and only exists when that exact set
+   has a matching previous value. */
+.workout-field-previous {
+  position: absolute !important;
+  top: -0.08rem !important;
+  right: 0.65rem !important;
+  z-index: 3;
+  display: block !important;
+  max-width: 42%;
+  overflow: hidden;
+  margin: 0 !important;
+  padding: 0 0.18rem !important;
+  color: rgb(148 163 184) !important;
+  background: #fff;
+  font-size: 0.5625rem !important;
+  font-weight: 400 !important;
+  line-height: 0.75rem !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* The entered/current value is centred against the full 44px control. The
+   legend and previous reference are overlays and cannot push it vertically. */
 .workout-floating-field > input,
 .workout-floating-field > select {
   position: absolute !important;
-  top: 50% !important;
-  left: 0 !important;
-  right: 0 !important;
+  inset: 0 !important;
   z-index: 1;
   display: block !important;
   width: 100% !important;
-  height: 2rem !important;
+  height: 100% !important;
   margin: 0 !important;
   padding: 0 0.75rem !important;
   border: 0 !important;
@@ -50,24 +71,30 @@
   background-color: transparent !important;
   box-shadow: none !important;
   outline: none !important;
-  line-height: 2rem !important;
-  transform: translateY(-50%) !important;
+  line-height: 2.75rem !important;
 }
 
-/* Range reps are genuinely selectable, so keep a clear native dropdown arrow
-   and enough right padding that the current value never collides with it. */
+/* Range reps use one deliberately drawn chevron. Hiding the native affordance
+   prevents the double-arrow shown by some mobile/desktop browsers. */
 .workout-floating-field > select {
-  appearance: auto !important;
-  -webkit-appearance: menulist !important;
-  padding-right: 2rem !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  padding-right: 2.5rem !important;
   cursor: pointer;
 }
 
-.workout-floating-field > input::placeholder {
-  color: rgb(148 163 184) !important;
-  opacity: 0.78;
-  font-size: 0.75rem;
-  font-weight: 400;
+.workout-floating-field:has(> select)::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 0.9rem;
+  z-index: 2;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid rgb(100 116 139);
+  border-bottom: 2px solid rgb(100 116 139);
+  transform: translateY(-68%) rotate(45deg);
+  pointer-events: none;
 }
 
 .workout-floating-field:focus-within {
@@ -75,12 +102,13 @@
   box-shadow: 0 0 0 1px rgb(148 163 184 / 0.08);
 }
 
-/* No separate previous-performance line: ghost placeholders never change row height. */
-.workout-floating-field > span:not(.workout-floating-label) {
+/* Any old per-input previous text is suppressed; the corner reference above is
+   the single previous-value treatment. */
+.workout-floating-field > span:not(.workout-floating-label):not(.workout-field-previous) {
   display: none !important;
 }
 
-/* One alignment box for Set 1 / Set 2 / ... across every logging method. */
+/* Set labels use the exact same 44px vertical box as the editable control. */
 .workout-set-label {
   display: flex;
   height: 2.75rem;
@@ -92,6 +120,7 @@
 
 .workout-set-number {
   display: block;
+  margin: 0;
   color: rgb(15 23 42);
   font-size: 0.875rem;
   font-weight: 500;
@@ -104,7 +133,7 @@
 }
 
 /* Set number, editable control and completion circle all share the same fixed
-   field baseline. Ghost placeholders never affect their positions. */
+   field baseline. Previous references never affect their positions. */
 .rounded-xl.bg-slate-50:has(.workout-floating-field) {
   align-items: start !important;
 }

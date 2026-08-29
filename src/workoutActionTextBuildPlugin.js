@@ -25,7 +25,7 @@ function addActionLayoutHooks(code) {
     let card = next.slice(cardStart, cardEnd)
     card = card.replace(
       'className="flex items-start gap-2"',
-      'className={`workout-exercise-header flex items-start gap-2${actionsOpen ? " workout-actions-open" : ""}`}',
+      'className="workout-exercise-header flex items-start gap-2"',
     )
     card = card.replace(
       '<div className="relative"><button type="button" aria-label={`Edit ',
@@ -44,7 +44,7 @@ function addActionLayoutHooks(code) {
     let pair = next.slice(pairStart, pairEnd)
     pair = pair.replace(
       'className="flex items-start justify-between gap-3"',
-      'className={`workout-exercise-header flex items-start justify-between gap-3${sharedActionsOpen ? " workout-actions-open" : ""}`}',
+      'className="workout-exercise-header flex items-start justify-between gap-3"',
     )
     pair = pair.replace(
       '<div className="relative"><button type="button" aria-label={`Edit ',
@@ -59,13 +59,18 @@ function addActionLayoutHooks(code) {
   return next
 }
 
-function makeWorkoutStartImmediate(code) {
-  let next = code
-  next = next.replace(
-    'await repository.createInProgressWorkoutDocument(db, user.uid, next); setWorkouts((items) => items.some((item) => item.id === next.id) ? items : [...items, next]); openSaved(next);',
-    'setWorkouts((items) => items.some((item) => item.id === next.id) ? items : [...items, next]); openSaved(next); await repository.createInProgressWorkoutDocument(db, user.uid, next);',
+function seedWorkoutScreenFromIntent(code) {
+  return code.replace(
+    'const [plans, setPlans] = useState([]); const [workouts, setWorkouts] = useState([]);',
+    'const [plans, setPlans] = useState(() => intent?.programmeSnapshot ? [intent.programmeSnapshot] : []); const [workouts, setWorkouts] = useState(() => intent?.workoutsSnapshot || []);',
   )
-  return next
+}
+
+function makeWorkoutStartImmediate(code) {
+  return code.replace(
+    'await repository.createInProgressWorkoutDocument(db, user.uid, next); setWorkouts((items) => items.some((item) => item.id === next.id) ? items : [...items, next]); openSaved(next);',
+    'setWorkouts((items) => items.some((item) => item.id === next.id) ? items : [...items, next]); openSaved(next); repository.createInProgressWorkoutDocument(db, user.uid, next).catch(console.error);',
+  )
 }
 
 function transformWorkoutScreen(code) {
@@ -77,6 +82,7 @@ function transformWorkoutScreen(code) {
     next = next.replace(screenAnchor, helpers + screenAnchor)
   }
 
+  next = seedWorkoutScreenFromIntent(next)
   next = replaceUnfinishedWorkoutSelection(next)
   next = replaceContinueSelection(next)
   next = addActionLayoutHooks(next)
@@ -98,6 +104,11 @@ function transformHomeScreen(code) {
   if (start >= 0 && end >= 0) {
     next = `${next.slice(0, start)}const unfinishedWorkout = useMemo(() => activeHomeWorkout(workouts), [workouts]);${next.slice(end)}`
   }
+
+  next = next.replace(
+    'onChooseSession={(sessionId) => onOpenWorkout({ mode: "session", sessionId })}',
+    'onChooseSession={(sessionId) => onOpenWorkout({ mode: "session", sessionId, programmeSnapshot: programme, workoutsSnapshot: workouts })}',
+  )
   return next
 }
 

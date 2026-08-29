@@ -17,6 +17,57 @@ function replaceContinueSelection(code) {
   return `${code.slice(0, bodyStart)} const saved = unfinished; ${code.slice(guard)}`
 }
 
+function addActionLayoutHooks(code) {
+  let next = code
+  const cardStart = next.indexOf('export function ExerciseCard(')
+  const cardEnd = cardStart >= 0 ? next.indexOf('\nfunction changeWorkout', cardStart) : -1
+  if (cardStart >= 0 && cardEnd > cardStart) {
+    let card = next.slice(cardStart, cardEnd)
+    card = card.replace(
+      'className="flex items-start gap-2"',
+      'className={`workout-exercise-header flex items-start gap-2${actionsOpen ? " workout-actions-open" : ""}`}',
+    )
+    card = card.replace(
+      '<div className="relative"><button type="button" aria-label={`Edit ',
+      '<div className="workout-exercise-actions relative"><button type="button" aria-label={`Edit ',
+    )
+    card = card.replace(
+      'className="absolute right-0 top-10 z-30 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg"',
+      'className="workout-exercise-actions-menu absolute right-0 top-10 z-30 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg"',
+    )
+    next = `${next.slice(0, cardStart)}${card}${next.slice(cardEnd)}`
+  }
+
+  const pairStart = next.indexOf('function WorkoutExerciseDisplay(')
+  const pairEnd = pairStart >= 0 ? next.indexOf('\n\nexport function WorkoutForm(', pairStart) : -1
+  if (pairStart >= 0 && pairEnd > pairStart) {
+    let pair = next.slice(pairStart, pairEnd)
+    pair = pair.replace(
+      'className="flex items-start justify-between gap-3"',
+      'className={`workout-exercise-header flex items-start justify-between gap-3${sharedActionsOpen ? " workout-actions-open" : ""}`}',
+    )
+    pair = pair.replace(
+      '<div className="relative"><button type="button" aria-label={`Edit ',
+      '<div className="workout-exercise-actions relative"><button type="button" aria-label={`Edit ',
+    )
+    pair = pair.replace(
+      'className="absolute right-0 top-10 z-30 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg"',
+      'className="workout-exercise-actions-menu absolute right-0 top-10 z-30 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg"',
+    )
+    next = `${next.slice(0, pairStart)}${pair}${next.slice(pairEnd)}`
+  }
+  return next
+}
+
+function makeWorkoutStartImmediate(code) {
+  let next = code
+  next = next.replace(
+    'await repository.createInProgressWorkoutDocument(db, user.uid, next); setWorkouts((items) => items.some((item) => item.id === next.id) ? items : [...items, next]); openSaved(next);',
+    'setWorkouts((items) => items.some((item) => item.id === next.id) ? items : [...items, next]); openSaved(next); await repository.createInProgressWorkoutDocument(db, user.uid, next);',
+  )
+  return next
+}
+
 function transformWorkoutScreen(code) {
   let next = code.replaceAll('>Change exercise</button>', '>Edit exercise</button>')
 
@@ -28,6 +79,8 @@ function transformWorkoutScreen(code) {
 
   next = replaceUnfinishedWorkoutSelection(next)
   next = replaceContinueSelection(next)
+  next = addActionLayoutHooks(next)
+  next = makeWorkoutStartImmediate(next)
   return next
 }
 

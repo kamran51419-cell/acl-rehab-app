@@ -37,19 +37,21 @@ function transformWorkoutScreen(code, id) {
     '<div className="workout-card-meta-row mt-2 flex min-h-8 w-full items-center justify-between gap-2">',
   )
 
-  const equipmentSelectClass = 'className="h-7 max-w-32 rounded-full border border-transparent bg-slate-50 px-2 text-xs font-normal text-slate-500 hover:border-slate-200"'
-  if (!strengthMeta.includes(equipmentSelectClass)) throw new Error(`Workout card alignment transform could not find equipment selector in ${id}`)
-  strengthMeta = strengthMeta.replace(
-    equipmentSelectClass,
-    'className="workout-equipment-select h-7 max-w-32 rounded-full border border-transparent bg-slate-50 px-2 text-xs font-normal text-slate-500 hover:border-slate-200"',
-  )
+  /* Earlier transforms may already have added these classes. Add them only
+     when absent instead of failing the build on an exact class string. */
+  if (!strengthMeta.includes('workout-equipment-select')) {
+    strengthMeta = strengthMeta.replace(
+      /className="([^"]*h-7[^\"]*max-w-32[^\"]*)"(?= value=\{exercise\.equipmentType)/,
+      'className="workout-equipment-select $1"',
+    )
+  }
 
-  const strengthFlagClass = 'className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-sm transition ${exercise.flaggedSkipped ?'
-  if (!strengthMeta.includes(strengthFlagClass)) throw new Error(`Workout card alignment transform could not find strength flag in ${id}`)
-  strengthMeta = strengthMeta.replace(
-    strengthFlagClass,
-    'className={`workout-card-flag inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-sm transition ${exercise.flaggedSkipped ?',
-  )
+  if (!strengthMeta.includes('workout-card-flag')) {
+    strengthMeta = strengthMeta.replace(
+      'className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-sm transition ${exercise.flaggedSkipped ?',
+      'className={`workout-card-flag inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-sm transition ${exercise.flaggedSkipped ?',
+    )
+  }
 
   const setContentAnchor = '{isSetTickExercise ?'
   if (!card.includes(setContentAnchor)) throw new Error(`Workout card alignment transform could not find set content in ${id}`)

@@ -17,12 +17,19 @@ function transformWorkoutScreen(code, id) {
     '<div className="workout-card-meta-row mt-1 flex min-h-8 w-full items-center justify-between gap-2">',
   )
 
-  const equipmentSelectClass = 'className="h-7 max-w-32 rounded-full border border-transparent bg-slate-50 px-2 text-xs font-normal text-slate-500 hover:border-slate-200"'
-  if (!card.includes(equipmentSelectClass)) throw new Error(`Workout card alignment transform could not find equipment selector in ${id}`)
-  card = card.replace(
-    equipmentSelectClass,
-    'className="workout-equipment-select h-7 max-w-32 rounded-full border border-transparent bg-slate-50 px-2 text-xs font-normal text-slate-500 hover:border-slate-200"',
-  )
+  /* Earlier workout plugins can change the selector's visual classes, so identify the
+     equipment select by its value binding instead of depending on one exact class string. */
+  const equipmentSelectPattern = /<select(?=[^>]*value=\{exercise\.equipmentType \|\| "standard"\})[^>]*>/
+  const equipmentSelectMatch = card.match(equipmentSelectPattern)
+  if (!equipmentSelectMatch) throw new Error(`Workout card alignment transform could not find equipment selector in ${id}`)
+  const equipmentSelect = equipmentSelectMatch[0]
+  const alignedEquipmentSelect = equipmentSelect.includes('workout-equipment-select')
+    ? equipmentSelect
+    : equipmentSelect.replace(/className="([^"]*)"/, 'className="workout-equipment-select $1"')
+  if (alignedEquipmentSelect === equipmentSelect && !equipmentSelect.includes('workout-equipment-select')) {
+    throw new Error(`Workout card alignment transform could not add equipment selector class in ${id}`)
+  }
+  card = card.replace(equipmentSelect, alignedEquipmentSelect)
 
   card = card.replace(
     'className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-sm transition ${exercise.flaggedSkipped ?',

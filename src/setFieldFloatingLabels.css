@@ -7,14 +7,15 @@
 .workout-field-shell {
   --workout-field-border: rgb(203 213 225);
   --workout-field-border-focus: rgb(148 163 184);
+  --workout-topline-inset: 0.8rem;
   position: relative;
   min-width: 0;
   height: 2.75rem;
 }
 
-/* The sides, bottom and rounded corner arcs are native. The straight top stroke
-   is intentionally omitted and is drawn only by .workout-field-topline, so no
-   border can ever show underneath a label. */
+/* Keep the browser's complete rounded outline. In particular, the native top
+   border remains present so both corner arcs render at exactly the same weight
+   as the sides and bottom. */
 .workout-floating-field {
   position: absolute;
   inset: 0;
@@ -24,29 +25,42 @@
   margin: 0;
   padding: 0;
   border: 1px solid var(--workout-field-border);
-  border-top: 0;
   border-radius: 0.75rem;
   background: #fff;
   overflow: hidden;
 }
 
-/* One real top-border rail. It slightly overlaps the rounded-corner tangent so
-   the join stays continuous on different device pixel ratios. */
+/* Remove only the flat centre of the native top stroke. This starts just beyond
+   the rounded-corner tangent, leaving both native corner arcs completely intact.
+   The custom top rail below uses these exact same endpoints, so there is no
+   unpainted/faint join between the curve and the straight line. */
+.workout-floating-field::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: var(--workout-topline-inset);
+  right: var(--workout-topline-inset);
+  z-index: 2;
+  height: 1px;
+  background: #fff;
+  pointer-events: none;
+}
+
+/* The replacement flat top stroke. Segments genuinely stop around each label,
+   so there is no line underneath the text and the labels need no background. */
 .workout-field-topline {
   position: absolute;
   top: 0;
-  left: 0.68rem;
-  right: 0.68rem;
+  left: var(--workout-topline-inset);
+  right: var(--workout-topline-inset);
   z-index: 5;
   display: flex;
   height: 1px;
   min-width: 0;
-  align-items: center;
+  align-items: flex-start;
   pointer-events: none;
 }
 
-/* Use an actual border stroke rather than a filled 1px rectangle. This matches
-   the rasterisation of the native outline much more closely on mobile screens. */
 .workout-topline-segment {
   display: block !important;
   height: 0;
@@ -54,15 +68,15 @@
   border-top: 1px solid var(--workout-field-border);
 }
 
-/* Optical spacing: the left measurement label sits a touch nearer its corner
-   than the right previous-value label. This reads more balanced even though the
-   label lengths differ. */
+/* Optical positioning: measurement labels are slightly nearer the left corner,
+   while Prev. keeps a little breathing room at the right. These values apply to
+   Reps, Weight, Time and Distance identically. */
 .workout-topline-start {
-  width: 0.14rem;
+  width: 0.08rem;
 }
 
 .workout-topline-end {
-  width: 0.22rem;
+  width: 0.14rem;
 }
 
 .workout-topline-middle {
@@ -85,6 +99,7 @@
   letter-spacing: 0.015em;
   white-space: nowrap;
   text-overflow: ellipsis;
+  transform: translateY(-50%);
 }
 
 /* The editable control is independent of the border labels. */
@@ -143,12 +158,17 @@
 
 .workout-field-shell:focus-within .workout-floating-field {
   border-color: var(--workout-field-border-focus);
-  border-top: 0;
   box-shadow: 0 0 0 1px rgb(148 163 184 / 0.08);
 }
 
 .workout-field-shell:focus-within .workout-topline-segment {
   border-top-color: var(--workout-field-border-focus);
+}
+
+/* The centre eraser remains white while focused; only the replacement segments
+   change to the focus border colour. */
+.workout-field-shell:focus-within .workout-floating-field::before {
+  background: #fff;
 }
 
 /* Suppress any old per-input previous line from legacy markup. */

@@ -81,9 +81,10 @@
   pointer-events: none;
 }
 
-/* Preserve the optical positions from the previous version. */
+/* Give every measurement label the same deliberate inset from the left curve.
+   Prev. keeps the right-side position that already reads correctly. */
 .workout-field-topline > .workout-border-label:first-of-type {
-  left: 0.88rem;
+  left: 1.1rem;
 }
 
 .workout-field-topline > .workout-border-label ~ .workout-border-label {

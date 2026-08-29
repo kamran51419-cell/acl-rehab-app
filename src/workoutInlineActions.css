@@ -1,23 +1,22 @@
 @media (max-width: 639px) {
-  /* Keep the existing exercise header and ellipsis layout untouched. */
-  section > div:first-child:has(button[aria-label^='Edit ']) {
-    position: relative;
+  /* The exercise header is the positioning box. The ellipsis stays exactly in
+     its normal top-right flex position. */
+  .workout-exercise-header {
+    position: relative !important;
   }
 
-  /* Reserve a full action row beneath the exercise metadata. */
-  section > div:first-child:has(button[aria-label^='Edit '] + div) {
+  .workout-exercise-header.workout-actions-open {
     margin-bottom: 3.25rem;
   }
 
-  /* The menu is still rendered inside the ellipsis wrapper, but the wrapper is
-     not allowed to become the positioning box. The full header is instead. */
-  section > div:first-child:has(button[aria-label^='Edit ']) div:has(> button[aria-label^='Edit ']) {
+  /* Remove the ellipsis wrapper as the positioning context only. */
+  .workout-exercise-actions {
     position: static !important;
   }
 
-  /* Span exactly the same inner left/right edges as the rest of the exercise
-     card, below the prescription/side/programme note. */
-  section > div:first-child:has(button[aria-label^='Edit ']) button[aria-label^='Edit '] + div {
+  /* Full-width row beneath all exercise metadata, aligned to the card's inner
+     left/right edges rather than the tiny ellipsis wrapper. */
+  .workout-exercise-actions-menu {
     position: absolute !important;
     top: calc(100% + 0.5rem) !important;
     right: 0 !important;
@@ -40,8 +39,7 @@
     box-sizing: border-box !important;
   }
 
-  /* Match the existing Add set / Remove set controls. */
-  section > div:first-child:has(button[aria-label^='Edit ']) button[aria-label^='Edit '] + div > button {
+  .workout-exercise-actions-menu > button {
     display: inline-flex !important;
     width: 100% !important;
     min-width: 0 !important;
@@ -64,11 +62,11 @@
     box-sizing: border-box !important;
   }
 
-  section > div:first-child:has(button[aria-label^='Edit ']) button[aria-label^='Edit '] + div > button:active {
+  .workout-exercise-actions-menu > button:active {
     background: rgb(248 250 252) !important;
   }
 
-  section > div:first-child:has(button[aria-label^='Edit ']) button[aria-label^='Edit '] + div > button:last-child {
+  .workout-exercise-actions-menu > button:last-child {
     color: rgb(220 38 38) !important;
   }
 }

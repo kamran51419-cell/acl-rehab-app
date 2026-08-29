@@ -46,3 +46,11 @@
   margin: 0 !important;
   vertical-align: middle !important;
 }
+
+/* Reps-only rows now use the same labelled input pattern as weighted rows.
+   Anchor the completion tick to the 40px input, not the full field height,
+   so optional Prev. text below the input cannot move it. */
+.workout-set-tick-row > button[aria-label^='Toggle set'] {
+  align-self: start !important;
+  margin-top: 1.5rem !important;
+}

@@ -1,55 +1,61 @@
 @media (max-width: 639px) {
-  /* Keep the exercise actions inside the card instead of floating over the workout. */
+  /* Keep the ellipsis in its original header position. The menu itself is
+     positioned relative to the header and the header reserves just enough
+     space underneath for the compact inline actions. */
   section > div:has(> div > button[aria-label^='Edit ']) {
-    flex-wrap: wrap;
+    position: relative;
+  }
+
+  section > div:has(> div > button[aria-label^='Edit '] + div) {
+    margin-bottom: 2.4rem;
   }
 
   div:has(> button[aria-label^='Edit ']) {
-    display: contents;
-  }
-
-  button[aria-label^='Edit '] {
-    order: 2;
-    flex: 0 0 auto;
+    position: static !important;
   }
 
   button[aria-label^='Edit '] + div {
-    position: static !important;
-    inset: auto !important;
-    order: 3;
+    position: absolute !important;
+    top: calc(100% + 0.3rem) !important;
+    right: 0 !important;
+    bottom: auto !important;
+    left: 0 !important;
+    z-index: 2 !important;
     display: flex !important;
-    flex: 0 0 100%;
-    width: 100% !important;
-    margin-top: 0.75rem;
-    padding: 0.5rem !important;
-    gap: 0.5rem;
+    width: auto !important;
+    justify-content: flex-end;
+    gap: 0.2rem;
+    margin: 0 !important;
+    padding: 0 !important;
     border: 0 !important;
-    border-radius: 0.75rem !important;
-    background: rgb(248 250 252) !important;
+    border-radius: 0 !important;
+    background: transparent !important;
     box-shadow: none !important;
   }
 
   button[aria-label^='Edit '] + div > button {
     display: inline-flex !important;
-    min-height: 2.5rem;
-    flex: 1 1 0;
+    min-height: 2rem !important;
+    flex: 0 0 auto !important;
     align-items: center;
     justify-content: center;
     margin: 0 !important;
-    padding: 0.5rem 0.75rem !important;
-    border: 1px solid rgb(226 232 240);
-    border-radius: 0.75rem;
-    background: #fff;
-    color: rgb(51 65 85);
-    font-size: 0.875rem;
-    font-weight: 500;
-    line-height: 1.25rem;
+    padding: 0.3rem 0.5rem !important;
+    border: 0 !important;
+    border-radius: 0.5rem !important;
+    background: transparent !important;
+    color: rgb(71 85 105);
+    font-size: 0.75rem !important;
+    font-weight: 500 !important;
+    line-height: 1rem !important;
     text-align: center;
   }
 
+  button[aria-label^='Edit '] + div > button:active {
+    background: rgb(248 250 252) !important;
+  }
+
   button[aria-label^='Edit '] + div > button:last-child {
-    border-color: rgb(254 202 202);
-    background: rgb(254 242 242);
-    color: rgb(185 28 28);
+    color: rgb(220 38 38) !important;
   }
 }

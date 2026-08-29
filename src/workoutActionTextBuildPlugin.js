@@ -1,20 +1,33 @@
+function replaceUnfinishedWorkoutSelection(code) {
+  const programmeIndex = code.indexOf('const programme = useMemo(')
+  if (programmeIndex < 0) return code
+  const start = code.indexOf('const unfinished = ', programmeIndex)
+  const endMarker = '\n  const completedWorkouts'
+  const end = start >= 0 ? code.indexOf(endMarker, start) : -1
+  if (start < 0 || end < 0) return code
+  return `${code.slice(0, start)}const unfinished = activeInProgressWorkout(workouts, suppressedWorkoutId);${code.slice(end)}`
+}
+
+function replaceContinueSelection(code) {
+  const start = code.indexOf('if (intent.mode === "continue") {')
+  if (start < 0) return code
+  const guard = code.indexOf('if (!saved) return;', start)
+  if (guard < 0) return code
+  const bodyStart = start + 'if (intent.mode === "continue") {'.length
+  return `${code.slice(0, bodyStart)} const saved = unfinished; ${code.slice(guard)}`
+}
+
 function transformWorkoutScreen(code) {
   let next = code.replaceAll('>Change exercise</button>', '>Edit exercise</button>')
 
   const screenAnchor = 'export default function WorkoutScreen('
   if (!next.includes('function activeInProgressWorkout(') && next.includes(screenAnchor)) {
-    const helpers = `function workoutStateTime(value) {\n  if (!value) return 0;\n  if (value?.toDate) return value.toDate().getTime();\n  if (value?.seconds) return Number(value.seconds) * 1000;\n  const parsed = new Date(value).getTime();\n  return Number.isNaN(parsed) ? 0 : parsed;\n}\n\nfunction activeInProgressWorkout(workouts, suppressedWorkoutId = null) {\n  const list = workouts || [];\n  const latestCompletedAt = Math.max(0, ...list.filter((item) => item.status === "completed" || item.completed === true).map((item) => workoutStateTime(item.completedAt) || workoutStateTime(item.updatedAt)));\n  return list\n    .filter((item) => item.status === "in_progress" && item.completed !== true && !item.completedAt && item.id !== suppressedWorkoutId)\n    .filter((item) => { const started = workoutStateTime(item.startedAt) || workoutStateTime(item.createdAt); return !latestCompletedAt || !started || started > latestCompletedAt; })\n    .sort((a, b) => (workoutStateTime(b.startedAt) || workoutStateTime(b.createdAt)) - (workoutStateTime(a.startedAt) || workoutStateTime(a.createdAt)))[0];\n}\n\n`
+    const helpers = `function workoutStateTime(value) {\n  if (!value) return 0;\n  if (value?.toDate) return value.toDate().getTime();\n  if (value?.seconds) return Number(value.seconds) * 1000;\n  const parsed = new Date(value).getTime();\n  return Number.isNaN(parsed) ? 0 : parsed;\n}\n\nfunction activeInProgressWorkout(workouts, suppressedWorkoutId = null) {\n  const list = workouts || [];\n  const latestCompletedAt = Math.max(0, ...list.filter((item) => item.status === "completed" || item.completed === true).map((item) => workoutStateTime(item.completedAt) || workoutStateTime(item.updatedAt)));\n  return list\n    .filter((item) => item.status === "in_progress" && item.completed !== true && !item.completedAt && item.id !== suppressedWorkoutId)\n    .filter((item) => { const started = workoutStateTime(item.startedAt) || workoutStateTime(item.createdAt); return Boolean(started) && (!latestCompletedAt || started > latestCompletedAt); })\n    .sort((a, b) => (workoutStateTime(b.startedAt) || workoutStateTime(b.createdAt)) - (workoutStateTime(a.startedAt) || workoutStateTime(a.createdAt)))[0];\n}\n\n`
     next = next.replace(screenAnchor, helpers + screenAnchor)
   }
 
-  next = next.replace(
-    'const programme = useMemo(() => plans.find((plan) => plan.isActive && !plan.isArchived), [plans]); const unfinished = workouts.find((item) => item.status === "in_progress" && item.id !== suppressedWorkoutId);',
-    'const programme = useMemo(() => plans.find((plan) => plan.isActive && !plan.isArchived), [plans]); const unfinished = activeInProgressWorkout(workouts, suppressedWorkoutId);',
-  )
-  next = next.replace(
-    'if (intent.mode === "continue") { const saved = workouts.find((item) => item.id === intent.workoutId && item.status === "in_progress") || unfinished;',
-    'if (intent.mode === "continue") { const saved = unfinished;',
-  )
+  next = replaceUnfinishedWorkoutSelection(next)
+  next = replaceContinueSelection(next)
   return next
 }
 
@@ -22,13 +35,17 @@ function transformHomeScreen(code) {
   let next = code
   const homeAnchor = 'export default function HomeScreen('
   if (!next.includes('function activeHomeWorkout(') && next.includes(homeAnchor)) {
-    const helpers = `function activeHomeWorkout(workouts) {\n  const list = workouts || [];\n  const time = (value) => timestampDate(value)?.getTime() || 0;\n  const latestCompletedAt = Math.max(0, ...list.filter((item) => item.status === "completed" || item.completed === true).map((item) => time(item.completedAt) || time(item.updatedAt)));\n  return list\n    .filter((item) => item.status === "in_progress" && item.completed !== true && !item.completedAt)\n    .filter((item) => { const started = time(item.startedAt) || time(item.createdAt); return !latestCompletedAt || !started || started > latestCompletedAt; })\n    .sort((a, b) => (time(b.startedAt) || time(b.createdAt)) - (time(a.startedAt) || time(a.createdAt)))[0] || null;\n}\n\n`
+    const helpers = `function activeHomeWorkout(workouts) {\n  const list = workouts || [];\n  const time = (value) => timestampDate(value)?.getTime() || 0;\n  const latestCompletedAt = Math.max(0, ...list.filter((item) => item.status === "completed" || item.completed === true).map((item) => time(item.completedAt) || time(item.updatedAt)));\n  return list\n    .filter((item) => item.status === "in_progress" && item.completed !== true && !item.completedAt)\n    .filter((item) => { const started = time(item.startedAt) || time(item.createdAt); return Boolean(started) && (!latestCompletedAt || started > latestCompletedAt); })\n    .sort((a, b) => (time(b.startedAt) || time(b.createdAt)) - (time(a.startedAt) || time(a.createdAt)))[0] || null;\n}\n\n`
     next = next.replace(homeAnchor, helpers + homeAnchor)
   }
-  return next.replace(
-    'const unfinishedWorkout = useMemo(() => workouts.find((item) => item.status === "in_progress") || null, [workouts]);',
-    'const unfinishedWorkout = useMemo(() => activeHomeWorkout(workouts), [workouts]);',
-  )
+
+  const start = next.indexOf('const unfinishedWorkout = useMemo(')
+  const endMarker = '\n  const incompleteWorkoutList'
+  const end = start >= 0 ? next.indexOf(endMarker, start) : -1
+  if (start >= 0 && end >= 0) {
+    next = `${next.slice(0, start)}const unfinishedWorkout = useMemo(() => activeHomeWorkout(workouts), [workouts]);${next.slice(end)}`
+  }
+  return next
 }
 
 function transformPlanRepository(code) {

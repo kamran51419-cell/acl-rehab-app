@@ -7,32 +7,47 @@ function transformWorkoutScreen(code, id) {
 
   let card = next.slice(functionStart, functionEnd)
 
+  const headerSource = '<div className="flex items-start gap-2"><div className="min-w-0 flex-1">'
+  if (!card.includes(headerSource)) throw new Error(`Workout card alignment transform could not find card header in ${id}`)
   card = card.replace(
-    '<div className="flex items-start gap-2"><div className="min-w-0 flex-1">',
+    headerSource,
     '<div className="workout-card-header flex items-start gap-2"><div className="min-w-0 flex-1">',
   )
 
-  card = card.replace(
+  /*
+   * Strength cards originally render the equipment/flag row inside the
+   * min-w-0 flex-1 title/description column. That column stops before the
+   * edit-menu slot, so right:0 on the flag can never line up with the menu.
+   * Move the whole conditional out of that column and reinsert it at the
+   * card-body level immediately before the set content.
+   */
+  const strengthMetaPrefix = '{exercise.exerciseType === EXERCISE_TYPE.STRENGTH && onEquipment ? <div className="mt-1 inline-flex items-center gap-1.5">'
+  const strengthMetaStart = card.indexOf(strengthMetaPrefix)
+  if (strengthMetaStart < 0) throw new Error(`Workout card alignment transform could not find strength metadata row in ${id}`)
+  const strengthMetaEndMarker = '</div> : null}'
+  const strengthMetaEndStart = card.indexOf(strengthMetaEndMarker, strengthMetaStart)
+  if (strengthMetaEndStart < 0) throw new Error(`Workout card alignment transform could not find strength metadata row end in ${id}`)
+  const strengthMetaEnd = strengthMetaEndStart + strengthMetaEndMarker.length
+
+  let strengthMeta = card.slice(strengthMetaStart, strengthMetaEnd)
+  card = card.slice(0, strengthMetaStart) + card.slice(strengthMetaEnd)
+
+  strengthMeta = strengthMeta.replace(
     '<div className="mt-1 inline-flex items-center gap-1.5">',
-    '<div className="workout-card-meta-row mt-1 flex min-h-8 w-full items-center justify-between gap-2">',
+    '<div className="workout-card-meta-row mt-2 flex min-h-8 w-full items-center justify-between gap-2">',
   )
 
-  /* Earlier workout plugins can change the selector's visual classes, so identify the
-     equipment select by its value binding instead of depending on one exact class string. */
-  const equipmentSelectPattern = /<select(?=[^>]*value=\{exercise\.equipmentType \|\| "standard"\})[^>]*>/
-  const equipmentSelectMatch = card.match(equipmentSelectPattern)
-  if (!equipmentSelectMatch) throw new Error(`Workout card alignment transform could not find equipment selector in ${id}`)
-  const equipmentSelect = equipmentSelectMatch[0]
-  const alignedEquipmentSelect = equipmentSelect.includes('workout-equipment-select')
-    ? equipmentSelect
-    : equipmentSelect.replace(/className="([^"]*)"/, 'className="workout-equipment-select $1"')
-  if (alignedEquipmentSelect === equipmentSelect && !equipmentSelect.includes('workout-equipment-select')) {
-    throw new Error(`Workout card alignment transform could not add equipment selector class in ${id}`)
-  }
-  card = card.replace(equipmentSelect, alignedEquipmentSelect)
+  const equipmentSelectClass = 'className="h-7 max-w-32 rounded-full border border-transparent bg-slate-50 px-2 text-xs font-normal text-slate-500 hover:border-slate-200"'
+  if (!strengthMeta.includes(equipmentSelectClass)) throw new Error(`Workout card alignment transform could not find equipment selector in ${id}`)
+  strengthMeta = strengthMeta.replace(
+    equipmentSelectClass,
+    'className="workout-equipment-select h-7 max-w-32 rounded-full border border-transparent bg-slate-50 px-2 text-xs font-normal text-slate-500 hover:border-slate-200"',
+  )
 
-  card = card.replace(
-    'className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-sm transition ${exercise.flaggedSkipped ?',
+  const strengthFlagClass = 'className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-sm transition ${exercise.flaggedSkipped ?'
+  if (!strengthMeta.includes(strengthFlagClass)) throw new Error(`Workout card alignment transform could not find strength flag in ${id}`)
+  strengthMeta = strengthMeta.replace(
+    strengthFlagClass,
     'className={`workout-card-flag inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-sm transition ${exercise.flaggedSkipped ?',
   )
 
@@ -40,7 +55,7 @@ function transformWorkoutScreen(code, id) {
   if (!card.includes(setContentAnchor)) throw new Error(`Workout card alignment transform could not find set content in ${id}`)
   card = card.replace(
     setContentAnchor,
-    '{!hideExerciseName && onFlag && exercise.exerciseType !== EXERCISE_TYPE.STRENGTH ? <div className="workout-card-meta-row mt-1 flex min-h-8 w-full items-center justify-end"><button type="button" aria-label={exercise.flaggedSkipped ? "Remove exercise flag" : "Flag exercise as intentionally skipped"} aria-pressed={Boolean(exercise.flaggedSkipped)} title={exercise.flaggedSkipped ? "Flagged — tap to remove" : "Flag exercise"} className={`workout-card-flag inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm transition-colors ${exercise.flaggedSkipped ? "border-red-300 bg-red-100 text-red-700 shadow-sm" : "border-slate-200 bg-white text-slate-400 hover:border-red-200 hover:bg-red-50 hover:text-red-600"}`} onClick={() => onFlag(exercise.id, !exercise.flaggedSkipped)}><span aria-hidden="true">⚑</span></button></div> : null}{isSetTickExercise ?',
+    `${strengthMeta}{!hideExerciseName && onFlag && exercise.exerciseType !== EXERCISE_TYPE.STRENGTH ? <div className="workout-card-meta-row mt-2 flex min-h-8 w-full items-center justify-end"><button type="button" aria-label={exercise.flaggedSkipped ? "Remove exercise flag" : "Flag exercise as intentionally skipped"} aria-pressed={Boolean(exercise.flaggedSkipped)} title={exercise.flaggedSkipped ? "Flagged — tap to remove" : "Flag exercise"} className={\`workout-card-flag inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm transition-colors \${exercise.flaggedSkipped ? "border-red-300 bg-red-100 text-red-700 shadow-sm" : "border-slate-200 bg-white text-slate-400 hover:border-red-200 hover:bg-red-50 hover:text-red-600"}\`} onClick={() => onFlag(exercise.id, !exercise.flaggedSkipped)}><span aria-hidden="true">⚑</span></button></div> : null}{isSetTickExercise ?`,
   )
 
   card = card.replace(

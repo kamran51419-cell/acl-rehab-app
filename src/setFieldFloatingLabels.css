@@ -3,17 +3,14 @@
   display: none !important;
 }
 
-/* The shell owns the true outer-border coordinate system. This matters because
-   fieldset positions absolute descendants from its legend/content area rather
-   than reliably from the visible top border. */
+/* The shell owns one stable coordinate system for the outline, labels and
+   editable control. Both left and right labels are rendered the same way. */
 .workout-field-shell {
   position: relative;
   min-width: 0;
   height: 2.75rem;
 }
 
-/* One fully white control with one clean outline. The native legend cuts the
-   left label into the border. */
 .workout-floating-field {
   position: absolute;
   inset: 0;
@@ -25,63 +22,52 @@
   border: 1px solid rgb(203 213 225);
   border-radius: 0.75rem;
   background: #fff;
-  overflow: visible;
+  overflow: hidden;
 }
 
-.workout-floating-label,
-.workout-field-previous {
+/* Reps/Weight/Time/Distance and Prev. now use the exact same border-label
+   implementation. The tiny white mask removes only the outline behind the text,
+   leaving the field itself continuously white with no visible tab/background. */
+.workout-border-label {
+  position: absolute;
+  top: 0;
+  z-index: 5;
+  display: block;
+  max-width: 44%;
+  margin: 0;
+  padding: 0 0.12rem;
   color: rgb(100 116 139);
   font-size: 0.5625rem;
   font-weight: 600;
   line-height: 0.75rem;
   letter-spacing: 0.015em;
   white-space: nowrap;
+  text-overflow: ellipsis;
+  transform: translateY(-50%);
   pointer-events: none;
 }
 
-/* Real fieldset legend: native left-hand border gap. */
-.workout-floating-label {
-  position: relative;
-  z-index: 3;
-  width: auto;
-  margin-left: 0.55rem;
-  padding: 0 0.12rem;
-  background: transparent;
-}
-
-/* Mirror the real legend on the right edge. The legend text's visual baseline
-   sits slightly below the mathematical border centre, so use the same optical
-   offset rather than centring the previous label with translateY(-50%). */
-.workout-field-previous {
-  position: absolute !important;
-  top: -0.125rem !important;
-  right: 0.55rem !important;
-  z-index: 5;
-  display: block !important;
-  max-width: 42%;
-  margin: 0 !important;
-  padding: 0 0.12rem !important;
-  color: rgb(100 116 139) !important;
-  font-size: 0.5625rem !important;
-  font-weight: 600 !important;
-  line-height: 0.75rem !important;
-  letter-spacing: 0.015em !important;
-  transform: none !important;
-  text-overflow: ellipsis;
-}
-
-.workout-field-previous::before {
+.workout-border-label::before {
   content: "";
   position: absolute;
   left: -0.02rem;
   right: -0.02rem;
-  top: 0.375rem;
+  top: 50%;
   z-index: -1;
-  height: 1px;
+  height: 2px;
+  transform: translateY(-50%);
   background: #fff;
 }
 
-/* The editable control is independent of fieldset/legend layout. */
+.workout-border-label-left {
+  left: 0.55rem;
+}
+
+.workout-border-label-right {
+  right: 0.55rem;
+}
+
+/* The editable control is independent of the border labels. */
 .workout-field-control {
   position: absolute;
   inset: 0;
@@ -135,7 +121,7 @@
   cursor: pointer;
 }
 
-.workout-floating-field:focus-within {
+.workout-field-shell:focus-within .workout-floating-field {
   border-color: rgb(148 163 184);
   box-shadow: 0 0 0 1px rgb(148 163 184 / 0.08);
 }

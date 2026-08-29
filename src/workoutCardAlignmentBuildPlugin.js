@@ -64,14 +64,14 @@ function transformWorkoutScreen(code, id) {
   if (!card.includes(tickSetList)) throw new Error(`Workout card alignment transform could not find tick set list in ${id}`)
   card = card.replace(
     tickSetList,
-    '<div className="mt-3 space-y-2"><div className="workout-set-header grid grid-cols-[3.5rem_minmax(0,1fr)_2rem] gap-3 px-3 pb-0.5 text-xs font-medium text-slate-500"><span aria-hidden="true"></span><div className={`grid ${fields.time && fields.distance ? "grid-cols-2 gap-2" : "grid-cols-1"}`}>{isRepsOnly ? <span>Reps</span> : <>{fields.time ? <span>{`Time (${durationUnitLabel})`}</span> : null}{fields.distance ? <span>Distance (km)</span> : null}</>}</div><span aria-hidden="true"></span></div>{exercise.recordedSets.map((set) =>',
+    '<div className="mt-3 space-y-2"><div className="workout-set-header grid grid-cols-[3.5rem_minmax(0,1fr)_2rem] gap-3 px-3 pb-0.5 text-xs font-medium text-slate-500"><span>Set</span><div className={`grid ${fields.time && fields.distance ? "grid-cols-2 gap-2" : "grid-cols-1"}`}>{isRepsOnly ? <span>Reps</span> : <>{fields.time ? <span>{`Time (${durationUnitLabel})`}</span> : null}{fields.distance ? <span>Distance (km)</span> : null}</>}</div><span aria-hidden="true"></span></div>{exercise.recordedSets.map((set) =>',
   )
 
   const weightedSetList = '<div className="mt-3 space-y-2">{(exercise.recordedSets || []).map((set) =>'
   if (!card.includes(weightedSetList)) throw new Error(`Workout card alignment transform could not find weighted set list in ${id}`)
   card = card.replace(
     weightedSetList,
-    '<div className="mt-3 space-y-2"><div className="workout-set-header grid grid-cols-[3.25rem_minmax(0,1fr)_minmax(0,1fr)] gap-2 px-3 pb-0.5 text-xs font-medium text-slate-500"><span aria-hidden="true"></span><span>{fields.reps ? "Reps" : fields.time ? `Time (${durationUnitLabel})` : fields.distance ? "Distance (km)" : ""}</span><span>{isWeighted ? "Weight (kg)" : ""}</span></div>{(exercise.recordedSets || []).map((set) =>',
+    '<div className="mt-3 space-y-2"><div className="workout-set-header grid grid-cols-[3.25rem_minmax(0,1fr)_minmax(0,1fr)] gap-2 px-3 pb-0.5 text-xs font-medium text-slate-500"><span>Set</span><span>{fields.reps ? "Reps" : fields.time ? `Time (${durationUnitLabel})` : fields.distance ? "Distance (km)" : ""}</span><span>{isWeighted ? "Weight (kg)" : ""}</span></div>{(exercise.recordedSets || []).map((set) =>',
   )
 
   card = card.replace(

@@ -25,9 +25,9 @@
   overflow: hidden;
 }
 
-/* Reps/Weight/Time/Distance and Prev. now use the exact same border-label
-   implementation. The tiny white mask removes only the outline behind the text,
-   leaving the field itself continuously white with no visible tab/background. */
+/* Reps/Weight/Time/Distance and Prev. use the exact same border-label
+   implementation. The label itself has no painted background; only the single
+   1px outline directly behind the glyph area is removed. */
 .workout-border-label {
   position: absolute;
   top: 0;
@@ -45,16 +45,18 @@
   text-overflow: ellipsis;
   transform: translateY(-50%);
   pointer-events: none;
+  background: transparent;
 }
 
+/* Match the real outline exactly: no overhang and no 2px halo at either edge. */
 .workout-border-label::before {
   content: "";
   position: absolute;
-  left: -0.02rem;
-  right: -0.02rem;
+  left: 0;
+  right: 0;
   top: 50%;
   z-index: -1;
-  height: 2px;
+  height: 1px;
   transform: translateY(-50%);
   background: #fff;
 }

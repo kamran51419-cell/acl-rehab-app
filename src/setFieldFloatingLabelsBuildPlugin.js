@@ -2,19 +2,19 @@ function transformWorkoutScreen(code) {
   let next = code
 
   // Keep the programmed prescription visible in one consistent place for every
-  // measurement type. The logging controls below are then only about what was done.
+  // non-interval measurement type. Prefixes make it distinct from a programme note.
   next = next.replace(
     'const prescribedDistance = exercise.prescription?.targetDistance ?? exercise.prescription?.distance; const isSetTickExercise',
-    'const prescribedDistance = exercise.prescription?.targetDistance ?? exercise.prescription?.distance; const prescribedRepsTarget = exercise.prescription?.targetReps; const prescribedRepsText = fields.reps && prescribedRepsTarget !== undefined && prescribedRepsTarget !== null ? (typeof prescribedRepsTarget === "number" ? `${prescribedRepsTarget} reps` : prescribedRepsTarget.type === "range" ? `${prescribedRepsTarget.min}–${prescribedRepsTarget.max} reps` : prescribedRepsTarget.value !== undefined ? `${prescribedRepsTarget.value} reps` : null) : null; const prescriptionMeasureSummary = [prescribedRepsText, fields.time && prescribedDuration !== "—" ? prescribedDuration : null, fields.distance && prescribedDistance !== undefined && prescribedDistance !== null ? `${prescribedDistance} km` : null].filter(Boolean).join(" · "); const isSetTickExercise',
+    'const prescribedDistance = exercise.prescription?.targetDistance ?? exercise.prescription?.distance; const prescribedRepsTarget = exercise.prescription?.targetReps; const prescribedRepsText = fields.reps && prescribedRepsTarget !== undefined && prescribedRepsTarget !== null ? (typeof prescribedRepsTarget === "number" ? `Reps: ${prescribedRepsTarget}` : prescribedRepsTarget.type === "range" ? `Range: ${prescribedRepsTarget.min}–${prescribedRepsTarget.max} reps` : prescribedRepsTarget.value !== undefined ? `Reps: ${prescribedRepsTarget.value}` : null) : null; const prescribedTimeText = fields.time && prescribedDuration !== "—" ? `Time: ${prescribedDuration}` : null; const prescribedDistanceText = fields.distance && prescribedDistance !== undefined && prescribedDistance !== null ? `Distance: ${prescribedDistance} km` : null; const prescriptionMeasureSummary = isIntervals ? "" : [prescribedRepsText, prescribedTimeText, prescribedDistanceText].filter(Boolean).join(" · "); const isSetTickExercise',
   )
 
   next = next.replace(
     '{side || exercise.prescription?.targetReps?.type === "range" ? <p className={hideExerciseName ? "text-sm font-semibold text-slate-700" : "text-xs text-slate-500"}>{[side, exercise.prescription?.targetReps?.type === "range" ? `Range: ${exercise.prescription.targetReps.min}–${exercise.prescription.targetReps.max} reps` : null].filter(Boolean).join(" · ")}</p> : null}{exercise.programmeNoteSnapshot ?',
-    '{side ? <p className={hideExerciseName ? "text-sm font-semibold text-slate-700" : "text-xs text-slate-500"}>{side}</p> : null}{prescriptionMeasureSummary ? <p className="mt-1 text-xs font-medium text-slate-600">{prescriptionMeasureSummary}</p> : null}{exercise.programmeNoteSnapshot ?',
+    '{side ? <p className={hideExerciseName ? "text-sm font-semibold text-slate-700" : "text-xs text-slate-500"}>{side}</p> : null}{prescriptionMeasureSummary ? <p className="workout-prescription-summary mt-1 text-xs font-semibold text-slate-700">{prescriptionMeasureSummary}</p> : null}{exercise.programmeNoteSnapshot ?',
   )
 
   // Reps fields (fixed and range) use one identical outlined control. Previous
-  // reps are a small reference in the top-right and never affect row height.
+  // reps sit on the opposite side of the top border and never affect row height.
   next = next.replaceAll(
     '<div className="min-w-0"><RepsInput exercise={exercise} set={set} onChange={onChange}/></div>',
     '<fieldset className="workout-floating-field min-w-0"><legend className="workout-floating-label">Reps</legend>{set.previousReps !== undefined && set.previousReps !== "" ? <span className="workout-field-previous">Prev. {set.previousReps}</span> : null}<RepsInput exercise={exercise} set={set} onChange={onChange}/></fieldset>',
@@ -38,7 +38,7 @@ function transformWorkoutScreen(code) {
   )
 
   // Time/distance tick rows can contain one or both editable fields. Optional
-  // previous values use the same corner treatment whenever those values exist.
+  // previous values use the same border treatment whenever those values exist.
   next = next.replaceAll(
     '{fields.time ? <input aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} time`}',
     '{fields.time ? <fieldset className="workout-floating-field min-w-0"><legend className="workout-floating-label">Time ({durationUnitLabel})</legend>{set.previousDurationSeconds !== undefined && set.previousDurationSeconds !== "" ? <span className="workout-field-previous">Prev. {Number(set.previousDurationSeconds) / durationScale}</span> : null}<input aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} time`}',

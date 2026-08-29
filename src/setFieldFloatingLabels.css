@@ -49,19 +49,24 @@
   background: transparent;
 }
 
-/* Mirror the real legend on the right edge. This is positioned from the shell,
-   whose y=0 is the actual visible top border. The text is centred exactly on
-   that line and only the border stroke directly behind it is erased. */
+/* Mirror the real legend on the right edge. The legend text's visual baseline
+   sits slightly below the mathematical border centre, so use the same optical
+   offset rather than centring the previous label with translateY(-50%). */
 .workout-field-previous {
   position: absolute !important;
-  top: 0 !important;
+  top: -0.125rem !important;
   right: 0.55rem !important;
   z-index: 5;
   display: block !important;
   max-width: 42%;
   margin: 0 !important;
   padding: 0 0.12rem !important;
-  transform: translateY(-50%);
+  color: rgb(100 116 139) !important;
+  font-size: 0.5625rem !important;
+  font-weight: 600 !important;
+  line-height: 0.75rem !important;
+  letter-spacing: 0.015em !important;
+  transform: none !important;
   text-overflow: ellipsis;
 }
 
@@ -70,10 +75,9 @@
   position: absolute;
   left: -0.02rem;
   right: -0.02rem;
-  top: 50%;
+  top: 0.375rem;
   z-index: -1;
-  height: 2px;
-  transform: translateY(-50%);
+  height: 1px;
   background: #fff;
 }
 

@@ -1,35 +1,29 @@
 @media (max-width: 639px) {
-  /* The exercise header is the positioning box. The ellipsis stays exactly in
-     its normal top-right flex position. */
+  /* Keep the exercise metadata and ellipsis on the first flex line. */
   .workout-exercise-header {
-    position: relative !important;
+    flex-wrap: wrap !important;
   }
 
-  .workout-exercise-header.workout-actions-open {
-    margin-bottom: 3.25rem;
-  }
-
-  /* Remove the ellipsis wrapper as the positioning context only. */
+  /* Flatten only the tiny ellipsis wrapper so its button remains in the same
+     top-right flex position while the open action menu can become its own row. */
   .workout-exercise-actions {
-    position: static !important;
+    display: contents !important;
   }
 
-  /* Full-width row beneath all exercise metadata, aligned to the card's inner
-     left/right edges rather than the tiny ellipsis wrapper. */
+  /* The menu is a real second flex row, not an absolutely-positioned overlay. */
   .workout-exercise-actions-menu {
-    position: absolute !important;
-    top: calc(100% + 0.5rem) !important;
-    right: 0 !important;
-    bottom: auto !important;
-    left: 0 !important;
-    z-index: 2 !important;
+    position: static !important;
+    inset: auto !important;
+    z-index: auto !important;
     display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    width: auto !important;
-    min-width: 0 !important;
-    max-width: none !important;
+    flex: 0 0 100% !important;
+    order: 10 !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
     gap: 0.5rem !important;
-    margin: 0 !important;
+    margin: 0.5rem 0 0 !important;
     padding: 0 !important;
     overflow: visible !important;
     border: 0 !important;
@@ -44,7 +38,6 @@
     width: 100% !important;
     min-width: 0 !important;
     max-width: 100% !important;
-    min-height: 0 !important;
     align-items: center !important;
     justify-content: center !important;
     margin: 0 !important;

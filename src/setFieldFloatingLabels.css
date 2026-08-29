@@ -3,17 +3,15 @@
   display: none !important;
 }
 
-/* The shell owns one stable coordinate system for the outline, labels and
-   editable control. */
+/* One coordinate system for the outline, labels and editable control. */
 .workout-field-shell {
   position: relative;
   min-width: 0;
   height: 2.75rem;
 }
 
-/* Keep the whole control white. The top edge is intentionally transparent and
-   is drawn by .workout-field-topline so labels create real gaps rather than
-   painted-over/masked ones. */
+/* Keep one normal, continuous rounded outline. Rebuilding the top edge as a
+   separate rail caused the white corner gaps/dots seen on mobile. */
 .workout-floating-field {
   position: absolute;
   inset: 0;
@@ -23,61 +21,56 @@
   margin: 0;
   padding: 0;
   border: 1px solid rgb(203 213 225);
-  border-top-color: transparent;
   border-radius: 0.75rem;
   background: #fff;
   overflow: hidden;
 }
 
-/* The rounded side borders naturally meet the top edge at the 0.75rem radius.
-   Start the top rail exactly at those tangent points. This avoids the tiny
-   bridge segments that rendered as dots/dashes beside the labels. */
+/* The transformed markup still contains the top-line rail, but it is now only
+   a positioning layer for the two labels. The real border remains untouched. */
 .workout-field-topline {
   position: absolute;
-  top: 0;
-  left: 0.75rem;
-  right: 0.75rem;
+  inset: 0;
   z-index: 5;
-  display: flex;
-  height: 1px;
-  align-items: center;
-  min-width: 0;
+  height: 0;
   pointer-events: none;
 }
 
 .workout-topline-segment {
-  height: 1px;
-  flex: 0 0 auto;
-  background: rgb(203 213 225);
+  display: none !important;
 }
 
-/* These elements remain in the transformed markup for compatibility, but the
-   corner-to-label bridge is intentionally provided by the rounded border itself. */
-.workout-topline-start,
-.workout-topline-end {
-  display: none;
-}
-
-.workout-topline-middle {
-  min-width: 0.45rem;
-  flex: 1 1 auto;
-}
-
+/* Reps/Weight/Time/Distance and Prev. use exactly the same floating-label
+   treatment. The backing is the same white as the field and only extends a few
+   pixels beyond the text, so it cleanly interrupts the 1px border without a
+   visible tab, dot or broken corner. */
 .workout-border-label {
+  position: absolute;
+  top: 0;
   display: block;
-  flex: 0 0 auto;
   max-width: 44%;
   margin: 0;
-  padding: 0 0.2rem;
+  padding: 0 0.18rem;
   overflow: hidden;
   color: rgb(100 116 139);
+  background: #fff;
   font-size: 0.5625rem;
   font-weight: 600;
   line-height: 0.75rem;
   letter-spacing: 0.015em;
   white-space: nowrap;
   text-overflow: ellipsis;
-  background: transparent;
+  transform: translateY(-50%);
+}
+
+.workout-field-topline > .workout-border-label:first-of-type {
+  left: 0.75rem;
+}
+
+/* Only a second label is the previous-performance label. */
+.workout-field-topline > .workout-border-label ~ .workout-border-label {
+  right: 0.75rem;
+  left: auto;
 }
 
 /* The editable control is independent of the border labels. */
@@ -136,12 +129,7 @@
 
 .workout-field-shell:focus-within .workout-floating-field {
   border-color: rgb(148 163 184);
-  border-top-color: transparent;
   box-shadow: 0 0 0 1px rgb(148 163 184 / 0.08);
-}
-
-.workout-field-shell:focus-within .workout-topline-segment {
-  background: rgb(148 163 184);
 }
 
 /* Suppress any old per-input previous line from legacy markup. */

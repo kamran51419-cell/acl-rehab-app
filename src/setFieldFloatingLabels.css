@@ -3,8 +3,8 @@
   display: none !important;
 }
 
-/* The fieldset only owns the outline/legend. Actual controls sit in a separate
-   centred layer so browser fieldset layout cannot push values downward. */
+/* Draw one clean outline around the control. Labels simply interrupt that line;
+   they do not sit on painted white/grey tabs. */
 .workout-floating-field {
   position: relative;
   min-width: 0;
@@ -13,25 +13,33 @@
   padding: 0;
   border: 1px solid rgb(203 213 225);
   border-radius: 0.75rem;
-  background: #fff;
+  background: transparent;
+  overflow: visible;
 }
 
+.workout-floating-label,
+.workout-field-previous {
+  color: rgb(100 116 139);
+  font-size: 0.5625rem;
+  line-height: 0.75rem;
+  letter-spacing: 0.015em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* The left legend is the real fieldset legend, so its gap is native and smooth. */
 .workout-floating-label {
   position: relative;
-  z-index: 4;
+  z-index: 3;
   width: auto;
   margin-left: 0.55rem;
   padding: 0 0.2rem;
-  color: rgb(100 116 139);
-  font-size: 0.5625rem;
   font-weight: 600;
-  line-height: 0.75rem;
-  letter-spacing: 0.015em;
-  pointer-events: none;
-  white-space: nowrap;
+  background: transparent;
 }
 
-/* Previous performance reads as a second tiny legend on the top-right border. */
+/* Previous performance mirrors the left legend visually. Instead of a visible
+   rectangle, mask only the 1px outline directly behind the text. */
 .workout-field-previous {
   position: absolute !important;
   top: -0.375rem !important;
@@ -43,65 +51,81 @@
   margin: 0 !important;
   padding: 0 0.22rem !important;
   color: rgb(148 163 184) !important;
-  background: linear-gradient(to bottom, rgb(248 250 252) 0 50%, #fff 50% 100%);
-  font-size: 0.5625rem !important;
   font-weight: 400 !important;
-  line-height: 0.75rem !important;
   text-overflow: ellipsis;
-  white-space: nowrap;
-  pointer-events: none;
 }
 
-/* This layer is the real 44px control box. It is completely independent from
-   legend geometry and therefore gives inputs/selects one stable vertical centre. */
+.workout-field-previous::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  transform: translateY(-50%);
+  background: rgb(248 250 252);
+}
+
+/* The control body is completely independent from fieldset/legend layout. */
 .workout-field-control {
-  position: absolute !important;
-  inset: 0 !important;
+  position: absolute;
+  inset: 0;
   z-index: 1;
-  display: flex !important;
+  display: flex;
   min-width: 0;
-  align-items: center !important;
+  align-items: center;
+  border-radius: inherit;
+  background: #fff;
+  overflow: hidden;
 }
 
 .workout-field-control > input,
 .workout-field-control > select {
   display: block !important;
   width: 100% !important;
-  height: 2.5rem !important;
-  min-height: 2.5rem !important;
+  height: 100% !important;
+  min-height: 0 !important;
   margin: 0 !important;
   padding: 0 0.75rem !important;
   border: 0 !important;
-  border-radius: 0.75rem !important;
-  background-color: transparent !important;
-  background-image: none !important;
+  border-radius: inherit !important;
+  background: transparent !important;
   box-shadow: none !important;
   outline: none !important;
-  line-height: normal !important;
-  vertical-align: middle !important;
+  line-height: 1 !important;
+  font: inherit;
 }
 
-/* Remove every browser/Tailwind select affordance, then draw exactly one arrow. */
-.workout-field-control > select {
-  appearance: none !important;
-  -webkit-appearance: none !important;
-  -moz-appearance: none !important;
-  padding-right: 2.5rem !important;
-  cursor: pointer;
+/* Inputs need a tiny optical correction because browser text metrics sit low
+   even when the box itself is mathematically centred. */
+.workout-field-control > input {
+  padding-top: 0 !important;
+  padding-bottom: 0.05rem !important;
 }
 
-.workout-floating-field:has(.workout-field-control > select)::after {
+/* Rep ranges get exactly one controlled chevron. Remove all browser arrows and
+   background images first, then draw one consistent affordance. */
+.workout-field-control:has(> select)::after {
   content: "";
   position: absolute;
   top: 50%;
-  right: 0.95rem;
-  z-index: 3;
+  right: 0.9rem;
   width: 0.48rem;
   height: 0.48rem;
   border-right: 2px solid rgb(100 116 139);
   border-bottom: 2px solid rgb(100 116 139);
-  transform: translateY(-62%) rotate(45deg);
+  transform: translateY(-68%) rotate(45deg);
   pointer-events: none;
+}
+
+.workout-field-control > select {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  background-image: none !important;
+  padding-right: 2.5rem !important;
+  cursor: pointer;
 }
 
 .workout-floating-field:focus-within {
@@ -109,23 +133,16 @@
   box-shadow: 0 0 0 1px rgb(148 163 184 / 0.08);
 }
 
-/* Suppress any legacy previous-value line emitted by older markup. */
+/* Suppress any old per-input previous line from legacy markup. */
 .workout-floating-field > span:not(.workout-floating-label):not(.workout-field-previous),
 .workout-field-control > span {
   display: none !important;
 }
 
-/* Prescription metadata is stronger and more compact than the programme description. */
+/* Prescription metadata is deliberately stronger than the programme note so
+   prescribed measurements cannot be mistaken for the user's description. */
 .workout-prescription-summary {
-  color: rgb(71 85 105) !important;
-  font-weight: 600 !important;
   letter-spacing: 0.005em;
-}
-
-.workout-programme-description {
-  color: rgb(148 163 184) !important;
-  font-weight: 400 !important;
-  line-height: 1.25rem;
 }
 
 /* Set labels use the exact same 44px vertical box as the editable control. */
@@ -152,7 +169,6 @@
   display: none !important;
 }
 
-/* Set number, editable control and completion circle all share the same fixed baseline. */
 .rounded-xl.bg-slate-50:has(.workout-floating-field) {
   align-items: start !important;
 }

@@ -33,11 +33,11 @@ import { verticalIntervalWorkoutDisplayPlugin } from './src/verticalIntervalWork
 export default defineConfig({
   plugins: [
     timeWeightTrackingBuildPlugin(),
+    workoutActionsSheetBuildPlugin(),
     equipmentTrackingBuildPlugin(),
     latestPreviousPerformanceBuildPlugin(),
     timedPreviousPerformanceBuildPlugin(),
     workoutExerciseEditBuildPlugin(),
-    workoutActionsSheetBuildPlugin(),
     workoutUiPolishBuildPlugin(),
     repeatedIntervalBlocksPlugin(),
     intervalSummaryGrammarBuildPlugin(),

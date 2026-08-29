@@ -1,9 +1,12 @@
 const PRESCRIPTION_HELPER = `function workoutPrescriptionSummary(exercise) {
-  const summary = programmeSummary(exercise);
+  let summary = programmeSummary(exercise);
   const side = resolveWorkoutExerciseSide(exercise);
-  if (side === SIDE.LEFT) return summary.replace(/\\s+left$/i, "");
-  if (side === SIDE.RIGHT) return summary.replace(/\\s+right$/i, "");
-  if (side === SIDE.SEPARATE) return summary.replace(/\\s+left & right$/i, "");
+  if (side === SIDE.LEFT) summary = summary.replace(/\\s+left$/i, "");
+  if (side === SIDE.RIGHT) summary = summary.replace(/\\s+right$/i, "");
+  if (side === SIDE.SEPARATE) summary = summary.replace(/\\s+left & right$/i, "");
+
+  summary = summary.replace(/^\\d+\\s*×\\s*/, "");
+  if (exercise.prescription?.targetReps && !/\\breps?\\b/i.test(summary)) return summary + " reps";
   return summary;
 }`
 

@@ -1,21 +1,25 @@
 @media (max-width: 639px) {
-  /* The header is the sizing/positioning reference for the mobile action row.
-     The ellipsis itself keeps its normal wrapper and normal flex position. */
-  .workout-exercise-header {
+  /* Scope this only to the top header row of workout exercise cards. The
+     ellipsis stays in its normal flex position. */
+  section > div:first-child:has(button[aria-label^='Edit ']) {
     position: relative;
   }
 
-  .workout-exercise-header.workout-actions-open {
+  /* When the menu is open, reserve exactly one row beneath the metadata so the
+     set cards are pushed down instead of being covered. */
+  section > div:first-child:has(button[aria-label^='Edit '] + div) {
     margin-bottom: 2.75rem;
   }
 
-  /* Remove only the dropdown wrapper's positioning context. This does not move
-     the ellipsis; it lets the open row size against the whole exercise header. */
-  .workout-exercise-actions {
+  /* Remove the tiny ellipsis wrapper as the positioning context without
+     changing its size or place in the header. */
+  section > div:first-child:has(button[aria-label^='Edit ']) div:has(> button[aria-label^='Edit ']) {
     position: static !important;
   }
 
-  .workout-exercise-actions-menu {
+  /* Position the actions against the full header width, directly under the
+     lowest prescription/side/note line. */
+  section > div:first-child:has(button[aria-label^='Edit ']) button[aria-label^='Edit '] + div {
     position: absolute !important;
     top: calc(100% + 0.25rem) !important;
     right: 0 !important;
@@ -23,7 +27,7 @@
     left: 0 !important;
     z-index: 2 !important;
     display: grid !important;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     width: auto !important;
     min-width: 0 !important;
     max-width: none !important;
@@ -39,7 +43,7 @@
   }
 
   /* Match the existing Add set / Remove set controls. */
-  .workout-exercise-actions-menu > button {
+  section > div:first-child:has(button[aria-label^='Edit ']) button[aria-label^='Edit '] + div > button {
     display: inline-flex !important;
     width: 100% !important;
     min-width: 0 !important;
@@ -49,7 +53,7 @@
     justify-content: center !important;
     margin: 0 !important;
     padding: 0.5rem 0.75rem !important;
-    overflow: visible !important;
+    overflow: hidden !important;
     border: 1px solid rgb(226 232 240) !important;
     border-radius: 0.5rem !important;
     background: #fff !important;
@@ -62,11 +66,11 @@
     box-sizing: border-box !important;
   }
 
-  .workout-exercise-actions-menu > button:active {
+  section > div:first-child:has(button[aria-label^='Edit ']) button[aria-label^='Edit '] + div > button:active {
     background: rgb(248 250 252) !important;
   }
 
-  .workout-exercise-actions-menu > button:last-child {
+  section > div:first-child:has(button[aria-label^='Edit ']) button[aria-label^='Edit '] + div > button:last-child {
     color: rgb(220 38 38) !important;
   }
 }

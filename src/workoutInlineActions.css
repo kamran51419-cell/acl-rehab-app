@@ -4,29 +4,31 @@
     position: relative;
   }
 
-  /* Reserve room only while the two actions are visible. */
+  /* Reserve a full action row beneath the exercise metadata. */
   section > div:first-child:has(button[aria-label^='Edit '] + div) {
-    margin-bottom: 2.75rem;
+    margin-bottom: 3.25rem;
   }
 
-  /* Let the open menu sit beneath the whole header. The explicit mobile width
-     prevents it from collapsing to the tiny ellipsis wrapper. */
+  /* The menu is still rendered inside the ellipsis wrapper, but the wrapper is
+     not allowed to become the positioning box. The full header is instead. */
   section > div:first-child:has(button[aria-label^='Edit ']) div:has(> button[aria-label^='Edit ']) {
     position: static !important;
   }
 
+  /* Span exactly the same inner left/right edges as the rest of the exercise
+     card, below the prescription/side/programme note. */
   section > div:first-child:has(button[aria-label^='Edit ']) button[aria-label^='Edit '] + div {
     position: absolute !important;
-    top: calc(100% + 0.25rem) !important;
+    top: calc(100% + 0.5rem) !important;
     right: 0 !important;
     bottom: auto !important;
-    left: auto !important;
+    left: 0 !important;
     z-index: 2 !important;
     display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    width: calc(100vw - 5rem) !important;
+    width: auto !important;
     min-width: 0 !important;
-    max-width: calc(100vw - 5rem) !important;
+    max-width: none !important;
     gap: 0.5rem !important;
     margin: 0 !important;
     padding: 0 !important;

@@ -1,0 +1,30 @@
+/* Keep every set self-explanatory without a separate table-like header. */
+.workout-set-header {
+  display: none !important;
+}
+
+.workout-floating-field {
+  position: relative;
+  min-width: 0;
+}
+
+.workout-floating-label {
+  position: absolute;
+  top: -0.45rem;
+  left: 0.6rem;
+  z-index: 2;
+  padding: 0 0.22rem;
+  background: #fff;
+  color: rgb(100 116 139);
+  font-size: 0.625rem;
+  font-weight: 500;
+  line-height: 0.9rem;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* The circle follows the 40px input baseline, never the optional Prev. line. */
+.workout-set-tick-row > button[aria-label^='Toggle set'] {
+  align-self: start !important;
+  margin-top: 0.25rem !important;
+}

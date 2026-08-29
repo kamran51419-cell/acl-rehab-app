@@ -84,10 +84,12 @@
   pointer-events: none;
 }
 
-/* Main measurement label: top-left. */
+/* Main measurement label: top-left. Give the cut-out enough width for labels
+   such as Weight (kg), otherwise the border can show through the last letters. */
 .workout-field-topline > .workout-topline-start + .workout-border-label {
   left: 0.94rem;
   right: auto;
+  max-width: calc(100% - 1.88rem);
 }
 
 /* Previous value: bottom-right, mirroring the label inset on the opposite edge. */
@@ -240,6 +242,7 @@
 
   .workout-field-topline > .workout-topline-start + .workout-border-label {
     left: 0.45rem;
+    max-width: calc(100% - 0.9rem);
   }
 
   .workout-border-label-previous {
@@ -252,5 +255,34 @@
     background: rgb(239 246 255) !important;
     color: rgb(51 65 85) !important;
     box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+  }
+
+  /* Treat the exercise ellipsis menu as a compact mobile action sheet instead
+     of a tiny dropdown sitting over the first set fields. This keeps labels and
+     values completely hidden underneath it and matches the app's rounded cards. */
+  button[aria-label^='Edit '] + div {
+    position: fixed !important;
+    top: auto !important;
+    right: 0.75rem !important;
+    bottom: calc(5.75rem + env(safe-area-inset-bottom)) !important;
+    left: 0.75rem !important;
+    z-index: 90 !important;
+    width: auto !important;
+    padding: 0.375rem !important;
+    border: 1px solid rgb(226 232 240) !important;
+    border-radius: 1rem !important;
+    background: #fff !important;
+    box-shadow: 0 18px 45px rgb(15 23 42 / 0.18) !important;
+  }
+
+  button[aria-label^='Edit '] + div > button {
+    min-height: 2.75rem;
+    border-radius: 0.75rem;
+    padding: 0.75rem 0.875rem !important;
+    font-weight: 600;
+  }
+
+  button[aria-label^='Edit '] + div > button + button {
+    margin-top: 0.25rem;
   }
 }

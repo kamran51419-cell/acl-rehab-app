@@ -1,39 +1,34 @@
+.workout-exercise-actions-mobile {
+  display: none;
+}
+
 @media (max-width: 639px) {
-  /* Keep the exercise metadata and ellipsis on the first flex line. */
+  /* Keep the original ellipsis wrapper as a normal first-row flex item. */
   .workout-exercise-header {
     flex-wrap: wrap !important;
   }
 
-  /* Flatten only the tiny ellipsis wrapper so its button remains in the same
-     top-right flex position while the open action menu can become its own row. */
-  .workout-exercise-actions {
-    display: contents !important;
+  /* The desktop dropdown remains available on larger screens only. */
+  .workout-exercise-actions-desktop {
+    display: none !important;
   }
 
-  /* The menu is a real second flex row, not an absolutely-positioned overlay. */
-  .workout-exercise-actions-menu {
-    position: static !important;
-    inset: auto !important;
-    z-index: auto !important;
+  /* A dedicated full-width second flex row avoids any absolute positioning,
+     overlap with notes/equipment, or dependence on the ellipsis wrapper size. */
+  .workout-exercise-actions-mobile {
     display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     flex: 0 0 100% !important;
-    order: 10 !important;
     width: 100% !important;
     min-width: 100% !important;
     max-width: 100% !important;
     gap: 0.5rem !important;
     margin: 0.5rem 0 0 !important;
     padding: 0 !important;
-    overflow: visible !important;
-    border: 0 !important;
-    border-radius: 0 !important;
-    background: transparent !important;
-    box-shadow: none !important;
     box-sizing: border-box !important;
   }
 
-  .workout-exercise-actions-menu > button {
+  .workout-exercise-actions-mobile > button {
     display: inline-flex !important;
     width: 100% !important;
     min-width: 0 !important;
@@ -55,11 +50,11 @@
     box-sizing: border-box !important;
   }
 
-  .workout-exercise-actions-menu > button:active {
+  .workout-exercise-actions-mobile > button:active {
     background: rgb(248 250 252) !important;
   }
 
-  .workout-exercise-actions-menu > button:last-child {
+  .workout-exercise-actions-mobile > button:last-child {
     color: rgb(220 38 38) !important;
   }
 }

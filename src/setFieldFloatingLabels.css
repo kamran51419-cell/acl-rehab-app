@@ -4,13 +4,16 @@
 }
 
 /* The shell owns one stable coordinate system for the outline, labels and
-   editable control. Both left and right labels are rendered the same way. */
+   editable control. */
 .workout-field-shell {
   position: relative;
   min-width: 0;
   height: 2.75rem;
 }
 
+/* Keep the whole control white. The top edge is intentionally transparent and
+   is drawn by .workout-field-topline so labels create real gaps rather than
+   painted-over/masked ones. */
 .workout-floating-field {
   position: absolute;
   inset: 0;
@@ -20,22 +23,51 @@
   margin: 0;
   padding: 0;
   border: 1px solid rgb(203 213 225);
+  border-top-color: transparent;
   border-radius: 0.75rem;
   background: #fff;
   overflow: hidden;
 }
 
-/* Reps/Weight/Time/Distance and Prev. use the exact same border-label
-   implementation. The label itself has no painted background; only the single
-   1px outline directly behind the glyph area is removed. */
-.workout-border-label {
+/* A genuine segmented top border: line -> label -> line -> Prev. -> line.
+   There is never a stroke behind either label, so no white mask, dot, halo or
+   thickness change can appear through the text. */
+.workout-field-topline {
   position: absolute;
   top: 0;
+  left: 0.7rem;
+  right: 0.7rem;
   z-index: 5;
+  display: flex;
+  height: 1px;
+  align-items: center;
+  min-width: 0;
+  pointer-events: none;
+}
+
+.workout-topline-segment {
+  height: 1px;
+  flex: 0 0 auto;
+  background: rgb(203 213 225);
+}
+
+.workout-topline-start,
+.workout-topline-end {
+  width: 0.18rem;
+}
+
+.workout-topline-middle {
+  min-width: 0.35rem;
+  flex: 1 1 auto;
+}
+
+.workout-border-label {
   display: block;
+  flex: 0 0 auto;
   max-width: 44%;
   margin: 0;
-  padding: 0 0.12rem;
+  padding: 0 0.18rem;
+  overflow: hidden;
   color: rgb(100 116 139);
   font-size: 0.5625rem;
   font-weight: 600;
@@ -43,30 +75,7 @@
   letter-spacing: 0.015em;
   white-space: nowrap;
   text-overflow: ellipsis;
-  transform: translateY(-50%);
-  pointer-events: none;
   background: transparent;
-}
-
-/* Match the real outline exactly: no overhang and no 2px halo at either edge. */
-.workout-border-label::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  z-index: -1;
-  height: 1px;
-  transform: translateY(-50%);
-  background: #fff;
-}
-
-.workout-border-label-left {
-  left: 0.55rem;
-}
-
-.workout-border-label-right {
-  right: 0.55rem;
 }
 
 /* The editable control is independent of the border labels. */
@@ -125,7 +134,12 @@
 
 .workout-field-shell:focus-within .workout-floating-field {
   border-color: rgb(148 163 184);
+  border-top-color: transparent;
   box-shadow: 0 0 0 1px rgb(148 163 184 / 0.08);
+}
+
+.workout-field-shell:focus-within .workout-topline-segment {
+  background: rgb(148 163 184);
 }
 
 /* Suppress any old per-input previous line from legacy markup. */

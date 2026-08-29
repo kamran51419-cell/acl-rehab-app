@@ -29,14 +29,14 @@
   overflow: hidden;
 }
 
-/* A genuine segmented top border: line -> label -> line -> Prev. -> line.
-   There is never a stroke behind either label, so no white mask, dot, halo or
-   thickness change can appear through the text. */
+/* The rounded side borders naturally meet the top edge at the 0.75rem radius.
+   Start the top rail exactly at those tangent points. This avoids the tiny
+   bridge segments that rendered as dots/dashes beside the labels. */
 .workout-field-topline {
   position: absolute;
   top: 0;
-  left: 0.7rem;
-  right: 0.7rem;
+  left: 0.75rem;
+  right: 0.75rem;
   z-index: 5;
   display: flex;
   height: 1px;
@@ -51,13 +51,15 @@
   background: rgb(203 213 225);
 }
 
+/* These elements remain in the transformed markup for compatibility, but the
+   corner-to-label bridge is intentionally provided by the rounded border itself. */
 .workout-topline-start,
 .workout-topline-end {
-  width: 0.18rem;
+  display: none;
 }
 
 .workout-topline-middle {
-  min-width: 0.35rem;
+  min-width: 0.45rem;
   flex: 1 1 auto;
 }
 
@@ -66,7 +68,7 @@
   flex: 0 0 auto;
   max-width: 44%;
   margin: 0;
-  padding: 0 0.18rem;
+  padding: 0 0.2rem;
   overflow: hidden;
   color: rgb(100 116 139);
   font-size: 0.5625rem;

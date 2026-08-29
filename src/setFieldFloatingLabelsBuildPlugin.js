@@ -13,34 +13,35 @@ function transformWorkoutScreen(code) {
     '{side ? <p className={hideExerciseName ? "text-sm font-semibold text-slate-700" : "text-xs text-slate-500"}>{side}</p> : null}{prescriptionMeasureSummary ? <p className="mt-1 text-xs font-medium text-slate-600">{prescriptionMeasureSummary}</p> : null}{exercise.programmeNoteSnapshot ?',
   )
 
-  // Reps fields (both fixed reps and rep-range selects). Fieldset/legend creates
-  // the real gap in the outline that the user preferred.
+  // Reps fields (fixed and range) use one identical outlined control. Previous
+  // reps are a small reference in the top-right and never affect row height.
   next = next.replaceAll(
     '<div className="min-w-0"><RepsInput exercise={exercise} set={set} onChange={onChange}/></div>',
-    '<fieldset className="workout-floating-field min-w-0"><legend className="workout-floating-label">Reps</legend><RepsInput exercise={exercise} set={set} onChange={onChange}/></fieldset>',
+    '<fieldset className="workout-floating-field min-w-0"><legend className="workout-floating-label">Reps</legend>{set.previousReps !== undefined && set.previousReps !== "" ? <span className="workout-field-previous">Prev. {set.previousReps}</span> : null}<RepsInput exercise={exercise} set={set} onChange={onChange}/></fieldset>',
   )
 
-  // Weight fields use the same outlined treatment. The matching previous value
-  // becomes a ghost placeholder only while this exact field is empty.
+  // Weight uses the same treatment. If this exact previous set has no weight,
+  // nothing is shown rather than borrowing a value from another set.
   next = next.replaceAll(
     '<div className="min-w-0"><input inputMode="decimal" className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3" value={set.rawWeight ?? set.weight ?? ""} onFocus={(event) => event.currentTarget.select()} onChange={(event) => onChange(exercise.id, set.id, "weight", event.target.value)}/>{set.previousWeight !== undefined && set.previousWeight !== "" ? <span className="mt-1 block text-[11px] font-normal text-slate-400">Prev. {set.previousWeight}</span> : null}</div>',
-    '<fieldset className="workout-floating-field min-w-0"><legend className="workout-floating-label">Weight (kg)</legend><input inputMode="decimal" placeholder={set.previousWeight !== undefined && set.previousWeight !== "" ? `Prev. ${set.previousWeight}` : ""} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3" value={set.rawWeight ?? set.weight ?? ""} onFocus={(event) => event.currentTarget.select()} onChange={(event) => onChange(exercise.id, set.id, "weight", event.target.value)}/></fieldset>',
+    '<fieldset className="workout-floating-field min-w-0"><legend className="workout-floating-label">Weight (kg)</legend>{set.previousWeight !== undefined && set.previousWeight !== "" ? <span className="workout-field-previous">Prev. {set.previousWeight}</span> : null}<input inputMode="decimal" className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3" value={set.rawWeight ?? set.weight ?? ""} onFocus={(event) => event.currentTarget.select()} onChange={(event) => onChange(exercise.id, set.id, "weight", event.target.value)}/></fieldset>',
   )
 
   // Time-only weighted fields.
   next = next.replaceAll(
     '<div className="min-w-0"><input aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} time`} inputMode="decimal" className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3"',
-    '<fieldset className="workout-floating-field min-w-0"><legend className="workout-floating-label">Time ({durationUnitLabel})</legend><input aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} time`} inputMode="decimal" className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3"',
+    '<fieldset className="workout-floating-field min-w-0"><legend className="workout-floating-label">Time ({durationUnitLabel})</legend>{set.previousDurationSeconds !== undefined && set.previousDurationSeconds !== "" ? <span className="workout-field-previous">Prev. {Number(set.previousDurationSeconds) / durationScale}</span> : null}<input aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} time`} inputMode="decimal" className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3"',
   )
   next = next.replaceAll(
     'onChange={(event) => onChange(exercise.id, set.id, "durationSeconds", event.target.value === "" ? "" : Number(event.target.value) * durationScale)}/></div>',
     'onChange={(event) => onChange(exercise.id, set.id, "durationSeconds", event.target.value === "" ? "" : Number(event.target.value) * durationScale)}/></fieldset>',
   )
 
-  // Time/distance tick rows can contain one or both editable fields.
+  // Time/distance tick rows can contain one or both editable fields. Optional
+  // previous values use the same corner treatment whenever those values exist.
   next = next.replaceAll(
     '{fields.time ? <input aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} time`}',
-    '{fields.time ? <fieldset className="workout-floating-field min-w-0"><legend className="workout-floating-label">Time ({durationUnitLabel})</legend><input aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} time`}',
+    '{fields.time ? <fieldset className="workout-floating-field min-w-0"><legend className="workout-floating-label">Time ({durationUnitLabel})</legend>{set.previousDurationSeconds !== undefined && set.previousDurationSeconds !== "" ? <span className="workout-field-previous">Prev. {Number(set.previousDurationSeconds) / durationScale}</span> : null}<input aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} time`}',
   )
   next = next.replaceAll(
     'onChange={(event) => onChange(exercise.id, set.id, "durationSeconds", event.target.value === "" ? "" : Number(event.target.value) * durationScale)}/> : null}{fields.distance ?',
@@ -48,27 +49,22 @@ function transformWorkoutScreen(code) {
   )
   next = next.replaceAll(
     '{fields.distance ? <input aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} distance`}',
-    '{fields.distance ? <fieldset className="workout-floating-field min-w-0"><legend className="workout-floating-label">Distance (km)</legend><input aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} distance`}',
+    '{fields.distance ? <fieldset className="workout-floating-field min-w-0"><legend className="workout-floating-label">Distance (km)</legend>{set.previousDistance !== undefined && set.previousDistance !== "" ? <span className="workout-field-previous">Prev. {set.previousDistance}</span> : null}<input aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} distance`}',
   )
   next = next.replaceAll(
     'onChange={(event) => onChange(exercise.id, set.id, "distance", event.target.value)}/> : null}</div>',
     'onChange={(event) => onChange(exercise.id, set.id, "distance", event.target.value)}/></fieldset> : null}</div>',
   )
 
-  // RepsInput owns both fixed-rep inputs and range selects. Fixed reps get the
-  // matching-set previous value only as a ghost placeholder when empty. Range
-  // selects keep the same Reps legend and use their native dropdown affordance.
-  next = next.replace(
-    ': <input aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} reps`} inputMode="numeric" className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3" value={value}',
-    ': <input aria-label={`${exercise.exerciseNameSnapshot} set ${set.setNumber} reps`} inputMode="numeric" placeholder={set.previousReps !== undefined && set.previousReps !== "" ? `Prev. ${set.previousReps}` : ""} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3" value={value}',
-  )
+  // RepsInput owns both fixed-rep inputs and range selects. Remove its legacy
+  // previous-value line because the fieldset now owns that reference for both.
   next = next.replace(
     'return <>{input}{set.previousReps !== undefined && set.previousReps !== "" ? <span className="mt-1 block text-[11px] font-normal text-slate-400">Prev. {set.previousReps}</span> : null}</>;',
     'return input;',
   )
 
   // Give every set number the same fixed-height alignment container, regardless
-  // of logging method or whether any previous value exists.
+  // of logging method or whether a previous value exists.
   next = next.replaceAll(
     '<span className="text-sm font-medium">Set {set.setNumber}</span>',
     '<div className="workout-set-label"><span className="workout-set-number">Set {set.setNumber}</span></div>',

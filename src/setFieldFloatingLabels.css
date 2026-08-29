@@ -3,8 +3,8 @@
   display: none !important;
 }
 
-/* Draw one clean outline around the control. Labels simply interrupt that line;
-   they do not sit on painted white/grey tabs. */
+/* One fully white control with one clean outline. The native legend cuts the
+   left label into the border; the right previous value mirrors that treatment. */
 .workout-floating-field {
   position: relative;
   min-width: 0;
@@ -13,7 +13,7 @@
   padding: 0;
   border: 1px solid rgb(203 213 225);
   border-radius: 0.75rem;
-  background: transparent;
+  background: #fff;
   overflow: visible;
 }
 
@@ -27,19 +27,21 @@
   pointer-events: none;
 }
 
-/* The left legend is the real fieldset legend, so its gap is native and smooth. */
+/* The real fieldset legend creates the left-hand border gap itself. Keep its
+   padding tiny so it reads as text embedded in the line, not a tab/box. */
 .workout-floating-label {
   position: relative;
   z-index: 3;
   width: auto;
   margin-left: 0.55rem;
-  padding: 0 0.2rem;
+  padding: 0 0.12rem;
   font-weight: 600;
   background: transparent;
 }
 
-/* Previous performance mirrors the left legend visually. Instead of a visible
-   rectangle, mask only the 1px outline directly behind the text. */
+/* Previous performance uses the same visual baseline as the legend. It does
+   not have a background block: only the single border pixel behind the text is
+   erased, leaving the rest of the field continuously white. */
 .workout-field-previous {
   position: absolute !important;
   top: -0.375rem !important;
@@ -47,9 +49,9 @@
   z-index: 4;
   display: block !important;
   max-width: 42%;
-  overflow: hidden;
+  overflow: visible;
   margin: 0 !important;
-  padding: 0 0.22rem !important;
+  padding: 0 0.12rem !important;
   color: rgb(148 163 184) !important;
   font-weight: 400 !important;
   text-overflow: ellipsis;
@@ -59,15 +61,16 @@
   content: "";
   position: absolute;
   z-index: -1;
-  left: 0;
-  right: 0;
+  left: 0.04rem;
+  right: 0.04rem;
   top: 50%;
-  height: 2px;
+  height: 1px;
   transform: translateY(-50%);
-  background: rgb(248 250 252);
+  background: #fff;
 }
 
-/* The control body is completely independent from fieldset/legend layout. */
+/* The editable control is independent of fieldset/legend layout. Its box is
+   the full 44px field, so values cannot be pushed down by either border label. */
 .workout-field-control {
   position: absolute;
   inset: 0;
@@ -76,7 +79,7 @@
   min-width: 0;
   align-items: center;
   border-radius: inherit;
-  background: #fff;
+  background: transparent;
   overflow: hidden;
 }
 
@@ -84,28 +87,21 @@
 .workout-field-control > select {
   display: block !important;
   width: 100% !important;
-  height: 100% !important;
-  min-height: 0 !important;
+  height: 2rem !important;
+  min-height: 2rem !important;
   margin: 0 !important;
   padding: 0 0.75rem !important;
   border: 0 !important;
-  border-radius: inherit !important;
+  border-radius: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
   outline: none !important;
-  line-height: 1 !important;
+  line-height: 2rem !important;
   font: inherit;
+  transform: translateY(-0.04rem);
 }
 
-/* Inputs need a tiny optical correction because browser text metrics sit low
-   even when the box itself is mathematically centred. */
-.workout-field-control > input {
-  padding-top: 0 !important;
-  padding-bottom: 0.05rem !important;
-}
-
-/* Rep ranges get exactly one controlled chevron. Remove all browser arrows and
-   background images first, then draw one consistent affordance. */
+/* Rep ranges get exactly one controlled chevron. */
 .workout-field-control:has(> select)::after {
   content: "";
   position: absolute;

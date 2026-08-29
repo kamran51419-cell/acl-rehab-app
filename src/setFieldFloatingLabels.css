@@ -216,6 +216,16 @@
     column-gap: 0.5rem !important;
   }
 
+  .workout-set-tick-row {
+    grid-template-columns: 2.1rem minmax(0, 1fr) 2rem !important;
+    column-gap: 0.5rem !important;
+  }
+
+  .workout-set-tick-row > .grid.min-w-0 {
+    width: 100%;
+    min-width: 0;
+  }
+
   .rounded-xl.bg-slate-50:has(> .workout-set-label + .workout-field-shell + .workout-field-shell) {
     grid-template-columns: 2.1rem minmax(0, 1fr) minmax(0, 1fr) !important;
   }
@@ -235,5 +245,12 @@
   .workout-border-label-previous {
     right: 0.45rem;
     max-width: calc(100% - 0.9rem);
+  }
+
+  .workout-previous-note {
+    border: 1px solid rgb(191 219 254);
+    background: rgb(239 246 255) !important;
+    color: rgb(51 65 85) !important;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
   }
 }

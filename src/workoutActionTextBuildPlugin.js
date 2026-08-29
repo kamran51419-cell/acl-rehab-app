@@ -17,23 +17,46 @@ function replaceContinueSelection(code) {
   return `${code.slice(0, bodyStart)} const saved = unfinished; ${code.slice(guard)}`
 }
 
-function addActionLayoutHooks(code) {
+const ACTION_MENU_CLASS = 'absolute right-0 top-10 z-30 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg'
+
+function addMobileActionRow(block, openState, headerClass) {
+  let next = block.replace(
+    headerClass,
+    headerClass.replace('className="', 'className="workout-exercise-header '),
+  )
+
+  const triggerStart = next.indexOf('<div className="relative"><button type="button" aria-label={`Edit ')
+  if (triggerStart < 0) return next
+
+  const menuPrefix = `{${openState} ? <div className="${ACTION_MENU_CLASS}">`
+  const menuStart = next.indexOf(menuPrefix, triggerStart)
+  if (menuStart < 0) return next
+
+  const menuInnerStart = menuStart + menuPrefix.length
+  const menuSuffix = '</div> : null}'
+  const menuEnd = next.indexOf(menuSuffix, menuInnerStart)
+  if (menuEnd < 0) return next
+
+  const wrapperEnd = menuEnd + menuSuffix.length
+  if (next.slice(wrapperEnd, wrapperEnd + 6) !== '</div>') return next
+
+  const menuInner = next.slice(menuInnerStart, menuEnd)
+  const desktopConditional = `{${openState} ? <div className="workout-exercise-actions-desktop ${ACTION_MENU_CLASS}">${menuInner}</div> : null}`
+  const mobileConditional = `{${openState} ? <div className="workout-exercise-actions-mobile">${menuInner}</div> : null}`
+
+  return `${next.slice(0, menuStart)}${desktopConditional}${next.slice(menuEnd + menuSuffix.length, wrapperEnd + 6)}${mobileConditional}${next.slice(wrapperEnd + 6)}`
+}
+
+function addMobileActionRows(code) {
   let next = code
+
   const cardStart = next.indexOf('export function ExerciseCard(')
   const cardEnd = cardStart >= 0 ? next.indexOf('\nfunction changeWorkout', cardStart) : -1
   if (cardStart >= 0 && cardEnd > cardStart) {
-    let card = next.slice(cardStart, cardEnd)
-    card = card.replace(
+    const card = addMobileActionRow(
+      next.slice(cardStart, cardEnd),
+      'actionsOpen',
       'className="flex items-start gap-2"',
-      'className="workout-exercise-header flex items-start gap-2"',
-    )
-    card = card.replace(
-      '<div className="relative"><button type="button" aria-label={`Edit ',
-      '<div className="workout-exercise-actions relative"><button type="button" aria-label={`Edit ',
-    )
-    card = card.replace(
-      'className="absolute right-0 top-10 z-30 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg"',
-      'className="workout-exercise-actions-menu absolute right-0 top-10 z-30 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg"',
     )
     next = `${next.slice(0, cardStart)}${card}${next.slice(cardEnd)}`
   }
@@ -41,21 +64,14 @@ function addActionLayoutHooks(code) {
   const pairStart = next.indexOf('function WorkoutExerciseDisplay(')
   const pairEnd = pairStart >= 0 ? next.indexOf('\n\nexport function WorkoutForm(', pairStart) : -1
   if (pairStart >= 0 && pairEnd > pairStart) {
-    let pair = next.slice(pairStart, pairEnd)
-    pair = pair.replace(
+    const pair = addMobileActionRow(
+      next.slice(pairStart, pairEnd),
+      'sharedActionsOpen',
       'className="flex items-start justify-between gap-3"',
-      'className="workout-exercise-header flex items-start justify-between gap-3"',
-    )
-    pair = pair.replace(
-      '<div className="relative"><button type="button" aria-label={`Edit ',
-      '<div className="workout-exercise-actions relative"><button type="button" aria-label={`Edit ',
-    )
-    pair = pair.replace(
-      'className="absolute right-0 top-10 z-30 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg"',
-      'className="workout-exercise-actions-menu absolute right-0 top-10 z-30 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg"',
     )
     next = `${next.slice(0, pairStart)}${pair}${next.slice(pairEnd)}`
   }
+
   return next
 }
 
@@ -85,7 +101,7 @@ function transformWorkoutScreen(code) {
   next = seedWorkoutScreenFromIntent(next)
   next = replaceUnfinishedWorkoutSelection(next)
   next = replaceContinueSelection(next)
-  next = addActionLayoutHooks(next)
+  next = addMobileActionRows(next)
   next = makeWorkoutStartImmediate(next)
   return next
 }

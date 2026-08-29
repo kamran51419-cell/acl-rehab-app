@@ -10,8 +10,9 @@
   height: 2.75rem;
 }
 
-/* Keep one normal, continuous rounded outline. Rebuilding the top edge as a
-   separate rail caused the white corner gaps/dots seen on mobile. */
+/* Keep the native rounded outline for the corners, sides and bottom. The
+   straight top section is replaced by the segmented rail below so there is
+   genuinely no stroke underneath either label. */
 .workout-floating-field {
   position: absolute;
   inset: 0;
@@ -26,51 +27,68 @@
   overflow: hidden;
 }
 
-/* The transformed markup still contains the top-line rail, but it is now only
-   a positioning layer for the two labels. The real border remains untouched. */
+/* Remove only the straight part of the native top border. The rounded corner
+   arcs are left completely untouched, so there are no white joins/gaps. */
+.workout-floating-field::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 0.75rem;
+  right: 0.75rem;
+  z-index: 2;
+  height: 2px;
+  background: #fff;
+  pointer-events: none;
+}
+
+/* Real top-border layout: corner -> line -> label -> line -> Prev. -> line ->
+   corner. Text has no backing/background at all. */
 .workout-field-topline {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0.75rem;
+  right: 0.75rem;
   z-index: 5;
-  height: 0;
+  display: flex;
+  height: 1px;
+  min-width: 0;
+  align-items: center;
   pointer-events: none;
 }
 
 .workout-topline-segment {
-  display: none !important;
+  display: block !important;
+  height: 1px;
+  flex: 0 0 auto;
+  background: rgb(203 213 225);
 }
 
-/* Reps/Weight/Time/Distance and Prev. use exactly the same floating-label
-   treatment. The backing is the same white as the field and only extends a few
-   pixels beyond the text, so it cleanly interrupts the 1px border without a
-   visible tab, dot or broken corner. */
+/* Give the labels comfortable, deliberate insets instead of hugging corners. */
+.workout-topline-start,
+.workout-topline-end {
+  width: 0.55rem;
+}
+
+.workout-topline-middle {
+  min-width: 0.55rem;
+  flex: 1 1 auto;
+}
+
 .workout-border-label {
-  position: absolute;
-  top: 0;
   display: block;
+  flex: 0 0 auto;
   max-width: 44%;
   margin: 0;
-  padding: 0 0.18rem;
+  padding: 0 0.2rem;
   overflow: hidden;
   color: rgb(100 116 139);
-  background: #fff;
+  background: transparent;
   font-size: 0.5625rem;
   font-weight: 600;
   line-height: 0.75rem;
   letter-spacing: 0.015em;
   white-space: nowrap;
   text-overflow: ellipsis;
-  transform: translateY(-50%);
-}
-
-.workout-field-topline > .workout-border-label:first-of-type {
-  left: 0.75rem;
-}
-
-/* Only a second label is the previous-performance label. */
-.workout-field-topline > .workout-border-label ~ .workout-border-label {
-  right: 0.75rem;
-  left: auto;
 }
 
 /* The editable control is independent of the border labels. */
@@ -130,6 +148,15 @@
 .workout-field-shell:focus-within .workout-floating-field {
   border-color: rgb(148 163 184);
   box-shadow: 0 0 0 1px rgb(148 163 184 / 0.08);
+}
+
+.workout-field-shell:focus-within .workout-topline-segment {
+  background: rgb(148 163 184);
+}
+
+/* Keep the erased straight section white even while focused. */
+.workout-field-shell:focus-within .workout-floating-field::before {
+  background: #fff;
 }
 
 /* Suppress any old per-input previous line from legacy markup. */

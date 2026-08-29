@@ -13,9 +13,8 @@
   height: 2.75rem;
 }
 
-/* Keep the browser's complete rounded outline. In particular, the native top
-   border remains present so both corner arcs render at exactly the same weight
-   as the sides and bottom. */
+/* Keep the browser's complete rounded outline so the corner arcs, sides and
+   bottom always render at exactly the same weight. */
 .workout-floating-field {
   position: absolute;
   inset: 0;
@@ -30,18 +29,18 @@
   overflow: hidden;
 }
 
-/* Remove only the flat centre of the native top stroke. This starts just beyond
-   the rounded-corner tangent, leaving both native corner arcs completely intact.
-   The custom top rail below uses these exact same endpoints, so there is no
-   unpainted/faint join between the curve and the straight line. */
+/* Cut only the flat top stroke. CSS borders sit across the element edge, so the
+   eraser must straddle that edge rather than sit inside the field. It begins a
+   little inside the rail endpoints; the replacement rail overlaps it there,
+   preventing pale/white joins while still leaving both rounded corners native. */
 .workout-floating-field::before {
   content: "";
   position: absolute;
-  top: 0;
-  left: var(--workout-topline-inset);
-  right: var(--workout-topline-inset);
+  top: -1px;
+  left: calc(var(--workout-topline-inset) + 0.08rem);
+  right: calc(var(--workout-topline-inset) + 0.08rem);
   z-index: 2;
-  height: 1px;
+  height: 2px;
   background: #fff;
   pointer-events: none;
 }
@@ -68,9 +67,7 @@
   border-top: 1px solid var(--workout-field-border);
 }
 
-/* Optical positioning: measurement labels are slightly nearer the left corner,
-   while Prev. keeps a little breathing room at the right. These values apply to
-   Reps, Weight, Time and Distance identically. */
+/* Optical positioning shared by Reps, Weight, Time and Distance. */
 .workout-topline-start {
   width: 0.08rem;
 }
@@ -165,8 +162,6 @@
   border-top-color: var(--workout-field-border-focus);
 }
 
-/* The centre eraser remains white while focused; only the replacement segments
-   change to the focus border colour. */
 .workout-field-shell:focus-within .workout-floating-field::before {
   background: #fff;
 }

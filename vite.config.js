@@ -21,6 +21,7 @@ import { programmeWorkoutVisualPolishBuildPlugin } from './src/programmeWorkoutV
 import { mobileUiUxAuditBuildPlugin } from './src/mobileUiUxAuditBuildPlugin.js'
 import { seamlessTabsBuildPlugin } from './src/seamlessTabsBuildPlugin.js'
 import { workoutCardAlignmentBuildPlugin } from './src/workoutCardAlignmentBuildPlugin.js'
+import { setFieldFloatingLabelsBuildPlugin } from './src/setFieldFloatingLabelsBuildPlugin.js'
 import { repeatedIntervalBlocksPlugin } from './src/repeatedIntervalBlocksPlugin.js'
 import { intervalSummaryGrammarBuildPlugin } from './src/intervalSummaryGrammarBuildPlugin.js'
 import { verticalIntervalWorkoutDisplayPlugin } from './src/verticalIntervalWorkoutDisplayPlugin.js'
@@ -49,6 +50,7 @@ export default defineConfig({
     mobileUiUxAuditBuildPlugin(),
     seamlessTabsBuildPlugin(),
     workoutCardAlignmentBuildPlugin(),
+    setFieldFloatingLabelsBuildPlugin(),
     react(),
     tailwindcss(),
     VitePWA({

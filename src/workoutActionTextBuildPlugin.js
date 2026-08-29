@@ -1,41 +1,36 @@
-function addActionClasses(block, openState) {
-  let next = block
+function transformWorkoutScreen(code) {
+  let next = code.replaceAll('>Change exercise</button>', '>Edit exercise</button>')
   next = next.replace(
-    'className="flex items-start gap-2"',
-    `className={\`workout-exercise-header flex items-start gap-2\${${openState} ? " workout-actions-open" : ""}\`}`,
+    'const programme = useMemo(() => plans.find((plan) => plan.isActive && !plan.isArchived), [plans]); const unfinished = workouts.find((item) => item.status === "in_progress" && item.id !== suppressedWorkoutId);',
+    'const programme = useMemo(() => plans.find((plan) => plan.isActive && !plan.isArchived), [plans]); const unfinished = workouts.filter((item) => item.status === "in_progress" && item.completed !== true && !item.completedAt && item.id !== suppressedWorkoutId).sort((a, b) => Number(b.updatedAt?.seconds || 0) - Number(a.updatedAt?.seconds || 0) || String(b.createdAt || "").localeCompare(String(a.createdAt || "")))[0];',
   )
   next = next.replace(
-    'className="flex items-start justify-between gap-3"',
-    `className={\`workout-exercise-header flex items-start justify-between gap-3\${${openState} ? " workout-actions-open" : ""}\`}`,
-  )
-  next = next.replaceAll(
-    '<div className="relative"><button type="button" aria-label={`Edit ',
-    '<div className="workout-exercise-actions relative"><button type="button" aria-label={`Edit ',
-  )
-  next = next.replaceAll(
-    'className="absolute right-0 top-10 z-30 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg"',
-    'className="workout-exercise-actions-menu absolute right-0 top-10 z-30 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg"',
+    'if (intent.mode === "continue") { const saved = workouts.find((item) => item.id === intent.workoutId && item.status === "in_progress") || unfinished;',
+    'if (intent.mode === "continue") { const saved = workouts.find((item) => item.id === intent.workoutId && item.status === "in_progress" && item.completed !== true && !item.completedAt) || unfinished;',
   )
   return next
 }
 
-function transformWorkoutScreen(code) {
-  let next = code.replaceAll('>Change exercise</button>', '>Edit exercise</button>')
+function transformHomeScreen(code) {
+  return code.replace(
+    'const unfinishedWorkout = useMemo(() => workouts.find((item) => item.status === "in_progress") || null, [workouts]);',
+    'const unfinishedWorkout = useMemo(() => workouts.filter((item) => item.status === "in_progress" && item.completed !== true && !item.completedAt).sort((a, b) => Number(b.updatedAt?.seconds || 0) - Number(a.updatedAt?.seconds || 0) || String(b.createdAt || "").localeCompare(String(a.createdAt || "")))[0] || null, [workouts]);',
+  )
+}
 
-  const cardStart = next.indexOf('export function ExerciseCard(')
-  const cardEnd = cardStart >= 0 ? next.indexOf('\nfunction changeWorkout', cardStart) : -1
-  if (cardStart >= 0 && cardEnd > cardStart) {
-    const card = addActionClasses(next.slice(cardStart, cardEnd), 'actionsOpen')
-    next = `${next.slice(0, cardStart)}${card}${next.slice(cardEnd)}`
-  }
-
-  const pairStart = next.indexOf('function WorkoutExerciseDisplay(')
-  const pairEnd = pairStart >= 0 ? next.indexOf('\n\nexport function WorkoutForm(', pairStart) : -1
-  if (pairStart >= 0 && pairEnd > pairStart) {
-    const pair = addActionClasses(next.slice(pairStart, pairEnd), 'sharedActionsOpen')
-    next = `${next.slice(0, pairStart)}${pair}${next.slice(pairEnd)}`
-  }
-
+function transformPlanRepository(code) {
+  let next = code.replace(
+    'import { collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, runTransaction, serverTimestamp, setDoc, updateDoc, writeBatch } from "firebase/firestore";',
+    'import { collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, writeBatch } from "firebase/firestore";',
+  )
+  next = next.replace(
+    '  const visible = remote.filter((workout) => !deletedWorkoutIds.has(workoutCacheKey(uid, workout.id))).map((workout) => {\n    const recent = recentWorkoutSnapshots.get(workoutCacheKey(uid, workout.id));\n    return workout.status === "in_progress" && recent?.status === "in_progress" ? recent : workout;\n  });',
+    '  const visible = remote.filter((workout) => !deletedWorkoutIds.has(workoutCacheKey(uid, workout.id))).map((workout) => {\n    const normalized = workout.completed === true || workout.completedAt ? { ...workout, status: "completed", completed: true } : workout;\n    const recent = recentWorkoutSnapshots.get(workoutCacheKey(uid, workout.id));\n    return normalized.status === "in_progress" && recent?.status === "in_progress" ? recent : normalized;\n  });',
+  )
+  next = next.replace(
+    '  const existing = await getDocs(collection(db, "users", uid, "workouts"));\n  if (existing.docs.some((item) => item.data()?.status === "in_progress" && item.id !== workout.id)) {',
+    '  const existing = await getDocs(query(collection(db, "users", uid, "workouts"), where("status", "==", "in_progress")));\n  if (existing.docs.some((item) => { const current = item.data(); return current?.completed !== true && !current?.completedAt && item.id !== workout.id; })) {',
+  )
   return next
 }
 
@@ -46,6 +41,8 @@ export function workoutActionTextBuildPlugin() {
     transform(code, id) {
       const cleanId = id.split('?')[0].replaceAll('\\\\', '/')
       if (cleanId.endsWith('/src/features/workout/WorkoutScreen.jsx')) return transformWorkoutScreen(code)
+      if (cleanId.endsWith('/src/features/home/HomeScreen.jsx')) return transformHomeScreen(code)
+      if (cleanId.endsWith('/src/lib/firebase/planRepository.js')) return transformPlanRepository(code)
       return null
     },
   }

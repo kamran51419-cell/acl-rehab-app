@@ -1,0 +1,203 @@
+/* Keep every set self-explanatory without a separate table-like header. */
+.workout-set-header {
+  display: none !important;
+}
+
+/* One coordinate system for the outline, labels and editable control. */
+.workout-field-shell {
+  --workout-field-border: rgb(203 213 225);
+  --workout-field-border-focus: rgb(148 163 184);
+  position: relative;
+  min-width: 0;
+  height: 2.75rem;
+}
+
+/* Keep one normal browser-rendered rounded border. This preserves identical
+   weight through the corners, sides, top and bottom. */
+.workout-floating-field {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 2.75rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--workout-field-border);
+  border-radius: 0.75rem;
+  background: #fff;
+  overflow: hidden;
+}
+
+/* The old segmented rail remains in transformed markup only as a positioning
+   layer. The native border is no longer erased or rebuilt. */
+.workout-field-topline {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  height: 0;
+  pointer-events: none;
+}
+
+.workout-topline-segment {
+  display: none !important;
+}
+
+/* Reps/Weight/Time/Distance and Prev. are positioned directly on the native
+   top border. The text itself has no background. */
+.workout-border-label {
+  position: absolute;
+  top: 0;
+  z-index: 1;
+  display: block;
+  max-width: 44%;
+  margin: 0;
+  padding: 0 0.16rem;
+  overflow: visible;
+  color: rgb(100 116 139);
+  background: transparent;
+  font-size: 0.5625rem;
+  font-weight: 600;
+  line-height: 0.75rem;
+  letter-spacing: 0.015em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transform: translateY(-50%);
+  isolation: isolate;
+}
+
+/* This is the actual border cut: only a very thin stripe centred on the 1px
+   border is painted white. It sits behind the glyphs but above the field border,
+   so there is no rectangle/tab around the text and no line can show through it. */
+.workout-border-label::before {
+  content: "";
+  position: absolute;
+  left: 0.04rem;
+  right: 0.04rem;
+  top: 50%;
+  z-index: -1;
+  height: 3px;
+  transform: translateY(-50%);
+  background: #fff;
+  pointer-events: none;
+}
+
+/* The hidden border-segment spans come before/between the labels in the DOM,
+   so :first-of-type does not identify the left label. Anchor each label to its
+   neighbouring segment instead. Both sides use the exact same 0.94rem inset. */
+.workout-field-topline > .workout-topline-start + .workout-border-label {
+  left: 0.94rem;
+  right: auto;
+}
+
+.workout-field-topline > .workout-topline-middle + .workout-border-label {
+  right: 0.94rem;
+  left: auto;
+}
+
+/* The editable control is independent of the border labels. */
+.workout-field-control {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  border-radius: inherit;
+  background: transparent;
+  overflow: hidden;
+}
+
+.workout-field-control > input,
+.workout-field-control > select {
+  display: block !important;
+  width: 100% !important;
+  height: 2rem !important;
+  min-height: 2rem !important;
+  margin: 0 !important;
+  padding: 0 0.75rem !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+  line-height: 2rem !important;
+  font: inherit;
+  transform: translateY(-0.04rem);
+}
+
+/* Rep ranges get exactly one controlled chevron. */
+.workout-field-control:has(> select)::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 0.9rem;
+  width: 0.48rem;
+  height: 0.48rem;
+  border-right: 2px solid rgb(100 116 139);
+  border-bottom: 2px solid rgb(100 116 139);
+  transform: translateY(-68%) rotate(45deg);
+  pointer-events: none;
+}
+
+.workout-field-control > select {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  background-image: none !important;
+  padding-right: 2.5rem !important;
+  cursor: pointer;
+}
+
+.workout-field-shell:focus-within .workout-floating-field {
+  border-color: var(--workout-field-border-focus);
+  box-shadow: 0 0 0 1px rgb(148 163 184 / 0.08);
+}
+
+/* Suppress any old per-input previous line from legacy markup. */
+.workout-field-control > span {
+  display: none !important;
+}
+
+/* Prescription metadata is deliberately stronger than the programme note so
+   prescribed measurements cannot be mistaken for the user's description. */
+.workout-prescription-summary {
+  letter-spacing: 0.005em;
+}
+
+/* Set labels use the exact same 44px vertical box as the editable control. */
+.workout-set-label {
+  display: flex;
+  height: 2.75rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  align-items: center;
+}
+
+.workout-set-number {
+  display: block;
+  margin: 0;
+  color: rgb(15 23 42);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+  white-space: nowrap;
+}
+
+.workout-set-previous {
+  display: none !important;
+}
+
+.rounded-xl.bg-slate-50:has(.workout-field-shell) {
+  align-items: start !important;
+}
+
+.rounded-xl.bg-slate-50:has(.workout-field-shell) > .workout-set-label {
+  align-self: start !important;
+}
+
+.workout-set-tick-row > button[aria-label^='Toggle set'],
+.rounded-xl.bg-slate-50:has(.workout-field-shell) > button[aria-label^='Toggle set'] {
+  align-self: start !important;
+  margin-top: 0.375rem !important;
+}

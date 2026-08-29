@@ -18,6 +18,10 @@ import { programmeCollapseBuildPlugin } from './src/programmeCollapseBuildPlugin
 import { leftRightWorkoutGroupingBuildPlugin } from './src/leftRightWorkoutGroupingBuildPlugin.js'
 import { catchUpLeftRightGroupingBuildPlugin } from './src/catchUpLeftRightGroupingBuildPlugin.js'
 import { programmeWorkoutVisualPolishBuildPlugin } from './src/programmeWorkoutVisualPolishBuildPlugin.js'
+import { mobileUiUxAuditBuildPlugin } from './src/mobileUiUxAuditBuildPlugin.js'
+import { seamlessTabsBuildPlugin } from './src/seamlessTabsBuildPlugin.js'
+import { workoutCardAlignmentBuildPlugin } from './src/workoutCardAlignmentBuildPlugin.js'
+import { setFieldFloatingLabelsBuildPlugin } from './src/setFieldFloatingLabelsBuildPlugin.js'
 import { repeatedIntervalBlocksPlugin } from './src/repeatedIntervalBlocksPlugin.js'
 import { intervalSummaryGrammarBuildPlugin } from './src/intervalSummaryGrammarBuildPlugin.js'
 import { verticalIntervalWorkoutDisplayPlugin } from './src/verticalIntervalWorkoutDisplayPlugin.js'
@@ -43,6 +47,10 @@ export default defineConfig({
     leftRightWorkoutGroupingBuildPlugin(),
     catchUpLeftRightGroupingBuildPlugin(),
     programmeWorkoutVisualPolishBuildPlugin(),
+    mobileUiUxAuditBuildPlugin(),
+    seamlessTabsBuildPlugin(),
+    workoutCardAlignmentBuildPlugin(),
+    setFieldFloatingLabelsBuildPlugin(),
     react(),
     tailwindcss(),
     VitePWA({

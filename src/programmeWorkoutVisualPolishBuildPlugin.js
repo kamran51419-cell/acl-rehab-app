@@ -31,12 +31,22 @@ function transformPlansScreen(code) {
 
 function polishSetButtons(code) {
   const oldButtons = '<div className="mt-3 flex flex-wrap gap-2"><button type="button" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50" onClick={() => onAddSet?.(exercise.id)}>+ Add set</button><button type="button" disabled={setCount <= 1} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40" onClick={() => onRemoveSet?.(exercise.id)}>Remove set</button></div>'
-  const newButtons = '<div className="mt-3 inline-flex max-w-full items-center gap-1 rounded-xl bg-slate-50 p-1"><button type="button" className="h-8 rounded-lg bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50" onClick={() => onAddSet?.(exercise.id)}>+ Add set</button><button type="button" disabled={setCount <= 1} className="h-8 rounded-lg bg-white px-3 text-sm font-semibold text-red-600 shadow-sm ring-1 ring-red-100 transition hover:bg-red-50 hover:ring-red-200 disabled:cursor-not-allowed disabled:bg-transparent disabled:text-slate-400 disabled:shadow-none disabled:ring-0 disabled:opacity-45" onClick={() => onRemoveSet?.(exercise.id)}>− Remove set</button></div>'
+  const newButtons = '<div className="mt-3 grid w-full grid-cols-2 gap-2"><button type="button" className="workout-set-control w-full rounded-lg bg-white px-2.5 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50" onClick={() => onAddSet?.(exercise.id)}>+ Add set</button><button type="button" disabled={setCount <= 1} className="workout-set-control w-full rounded-lg bg-white px-2.5 text-sm font-semibold text-red-600 shadow-sm ring-1 ring-red-100 transition hover:bg-red-50 hover:ring-red-200 disabled:cursor-not-allowed disabled:bg-transparent disabled:text-slate-400 disabled:shadow-none disabled:ring-0 disabled:opacity-45" onClick={() => onRemoveSet?.(exercise.id)}>− Remove set</button></div>'
   let next = code.replaceAll(oldButtons, newButtons)
 
   const oldLinkedButtons = '<div className="mt-3 flex flex-wrap gap-2"><button type="button" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50" onClick={() => onAddSet?.(left.id)}>+ Add set</button><button type="button" disabled={setCount <= 1} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40" onClick={() => onRemoveSet?.(left.id)}>Remove set</button></div>'
-  const newLinkedButtons = '<div className="mt-3 inline-flex max-w-full items-center gap-1 rounded-xl bg-slate-50 p-1"><button type="button" className="h-8 rounded-lg bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50" onClick={() => onAddSet?.(left.id)}>+ Add set</button><button type="button" disabled={setCount <= 1} className="h-8 rounded-lg bg-white px-3 text-sm font-semibold text-red-600 shadow-sm ring-1 ring-red-100 transition hover:bg-red-50 hover:ring-red-200 disabled:cursor-not-allowed disabled:bg-transparent disabled:text-slate-400 disabled:shadow-none disabled:ring-0 disabled:opacity-45" onClick={() => onRemoveSet?.(left.id)}>− Remove set</button></div>'
+  const newLinkedButtons = '<div className="mt-3 grid w-full grid-cols-2 gap-2"><button type="button" className="workout-set-control w-full rounded-lg bg-white px-2.5 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50" onClick={() => onAddSet?.(left.id)}>+ Add set</button><button type="button" disabled={setCount <= 1} className="workout-set-control w-full rounded-lg bg-white px-2.5 text-sm font-semibold text-red-600 shadow-sm ring-1 ring-red-100 transition hover:bg-red-50 hover:ring-red-200 disabled:cursor-not-allowed disabled:bg-transparent disabled:text-slate-400 disabled:shadow-none disabled:ring-0 disabled:opacity-45" onClick={() => onRemoveSet?.(left.id)}>− Remove set</button></div>'
   next = next.replaceAll(oldLinkedButtons, newLinkedButtons)
+
+  next = next.replace(
+    '{side || exercise.prescription?.targetReps?.type === "range" ? <p',
+    '{side || (!hideExerciseName && exercise.prescription?.targetReps?.type === "range") ? <p',
+  )
+  next = next.replace(
+    '[side, exercise.prescription?.targetReps?.type === "range" ? `Range:',
+    '[side, !hideExerciseName && exercise.prescription?.targetReps?.type === "range" ? `Range:',
+  )
+
   return next
 }
 

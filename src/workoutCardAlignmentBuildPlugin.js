@@ -61,6 +61,11 @@ function transformWorkoutScreen(code, id) {
   )
 
   card = card.replace(
+    'className="grid grid-cols-[3.5rem_minmax(0,1fr)_2rem] items-center gap-3 rounded-xl bg-slate-50 p-3"',
+    'className="workout-set-tick-row grid grid-cols-[3.5rem_minmax(0,1fr)_2rem] items-center gap-3 rounded-xl bg-slate-50 p-3"',
+  )
+
+  card = card.replace(
     '<div className="flex items-center gap-2"><div className="min-w-0 flex-1"><RepsInput exercise={exercise} set={set} onChange={onChange}/></div><span className="text-sm">reps</span></div>',
     '<label className="text-xs font-medium">Reps<div className="mt-1"><RepsInput exercise={exercise} set={set} onChange={onChange}/></div></label>',
   )

@@ -39,12 +39,17 @@ function addMobileActionRow(block, openState, headerClass) {
 
   const wrapperEnd = menuEnd + menuSuffix.length
   if (next.slice(wrapperEnd, wrapperEnd + 6) !== '</div>') return next
+  const wrapperCloseEnd = wrapperEnd + 6
 
   const menuInner = next.slice(menuInnerStart, menuEnd)
   const desktopConditional = `{${openState} ? <div className="workout-exercise-actions-desktop ${ACTION_MENU_CLASS}">${menuInner}</div> : null}`
   const mobileConditional = `{${openState} ? <div className="workout-exercise-actions-mobile">${menuInner}</div> : null}`
+  const transformedWrapper = `${next.slice(triggerStart, menuStart)}${desktopConditional}${next.slice(menuEnd + menuSuffix.length, wrapperCloseEnd)}`
 
-  return `${next.slice(0, menuStart)}${desktopConditional}${next.slice(menuEnd + menuSuffix.length, wrapperEnd + 6)}${mobileConditional}${next.slice(wrapperEnd + 6)}`
+  /* The wrapper is the truthy branch of an existing ternary. A fragment keeps
+     the trigger and mobile row inside that one branch while rendering both as
+     direct flex children of the header. */
+  return `${next.slice(0, triggerStart)}<>${transformedWrapper}${mobileConditional}</>${next.slice(wrapperCloseEnd)}`
 }
 
 function addMobileActionRows(code) {

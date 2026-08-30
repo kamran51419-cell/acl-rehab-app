@@ -1,3 +1,4 @@
+// Keeps Add exercise setup consistent across quick, active, completed-edit, and catch-up workout flows.
 function replaceRequired(code, oldText, newText, id) {
   if (!code.includes(oldText)) throw new Error(`Unified add-exercise setup could not find expected source in ${id}`)
   return code.replace(oldText, newText)

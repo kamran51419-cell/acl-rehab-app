@@ -38,7 +38,6 @@ function transformExerciseProgress(code, id) {
 
 function transformProgressScreen(code, id) {
   let next = code
-  next = replaceRequired(next, 'import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";', 'import { CartesianGrid, Legend, Line, LineChart, ReferenceDot, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";', id)
   next = replaceRequired(
     next,
     'function StrengthGraph({ entries, leftRight = false }) {\n  const points = useMemo(() => strengthGraphPoints(entries), [entries]);',
@@ -46,46 +45,40 @@ function transformProgressScreen(code, id) {
   const points = strengthGraphPoints(entries).map((point) => ({ ...point }));
   const byWorkout = new Map(points.map((point) => [point.workoutId, point]));
   (flaggedEntries || []).forEach((flag) => {
-    if (!byWorkout.has(flag.workoutId)) { const point = { workoutId: flag.workoutId, date: flag.date, displayDate: flag.displayDate }; points.push(point); byWorkout.set(flag.workoutId, point); }
+    if (!byWorkout.has(flag.workoutId)) {
+      const point = { workoutId: flag.workoutId, date: flag.date, displayDate: flag.displayDate };
+      points.push(point);
+      byWorkout.set(flag.workoutId, point);
+    }
   });
   points.sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.workoutId).localeCompare(String(b.workoutId)));
-  const markers = (flaggedEntries || []).flatMap((flag) => {
+  (flaggedEntries || []).forEach((flag) => {
     const key = leftRight ? (flag.side === SIDE.RIGHT ? "right" : "left") : "strength";
     const index = points.findIndex((point) => point.workoutId === flag.workoutId);
-    if (index < 0) return [];
+    if (index < 0) return;
     const point = points[index];
-    const actualY = point[key];
-    const actualWeight = point[key + "Weight"];
-    const actualReps = point[key + "Reps"];
-    let y = actualY;
+    let y = point[key];
     if (y === undefined || y === null) for (let cursor = index - 1; cursor >= 0; cursor -= 1) if (points[cursor][key] !== undefined && points[cursor][key] !== null) { y = points[cursor][key]; break; }
     if (y === undefined || y === null) for (let cursor = index + 1; cursor < points.length; cursor += 1) if (points[cursor][key] !== undefined && points[cursor][key] !== null) { y = points[cursor][key]; break; }
-    return y === undefined || y === null ? [] : [{ ...flag, y, actualY, actualWeight, actualReps }];
+    if (y === undefined || y === null) return;
+    const flagKey = leftRight ? (flag.side === SIDE.RIGHT ? "flagRight" : "flagLeft") : "flagStrength";
+    point[flagKey] = y;
+    point[flagKey + "Note"] = flag.workoutNote || "";
   });
-  return { points, markers };
+  return points;
 }
 
 function StrengthGraph({ entries, flaggedEntries = [], leftRight = false }) {
-  const graph = useMemo(() => strengthGraphWithFlags(entries, flaggedEntries, leftRight), [entries, flaggedEntries, leftRight]);
-  const points = graph.points;
-  const flagMarkers = graph.markers;
-  const [selectedFlag, setSelectedFlag] = useState(null);`,
+  const points = useMemo(() => strengthGraphWithFlags(entries, flaggedEntries, leftRight), [entries, flaggedEntries, leftRight]);`,
     id,
   )
   next = replaceRequired(next, '<LineChart data={points} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>', '<LineChart data={points} accessibilityLayer={false} tabIndex={-1} style={{ outline: "none" }} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>', id)
-  next = replaceRequired(next, '<div className="h-64 rounded-2xl border border-slate-200 bg-white p-2 sm:p-3"><ResponsiveContainer', '<div className="relative h-64 rounded-2xl border border-slate-200 bg-white p-2 sm:p-3" onPointerDown={() => setSelectedFlag(null)}><ResponsiveContainer', id)
-  next = replaceRequired(next, '<Tooltip content={<StrengthTooltip />}/>{leftRight ?', '<Tooltip content={<StrengthTooltip />}/>{flagMarkers.map((marker, index) => <ReferenceDot key={`${marker.workoutId}-${marker.side || "standard"}-${index}`} x={marker.displayDate} y={marker.y} r={5} ifOverflow="extendDomain" shape={(shapeProps) => <g role="button" tabIndex={0} aria-label={"Flagged session " + marker.displayDate} style={{ cursor: "pointer", outline: "none" }} onPointerDown={(event) => event.stopPropagation()} onPointerUp={(event) => { event.stopPropagation(); setSelectedFlag((current) => current?.workoutId === marker.workoutId && current?.side === marker.side ? null : { ...marker, tooltipX: shapeProps.cx, tooltipY: shapeProps.cy }); }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); setSelectedFlag((current) => current?.workoutId === marker.workoutId && current?.side === marker.side ? null : { ...marker, tooltipX: shapeProps.cx, tooltipY: shapeProps.cy }); } }}><circle cx={shapeProps.cx} cy={shapeProps.cy} r={16} fill="transparent" pointerEvents="all"/><circle cx={shapeProps.cx} cy={shapeProps.cy} r={5} fill="#dc2626" stroke="#dc2626" pointerEvents="none"/></g>}/>)}{leftRight ?', id)
-
-  const strengthGraphStart = next.indexOf('function StrengthGraph({ entries, flaggedEntries = [], leftRight = false }) {')
-  const symmetryStart = strengthGraphStart >= 0 ? next.indexOf('\n\nfunction SymmetryStats(', strengthGraphStart) : -1
-  if (strengthGraphStart < 0 || symmetryStart < 0) throw new Error(`Exercise flag transform could not isolate StrengthGraph in ${id}`)
-  const strengthGraphBlock = next.slice(strengthGraphStart, symmetryStart)
-  const strengthGraphClose = '</ResponsiveContainer></div></section>;'
-  if (!strengthGraphBlock.includes(strengthGraphClose)) throw new Error(`Exercise flag transform could not find StrengthGraph close in ${id}`)
-  const flagTooltip = '</ResponsiveContainer>{selectedFlag ? <div role="status" className="pointer-events-auto absolute z-20 w-44 rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-lg" style={{ left: `clamp(5.5rem, ${Number(selectedFlag.tooltipX || 0) + 8}px, calc(100% - 5.5rem))`, top: Number(selectedFlag.tooltipY || 0) < 92 ? Number(selectedFlag.tooltipY || 0) + 18 : Number(selectedFlag.tooltipY || 0) - 10, transform: Number(selectedFlag.tooltipY || 0) < 92 ? "translate(-50%, 0)" : "translate(-50%, -100%)" }} onPointerDown={(event) => event.stopPropagation()}><div className="font-medium">{selectedFlag.displayDate}</div><div className="mt-1 font-semibold text-red-600">Flagged</div>{selectedFlag.actualY !== undefined && selectedFlag.actualY !== null ? <><div className="mt-1">{leftRight ? (selectedFlag.side === SIDE.RIGHT ? "Right" : "Left") : "e1RM"}: {selectedFlag.actualY} kg</div>{selectedFlag.actualWeight !== undefined && selectedFlag.actualWeight !== null && selectedFlag.actualReps !== undefined && selectedFlag.actualReps !== null ? <div className="text-xs text-slate-500">{selectedFlag.actualWeight} kg × {selectedFlag.actualReps} reps</div> : null}</> : null}<div className="mt-1 whitespace-pre-wrap text-xs text-slate-600">{selectedFlag.workoutNote || "No note added."}</div></div> : null}</div></section>;'
-  const updatedStrengthGraphBlock = strengthGraphBlock.replace(strengthGraphClose, flagTooltip)
-  next = `${next.slice(0, strengthGraphStart)}${updatedStrengthGraphBlock}${next.slice(symmetryStart)}`
-
+  next = replaceRequired(
+    next,
+    '<Tooltip content={<StrengthTooltip />}/>{leftRight ?',
+    '<Tooltip content={<StrengthTooltip />}/>{leftRight ? <><Line type="linear" dataKey="flagLeft" name="Flagged" stroke="transparent" strokeWidth={0} dot={{ r: 5, fill: "#dc2626", stroke: "#dc2626" }} activeDot={{ r: 7, fill: "#dc2626", stroke: "#ffffff", strokeWidth: 2 }} connectNulls={false} isAnimationActive={false} legendType="none"/><Line type="linear" dataKey="flagRight" name="Flagged" stroke="transparent" strokeWidth={0} dot={{ r: 5, fill: "#dc2626", stroke: "#dc2626" }} activeDot={{ r: 7, fill: "#dc2626", stroke: "#ffffff", strokeWidth: 2 }} connectNulls={false} isAnimationActive={false} legendType="none"/></> : <Line type="linear" dataKey="flagStrength" name="Flagged" stroke="transparent" strokeWidth={0} dot={{ r: 5, fill: "#dc2626", stroke: "#dc2626" }} activeDot={{ r: 7, fill: "#dc2626", stroke: "#ffffff", strokeWidth: 2 }} connectNulls={false} isAnimationActive={false} legendType="none"/>}{leftRight ?',
+    id,
+  )
   next = replaceRequired(next, '<StrengthGraph entries={entries} leftRight/>', '<StrengthGraph entries={entries} flaggedEntries={(group.flaggedEntries || []).filter((entry) => entry.sideMode === PROGRESS_SIDE_MODE.LEFT_RIGHT)} leftRight/>', id)
   next = replaceRequired(next, 'const equipmentGroup = { ...group, entries: (group.entries || []).filter((entry) => (entry.equipmentType || "standard") === equipment) };', 'const equipmentGroup = { ...group, entries: (group.entries || []).filter((entry) => (entry.equipmentType || "standard") === equipment), flaggedEntries: (group.flaggedEntries || []).filter((entry) => (entry.equipmentType || "standard") === equipment) };', id)
   next = replaceRequired(next, '<StatsCards entries={selectedEntries}/><StrengthGraph entries={selectedEntries}/>', '<StatsCards entries={selectedEntries}/><StrengthGraph entries={selectedEntries} flaggedEntries={(equipmentGroup.flaggedEntries || []).filter((entry) => entry.sideMode === mode)}/>', id)

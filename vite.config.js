@@ -34,16 +34,6 @@ import { quickWorkoutPreviousPerformanceBuildPlugin } from './src/quickWorkoutPr
 import { statsImprovementPercentageBuildPlugin } from './src/statsImprovementPercentageBuildPlugin.js'
 import { inProgressWorkoutCleanupBuildPlugin } from './src/inProgressWorkoutCleanupBuildPlugin.js'
 
-const quickWorkoutPreviousPerformancePlugin = quickWorkoutPreviousPerformanceBuildPlugin()
-const quickWorkoutPreviousPerformanceWithoutRepository = {
-  ...quickWorkoutPreviousPerformancePlugin,
-  transform(code, id) {
-    const cleanId = id.split('?')[0].replaceAll('\\\\', '/')
-    if (cleanId.endsWith('/src/lib/firebase/planRepository.js')) return null
-    return quickWorkoutPreviousPerformancePlugin.transform.call(this, code, id)
-  },
-}
-
 export default defineConfig({
   plugins: [
     inProgressWorkoutCleanupBuildPlugin(),
@@ -75,7 +65,7 @@ export default defineConfig({
     exerciseMetaHierarchyBuildPlugin(),
     workoutActionTextBuildPlugin(),
     unifiedAddExerciseSetupBuildPlugin(),
-    quickWorkoutPreviousPerformanceWithoutRepository,
+    quickWorkoutPreviousPerformanceBuildPlugin(),
     statsImprovementPercentageBuildPlugin(),
     react(),
     tailwindcss(),

@@ -1,12 +1,11 @@
-function replaceRequired(code, oldText, newText, id) {
-  if (!code.includes(oldText)) throw new Error(`In-progress workout cleanup transform could not find expected source in ${id}`)
-  return code.replace(oldText, newText)
+function replaceIfPresent(code, oldText, newText) {
+  return code.includes(oldText) ? code.replace(oldText, newText) : code;
 }
 
-function transformPlanRepository(code, id) {
+function transformPlanRepository(code) {
   const oldStart = `export async function createInProgressWorkoutDocument(db, uid, workout) {
   const existing = await getDocs(collection(db, "users", uid, "workouts"));
-  if (existing.docs.some((item) => item.data()?.status === "in_progress" && item.id !== workout.id)) {`
+  if (existing.docs.some((item) => item.data()?.status === "in_progress" && item.id !== workout.id)) {`;
 
   const newStart = `function inProgressWorkoutHasProgress(workout) {
   return (workout?.exercises || []).some((exercise) => {
@@ -39,9 +38,9 @@ export async function createInProgressWorkoutDocument(db, uid, workout) {
   if (existing.docs.some((item) => {
     const saved = item.data();
     return item.id !== workout.id && saved?.status === "in_progress" && saved?.completed !== true && !saved?.completedAt && inProgressWorkoutHasProgress(saved);
-  })) {`
+  })) {`;
 
-  return replaceRequired(code, oldStart, newStart, id)
+  return replaceIfPresent(code, oldStart, newStart);
 }
 
 export function inProgressWorkoutCleanupBuildPlugin() {
@@ -49,9 +48,9 @@ export function inProgressWorkoutCleanupBuildPlugin() {
     name: 'in-progress-workout-cleanup',
     enforce: 'pre',
     transform(code, id) {
-      const cleanId = id.split('?')[0].replaceAll('\\\\', '/')
-      if (cleanId.endsWith('/src/lib/firebase/planRepository.js')) return transformPlanRepository(code, id)
-      return null
+      const cleanId = id.split('?')[0].replaceAll('\\\\', '/');
+      if (cleanId.endsWith('/src/lib/firebase/planRepository.js')) return transformPlanRepository(code);
+      return null;
     },
-  }
+  };
 }

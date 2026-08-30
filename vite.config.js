@@ -31,6 +31,7 @@ import { intervalSummaryGrammarBuildPlugin } from './src/intervalSummaryGrammarB
 import { verticalIntervalWorkoutDisplayPlugin } from './src/verticalIntervalWorkoutDisplayPlugin.js'
 import { unifiedAddExerciseSetupBuildPlugin } from './src/unifiedAddExerciseSetupBuildPlugin.js'
 import { quickWorkoutPreviousPerformanceBuildPlugin } from './src/quickWorkoutPreviousPerformanceBuildPlugin.js'
+import { statsImprovementPercentageBuildPlugin } from './src/statsImprovementPercentageBuildPlugin.js'
 
 export default defineConfig({
   plugins: [
@@ -63,6 +64,7 @@ export default defineConfig({
     workoutActionTextBuildPlugin(),
     unifiedAddExerciseSetupBuildPlugin(),
     quickWorkoutPreviousPerformanceBuildPlugin(),
+    statsImprovementPercentageBuildPlugin(),
     react(),
     tailwindcss(),
     VitePWA({

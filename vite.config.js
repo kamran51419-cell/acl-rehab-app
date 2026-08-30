@@ -15,6 +15,7 @@ import { exerciseNotesBuildPlugin } from './src/exerciseNotesBuildPlugin.js'
 import { mobileInteractionFixesBuildPlugin } from './src/mobileInteractionFixesBuildPlugin.js'
 import { catchUpParityBuildPlugin } from './src/catchUpParityBuildPlugin.js'
 import { exerciseFlagBuildPlugin } from './src/exerciseFlagBuildPlugin.js'
+import { flaggedGraphInteractionFixBuildPlugin } from './src/flaggedGraphInteractionFixBuildPlugin.js'
 import { programmeCollapseBuildPlugin } from './src/programmeCollapseBuildPlugin.js'
 import { leftRightWorkoutGroupingBuildPlugin } from './src/leftRightWorkoutGroupingBuildPlugin.js'
 import { catchUpLeftRightGroupingBuildPlugin } from './src/catchUpLeftRightGroupingBuildPlugin.js'
@@ -47,6 +48,7 @@ export default defineConfig({
     mobileInteractionFixesBuildPlugin(),
     catchUpParityBuildPlugin(),
     exerciseFlagBuildPlugin(),
+    flaggedGraphInteractionFixBuildPlugin(),
     programmeCollapseBuildPlugin(),
     leftRightWorkoutGroupingBuildPlugin(),
     catchUpLeftRightGroupingBuildPlugin(),

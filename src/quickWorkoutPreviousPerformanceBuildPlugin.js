@@ -130,11 +130,54 @@ function transformWorkoutScreen(code) {
 }
 
 function transformHomeScreen(code) {
-  const start = code.indexOf('const unfinishedWorkout = useMemo(');
-  const end = start >= 0 ? code.indexOf(';', start) : -1;
-  if (start < 0 || end <= start) return code;
-  const replacement = 'const unfinishedWorkout = useMemo(() => workouts.find((item) => item.status === "in_progress" && item.completed !== true && !item.completedAt && (item.exercises || []).some(exerciseAttempted)) || null, [workouts]);';
-  return code.slice(0, start) + replacement + code.slice(end + 1);
+  let next = code;
+
+  const start = next.indexOf('const unfinishedWorkout = useMemo(');
+  const end = start >= 0 ? next.indexOf(';', start) : -1;
+  if (start >= 0 && end > start) {
+    const replacement = 'const unfinishedWorkout = useMemo(() => workouts.find((item) => item.status === "in_progress" && item.completed !== true && !item.completedAt && (item.exercises || []).some(exerciseAttempted)) || null, [workouts]);';
+    next = next.slice(0, start) + replacement + next.slice(end + 1);
+  }
+
+  if (!next.includes('workout-start-area space-y-4')) {
+    next = next.replace(
+      /<section className="space-y-4">(?=<Button className=\{`w-full py-3 text-base)/,
+      '<section className="workout-start-area space-y-4">'
+    );
+  }
+
+  if (!next.includes('closeSessionChooser')) {
+    const todayMarker = '  const today = todayString();';
+    const dismissEffect = `
+  useEffect(() => {
+    if (!showSessions) return undefined;
+    const closeSessionChooser = (event) => {
+      if (event.target?.closest?.(".workout-start-area")) return;
+      setShowSessions(false);
+    };
+    document.addEventListener("pointerdown", closeSessionChooser);
+    return () => document.removeEventListener("pointerdown", closeSessionChooser);
+  }, [showSessions]);`;
+    next = replaceIfPresent(next, todayMarker, todayMarker + dismissEffect);
+  }
+
+  next = replaceIfPresent(
+    next,
+    'onStart={() => setShowSessions(true)}',
+    'onStart={() => setShowSessions((value) => !value)}'
+  );
+  next = replaceIfPresent(
+    next,
+    'onChooseSession={(sessionId) => onOpenWorkout({ mode: "session", sessionId })}',
+    'onChooseSession={(sessionId) => { setShowSessions(false); onOpenWorkout({ mode: "session", sessionId }); }}'
+  );
+  next = replaceIfPresent(
+    next,
+    'onOneOff={() => onOpenWorkout({ mode: "one_off" })}',
+    'onOneOff={() => { setShowSessions(false); onOpenWorkout({ mode: "one_off" }); }}'
+  );
+
+  return next;
 }
 
 function transformProgressScreen(code) {

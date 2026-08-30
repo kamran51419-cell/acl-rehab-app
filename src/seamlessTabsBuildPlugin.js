@@ -78,11 +78,13 @@ function transformWorkoutHistoryScreen(code) {
 
 function transformWorkoutScreen(code) {
   let next = code
-  next = next.replace(
-    'const editorWorkout = editor ? workouts.find((item) => item.id === editor.workoutId && item.status === "completed") : null;\n  if (editor && editorWorkout) return <CompletedWorkoutEditor user={user} saved={normalizeWorkoutForDisplay(editorWorkout)} mode={editor.mode} onClose={() => { sessionStorage.removeItem("completedWorkoutIntent"); setEditor(null); }}/ >;',
-    'const intentEditor = intent && ["catch_up", "edit_completed"].includes(intent.mode) ? { mode: intent.mode, workoutId: intent.workoutId } : null;\n  const requestedEditor = intentEditor || editor;\n  const editorWorkout = requestedEditor ? workouts.find((item) => item.id === requestedEditor.workoutId && item.status === "completed") : null;\n  if (requestedEditor && !editorWorkout) return <section className="rounded-2xl border border-slate-200 bg-white p-5 text-sm font-medium text-slate-600">Loading workout…</section>;\n  if (requestedEditor && editorWorkout) return <CompletedWorkoutEditor user={user} saved={normalizeWorkoutForDisplay(editorWorkout)} mode={requestedEditor.mode} onClose={() => { sessionStorage.removeItem("completedWorkoutIntent"); setEditor(null); window.dispatchEvent(new Event("acl-return-to-workout-history")); }}/ >;',
-  )
-  return next
+  const start = next.indexOf('  const editorWorkout = editor ?')
+  const end = start >= 0 ? next.indexOf('\n  if (workout)', start) : -1
+  if (start < 0 || end < 0) return next
+
+  const editorBlock = `  const intentEditor = intent && ["catch_up", "edit_completed"].includes(intent.mode) ? { mode: intent.mode, workoutId: intent.workoutId } : null;\n  const requestedEditor = intentEditor || editor;\n  const editorWorkout = requestedEditor ? workouts.find((item) => item.id === requestedEditor.workoutId && item.status === "completed") : null;\n  if (requestedEditor && !editorWorkout) return <section className="rounded-2xl border border-slate-200 bg-white p-5 text-sm font-medium text-slate-600">Loading workout…</section>;\n  if (requestedEditor && editorWorkout) return <CompletedWorkoutEditor user={user} saved={normalizeWorkoutForDisplay(editorWorkout)} mode={requestedEditor.mode} exerciseLibrary={library} completedWorkouts={completedWorkouts} onClose={() => { sessionStorage.removeItem("completedWorkoutIntent"); setEditor(null); window.dispatchEvent(new Event("acl-return-to-workout-history")); }}/ >;`
+
+  return `${next.slice(0, start)}${editorBlock}${next.slice(end)}`
 }
 
 export function seamlessTabsBuildPlugin() {

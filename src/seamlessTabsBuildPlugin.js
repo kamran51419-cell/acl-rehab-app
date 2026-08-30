@@ -78,8 +78,8 @@ function transformWorkoutScreen(code) {
     'export default function WorkoutScreen({ user, repository = defaultRepository, intent, onIntentHandled = noop, onFinished = noop, onDiscarded = noop, onCompletedEditorClosed = noop }) {',
   )
   next = next.replace(
-    'onClose={() => { sessionStorage.removeItem("completedWorkoutIntent"); setEditor(null); }}/ >',
-    'onClose={() => { sessionStorage.removeItem("completedWorkoutIntent"); setEditor(null); onCompletedEditorClosed(); }}/ >',
+    'const editorWorkout = editor ? workouts.find((item) => item.id === editor.workoutId && item.status === "completed") : null;\n  if (editor && editorWorkout) return <CompletedWorkoutEditor user={user} saved={normalizeWorkoutForDisplay(editorWorkout)} mode={editor.mode} onClose={() => { sessionStorage.removeItem("completedWorkoutIntent"); setEditor(null); }}/ >;',
+    'const requestedEditor = editor || (intent && handled.current !== intent.token && ["catch_up", "edit_completed"].includes(intent.mode) ? { mode: intent.mode, workoutId: intent.workoutId } : null);\n  const editorWorkout = requestedEditor ? workouts.find((item) => item.id === requestedEditor.workoutId && item.status === "completed") : null;\n  if (requestedEditor && !editorWorkout) return <section className="rounded-2xl border border-slate-200 bg-white p-5 text-sm font-medium text-slate-600">Loading workout…</section>;\n  if (requestedEditor && editorWorkout) return <CompletedWorkoutEditor user={user} saved={normalizeWorkoutForDisplay(editorWorkout)} mode={requestedEditor.mode} onClose={() => { sessionStorage.removeItem("completedWorkoutIntent"); setEditor(null); onCompletedEditorClosed(); }}/ >;',
   )
   return next
 }

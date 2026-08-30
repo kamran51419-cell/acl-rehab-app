@@ -46,6 +46,24 @@ input[type="date"] + .mt-2 > button::after {
   font-size: 1rem;
 }
 
+/* Strength charts should not show browser/SVG focus or tap-highlight rectangles. */
+.strength-progress-chart,
+.strength-progress-chart * {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.strength-progress-chart:focus,
+.strength-progress-chart:focus-visible,
+.strength-progress-chart .recharts-wrapper:focus,
+.strength-progress-chart .recharts-wrapper:focus-visible,
+.strength-progress-chart .recharts-surface:focus,
+.strength-progress-chart .recharts-surface:focus-visible,
+.strength-progress-chart svg:focus,
+.strength-progress-chart svg:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 @media (max-width: 767px) {
   /* Keep the bottom navigation compact while preserving its floating border. */
   #root > div > .fixed.bottom-0.left-0.right-0.z-20 {

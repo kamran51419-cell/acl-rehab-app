@@ -13,7 +13,7 @@ function transformApp(code) {
 
   next = next.replace(
     '{activeTab === "workout" && <WorkoutScreen user={user} intent={workoutIntent} trainingMode={trainingMode} />}',
-    '<div className={activeTab === "workout" ? "block" : "hidden"} aria-hidden={activeTab !== "workout"}><WorkoutScreen user={user} intent={workoutIntent} trainingMode={trainingMode} /></div>',
+    '<div className={activeTab === "workout" ? "block" : "hidden"} aria-hidden={activeTab !== "workout"}><WorkoutScreen user={user} intent={workoutIntent} trainingMode={trainingMode} onCompletedEditorClosed={() => setActiveTab("progress")} /></div>',
   )
 
   next = next.replace(
@@ -71,6 +71,19 @@ function transformWorkoutHistoryScreen(code) {
   return next
 }
 
+function transformWorkoutScreen(code) {
+  let next = code
+  next = next.replace(
+    'export default function WorkoutScreen({ user, repository = defaultRepository, intent, onIntentHandled = noop, onFinished = noop, onDiscarded = noop }) {',
+    'export default function WorkoutScreen({ user, repository = defaultRepository, intent, onIntentHandled = noop, onFinished = noop, onDiscarded = noop, onCompletedEditorClosed = noop }) {',
+  )
+  next = next.replace(
+    'onClose={() => { sessionStorage.removeItem("completedWorkoutIntent"); setEditor(null); }}/ >',
+    'onClose={() => { sessionStorage.removeItem("completedWorkoutIntent"); setEditor(null); onCompletedEditorClosed(); }}/ >',
+  )
+  return next
+}
+
 export function seamlessTabsBuildPlugin() {
   return {
     name: 'seamless-tabs',
@@ -80,6 +93,7 @@ export function seamlessTabsBuildPlugin() {
       if (cleanId.endsWith('/src/App.jsx')) return transformApp(code)
       if (cleanId.endsWith('/src/features/progress/ProgressScreen.jsx')) return transformProgressScreen(code)
       if (cleanId.endsWith('/src/features/workout/WorkoutHistoryScreen.jsx')) return transformWorkoutHistoryScreen(code)
+      if (cleanId.endsWith('/src/features/workout/WorkoutScreen.jsx')) return transformWorkoutScreen(code)
       return null
     },
   }

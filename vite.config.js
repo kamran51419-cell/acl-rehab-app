@@ -30,9 +30,14 @@ import { repeatedIntervalBlocksPlugin } from './src/repeatedIntervalBlocksPlugin
 import { intervalSummaryGrammarBuildPlugin } from './src/intervalSummaryGrammarBuildPlugin.js'
 import { verticalIntervalWorkoutDisplayPlugin } from './src/verticalIntervalWorkoutDisplayPlugin.js'
 import { unifiedAddExerciseSetupBuildPlugin } from './src/unifiedAddExerciseSetupBuildPlugin.js'
+import { intervalMeasurementChoiceBuildPlugin } from './src/intervalMeasurementChoiceBuildPlugin.js'
+import { quickWorkoutPreviousPerformanceBuildPlugin } from './src/quickWorkoutPreviousPerformanceBuildPlugin.js'
+import { statsImprovementPercentageBuildPlugin } from './src/statsImprovementPercentageBuildPlugin.js'
+import { inProgressWorkoutCleanupBuildPlugin } from './src/inProgressWorkoutCleanupBuildPlugin.js'
 
 export default defineConfig({
   plugins: [
+    inProgressWorkoutCleanupBuildPlugin(),
     timeWeightTrackingBuildPlugin(),
     equipmentTrackingBuildPlugin(),
     latestPreviousPerformanceBuildPlugin(),
@@ -61,6 +66,9 @@ export default defineConfig({
     exerciseMetaHierarchyBuildPlugin(),
     workoutActionTextBuildPlugin(),
     unifiedAddExerciseSetupBuildPlugin(),
+    intervalMeasurementChoiceBuildPlugin(),
+    quickWorkoutPreviousPerformanceBuildPlugin(),
+    statsImprovementPercentageBuildPlugin(),
     react(),
     tailwindcss(),
     VitePWA({

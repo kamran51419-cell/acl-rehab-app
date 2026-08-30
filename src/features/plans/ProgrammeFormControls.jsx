@@ -120,6 +120,7 @@ export function DurationInput({ seconds, durationUnit, onChange }) {
 
 export function IntervalValueInput({ stage, onChange }) {
   const isDistance = stage.distance !== undefined && stage.distance !== null;
+  const measurement = isDistance ? "distance" : "time";
   const timeUnit = stage.durationUnit || "seconds";
   const distanceUnit = stage.distanceUnit || "m";
   const value = isDistance
@@ -129,7 +130,22 @@ export function IntervalValueInput({ stage, onChange }) {
       : Number(stage.durationSeconds || 0);
 
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="grid gap-2 md:grid-cols-3">
+      <Field label="Measure by">
+        <Select
+          value={measurement}
+          onChange={(event) => {
+            if (event.target.value === "distance") {
+              onChange({ ...stage, distance: 0, distanceUnit: "m", durationSeconds: undefined, durationUnit: undefined });
+            } else {
+              onChange({ ...stage, durationSeconds: 0, durationUnit: "seconds", distance: undefined, distanceUnit: undefined });
+            }
+          }}
+        >
+          <option value="time">Time</option>
+          <option value="distance">Distance</option>
+        </Select>
+      </Field>
       <Field label={isDistance ? "Distance" : "Duration"}>
         <Input
           inputMode="decimal"
@@ -142,28 +158,29 @@ export function IntervalValueInput({ stage, onChange }) {
         />
       </Field>
       <Field label="Unit">
-        <Select
-          value={isDistance ? `distance:${distanceUnit}` : `time:${timeUnit}`}
-          onChange={(event) => {
-            const [kind, nextUnit] = event.target.value.split(":");
-            if (kind === "distance") {
+        {isDistance ? (
+          <Select
+            value={distanceUnit}
+            onChange={(event) => {
+              const nextUnit = event.target.value;
               const currentDistance = Number(stage.distance ?? 0);
-              const convertedDistance = isDistance && distanceUnit !== nextUnit
+              const convertedDistance = distanceUnit !== nextUnit
                 ? nextUnit === "km"
                   ? currentDistance / 1000
                   : currentDistance * 1000
                 : currentDistance;
-              onChange({ ...stage, distance: convertedDistance, distanceUnit: nextUnit, durationSeconds: undefined, durationUnit: undefined });
-            } else {
-              onChange({ ...stage, durationSeconds: stage.durationSeconds ?? 0, durationUnit: nextUnit, distance: undefined, distanceUnit: undefined });
-            }
-          }}
-        >
-          <option value="time:seconds">Seconds</option>
-          <option value="time:minutes">Minutes</option>
-          <option value="distance:m">Metres</option>
-          <option value="distance:km">Kilometres</option>
-        </Select>
+              onChange({ ...stage, distance: convertedDistance, distanceUnit: nextUnit });
+            }}
+          >
+            <option value="m">Metres</option>
+            <option value="km">Kilometres</option>
+          </Select>
+        ) : (
+          <Select value={timeUnit} onChange={(event) => onChange({ ...stage, durationSeconds: stage.durationSeconds ?? 0, durationUnit: event.target.value })}>
+            <option value="seconds">Seconds</option>
+            <option value="minutes">Minutes</option>
+          </Select>
+        )}
       </Field>
     </div>
   );

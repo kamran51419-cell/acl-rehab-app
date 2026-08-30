@@ -6,24 +6,28 @@ function replaceRequired(code, oldText, newText, id) {
 function transformProgressScreen(code, id) {
   let next = code
 
-  next = replaceRequired(
-    next,
-    '<LineChart data={points} accessibilityLayer={false} tabIndex={-1} style={{ outline: "none" }} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>',
-    '<LineChart data={points} accessibilityLayer={false} tabIndex={-1} style={{ outline: "none" }} margin={{ top: 8, right: 12, left: 0, bottom: 8 }} onClick={(state) => { const marker = flagMarkers.find((item) => item.displayDate === state?.activeLabel); if (!marker) { setSelectedFlag(null); return; } const chartX = Number(state?.chartX ?? 0); const chartY = Number(state?.chartY ?? 0); setSelectedFlag((current) => current?.workoutId === marker.workoutId && current?.side === marker.side ? null : { ...marker, tooltipX: chartX, tooltipY: chartY }); }}>',
-    id,
-  )
+  const tooltipStart = next.indexOf('function StrengthTooltip({ active, payload }) {')
+  const shortDateStart = tooltipStart >= 0 ? next.indexOf('\n\nfunction shortDate(', tooltipStart) : -1
+  if (tooltipStart < 0 || shortDateStart < 0) throw new Error(`Flagged graph interaction fix could not isolate StrengthTooltip in ${id}`)
+
+  const tooltipBlock = `function StrengthTooltip({ active, payload }) {
+  const point = payload?.[0]?.payload;
+  if (!active || !point) return null;
+  const performanceItems = (payload || []).filter((item) => item.value !== undefined && item.value !== null && !String(item.dataKey || "").startsWith("flag"));
+  const flagRows = [
+    { key: "flagStrength", label: "Flagged" },
+    { key: "flagLeft", label: "Left flagged" },
+    { key: "flagRight", label: "Right flagged" },
+  ].filter((item) => point[item.key] !== undefined && point[item.key] !== null);
+  const flagNotes = new Set(flagRows.map((item) => String(point[item.key + "Note"] || "").trim()).filter(Boolean));
+  return <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-lg"><div className="font-medium">{point.displayDate}</div>{performanceItems.map((item) => <div key={item.dataKey}><div>{item.name}: {item.value} kg</div><div className="text-xs text-slate-500">{point[item.dataKey + "Weight"]} kg × {point[item.dataKey + "Reps"]} reps</div>{point[item.dataKey + "Note"] && !flagNotes.has(String(point[item.dataKey + "Note"]).trim()) ? <div className="mt-1 max-w-56 whitespace-pre-wrap text-xs text-slate-600">{point[item.dataKey + "Note"]}</div> : null}</div>)}{flagRows.map((item) => <div key={item.key} className={performanceItems.length ? "mt-1.5 border-t border-slate-100 pt-1.5" : "mt-1"}><div className="font-semibold text-red-600">{item.label}</div><div className="mt-0.5 max-w-56 whitespace-pre-wrap text-xs text-slate-600">{point[item.key + "Note"] || "No note added."}</div></div>)}</div>;
+}`
+  next = `${next.slice(0, tooltipStart)}${tooltipBlock}${next.slice(shortDateStart)}`
 
   next = replaceRequired(
     next,
-    '<div className="relative h-64 rounded-2xl border border-slate-200 bg-white p-2 sm:p-3" onPointerDown={() => setSelectedFlag(null)}><ResponsiveContainer',
-    '<div className="strength-progress-chart relative h-64 rounded-2xl border border-slate-200 bg-white p-2 sm:p-3"><ResponsiveContainer',
-    id,
-  )
-
-  next = replaceRequired(
-    next,
-    '<Tooltip content={<StrengthTooltip />}/>{flagMarkers.map((marker, index) => <ReferenceDot key={`${marker.workoutId}-${marker.side || "standard"}-${index}`} x={marker.displayDate} y={marker.y} r={5} ifOverflow="extendDomain" shape={(shapeProps) => <g role="button" tabIndex={0} aria-label={"Flagged session " + marker.displayDate} style={{ cursor: "pointer", outline: "none" }} onPointerDown={(event) => event.stopPropagation()} onPointerUp={(event) => { event.stopPropagation(); setSelectedFlag((current) => current?.workoutId === marker.workoutId && current?.side === marker.side ? null : { ...marker, tooltipX: shapeProps.cx, tooltipY: shapeProps.cy }); }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); setSelectedFlag((current) => current?.workoutId === marker.workoutId && current?.side === marker.side ? null : { ...marker, tooltipX: shapeProps.cx, tooltipY: shapeProps.cy }); } }}><circle cx={shapeProps.cx} cy={shapeProps.cy} r={16} fill="transparent" pointerEvents="all"/><circle cx={shapeProps.cx} cy={shapeProps.cy} r={5} fill="#dc2626" stroke="#dc2626" pointerEvents="none"/></g>}/>)}{leftRight ?',
-    '<Tooltip content={<StrengthTooltip />}/>{flagMarkers.map((marker, index) => <ReferenceDot key={`${marker.workoutId}-${marker.side || "standard"}-${index}`} x={marker.displayDate} y={marker.y} r={5} fill="#dc2626" stroke="#dc2626" ifOverflow="extendDomain"/>)}{leftRight ?',
+    '<div className="h-64 rounded-2xl border border-slate-200 bg-white p-2 sm:p-3"><ResponsiveContainer',
+    '<div className="strength-progress-chart h-64 rounded-2xl border border-slate-200 bg-white p-2 sm:p-3"><ResponsiveContainer',
     id,
   )
 

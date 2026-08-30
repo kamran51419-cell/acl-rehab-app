@@ -15,15 +15,36 @@ function transformWorkoutScreen(code, id) {
 
   next = replaceRequired(
     next,
+    'function WorkoutExerciseEditor({ workout, exercise, exercises, onCancel, onSave }) {',
+    'function WorkoutExerciseEditor({ workout, exercise, exercises, onCancel, onSave, heading = "Edit exercise", description = "Changes here apply to this workout only. Your Programme stays unchanged.", actionLabel = "Save changes" }) {',
+    id,
+  )
+
+  next = replaceRequired(
+    next,
+    '<div id="workout-edit-header" className="shrink-0 px-4 pb-3 pt-4 sm:px-5 sm:pb-4 sm:pt-6"><h2 className="text-lg font-semibold">Edit exercise</h2><p className="mt-1 text-xs text-slate-500">Changes here apply to this workout only. Your Programme stays unchanged.</p></div><div id="workout-edit-scroll" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 sm:px-5">',
+    '<div id="workout-edit-header" className="shrink-0 px-4 pb-3 pt-4 sm:px-5 sm:pb-4 sm:pt-6"><h2 className="text-lg font-semibold">{heading}</h2><p className="mt-1 text-xs text-slate-500">{description}</p></div><div id="workout-edit-scroll" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 sm:px-5">',
+    id,
+  )
+
+  next = replaceRequired(
+    next,
+    '<button id="workout-edit-save" type="button" className="h-11 rounded-xl px-4 text-sm font-semibold" onClick={() => onSave(draft)}>Save changes</button>',
+    '<button id="workout-edit-save" type="button" className="h-11 rounded-xl px-4 text-sm font-semibold" onClick={() => onSave(draft)}>{actionLabel}</button>',
+    id,
+  )
+
+  next = replaceRequired(
+    next,
     '  const original = useRef(saved); const catchUp = mode === "catch_up"; const originalDate = saved.date || saved.workoutDate || ""; const [entryDate, setEntryDate] = useState(catchUp ? todayString() : originalDate || todayString()); const [draft, setDraft] = useState(() => ({ ...saved, exercises: catchUp ? saved.exercises.filter((exercise) => !exerciseAttempted(exercise)) : saved.exercises })); const [saving, setSaving] = useState(false); const [error, setError] = useState("");',
-    '  const original = useRef(saved); const catchUp = mode === "catch_up"; const originalDate = saved.date || saved.workoutDate || ""; const [entryDate, setEntryDate] = useState(catchUp ? todayString() : originalDate || todayString()); const [draft, setDraft] = useState(() => ({ ...saved, exercises: catchUp ? saved.exercises.filter((exercise) => !exerciseAttempted(exercise)).map((exercise) => ({ ...exercise, catchUpSourceId: exercise.id })) : saved.exercises })); const [saving, setSaving] = useState(false); const [error, setError] = useState(""); const [editing, setEditing] = useState(null); const [draggingIndex, setDraggingIndex] = useState(null); const [dragOverIndex, setDragOverIndex] = useState(null);\n  const reorderDraft = (fromIndex, toIndex) => { if (fromIndex === null || toIndex === null || fromIndex === toIndex) return; setDraft((current) => { const items = ordered(current.exercises); if (!items[fromIndex] || !items[toIndex]) return current; const [moved] = items.splice(fromIndex, 1); items.splice(toIndex, 0, moved); return { ...current, exercises: items.map((item, index) => ({ ...item, sortOrder: index })) }; }); };',
+    '  const original = useRef(saved); const catchUp = mode === "catch_up"; const originalDate = saved.date || saved.workoutDate || ""; const [entryDate, setEntryDate] = useState(catchUp ? todayString() : originalDate || todayString()); const [draft, setDraft] = useState(() => ({ ...saved, exercises: catchUp ? saved.exercises.filter((exercise) => !exerciseAttempted(exercise)).map((exercise) => ({ ...exercise, catchUpSourceId: exercise.id })) : saved.exercises })); const [saving, setSaving] = useState(false); const [error, setError] = useState(""); const [editing, setEditing] = useState(null); const [picker, setPicker] = useState(false); const [adding, setAdding] = useState(null); const [draggingIndex, setDraggingIndex] = useState(null); const [dragOverIndex, setDragOverIndex] = useState(null);\n  const reorderDraft = (fromIndex, toIndex) => { if (fromIndex === null || toIndex === null || fromIndex === toIndex) return; setDraft((current) => { const items = ordered(current.exercises); if (!items[fromIndex] || !items[toIndex]) return current; const [moved] = items.splice(fromIndex, 1); items.splice(toIndex, 0, moved); return { ...current, exercises: items.map((item, index) => ({ ...item, sortOrder: index })) }; }); };\n  const prepareExerciseToAdd = (definition) => { const exerciseType = definitionType(definition); const loggingMethod = defaultLoggingMethodForExerciseType(exerciseType); const base = { id: `workout-exercise-${makeId()}`, exerciseId: definition.id, exerciseNameSnapshot: definition.name, exerciseType, loggingMethod, prescription: createDefaultPrescription(exerciseType, loggingMethod), notes: "", sortOrder: draft.exercises.length }; const previousWeights = previousWeightsForExercise(completedWorkouts, base); const previousReps = previousRepsForExercise(completedWorkouts, base); setAdding({ ...createWorkoutExerciseSnapshot(base, previousWeights, previousReps), addedDuringWorkout: true }); setPicker(false); };',
     id,
   )
 
   next = replaceRequired(
     next,
     '      const exercises = original.current.exercises.map((exercise) => {\n        const edited = editedById.get(exercise.id);\n        if (!edited || (catchUp && !completedCatchUpIds.has(exercise.id))) return exercise;\n        return { ...edited, completedDate: exerciseAttempted(edited) ? entryDate : edited.completedDate };\n      });',
-    '      const exercises = catchUp\n        ? (() => {\n            const completedDraft = draft.exercises.filter(exerciseAttempted).map(({ catchUpSourceId, ...exercise }) => ({ ...exercise, completedDate: entryDate }));\n            const replacedSourceIds = new Set(draft.exercises.filter(exerciseAttempted).map((exercise) => exercise.catchUpSourceId).filter(Boolean));\n            const kept = original.current.exercises.filter((exercise) => !replacedSourceIds.has(exercise.id));\n            return [...kept, ...completedDraft].map((exercise, index) => ({ ...exercise, sortOrder: index }));\n          })()\n        : original.current.exercises.map((exercise) => {\n            const edited = editedById.get(exercise.id);\n            if (!edited) return exercise;\n            return { ...edited, completedDate: exerciseAttempted(edited) ? entryDate : edited.completedDate };\n          });',
+    '      const exercises = catchUp\n        ? (() => {\n            const completedDraft = draft.exercises.filter(exerciseAttempted).map(({ catchUpSourceId, ...exercise }) => ({ ...exercise, completedDate: entryDate }));\n            const replacedSourceIds = new Set(draft.exercises.filter(exerciseAttempted).map((exercise) => exercise.catchUpSourceId).filter(Boolean));\n            const kept = original.current.exercises.filter((exercise) => !replacedSourceIds.has(exercise.id));\n            return [...kept, ...completedDraft].map((exercise, index) => ({ ...exercise, sortOrder: index }));\n          })()\n        : (() => {\n            const originalIds = new Set(original.current.exercises.map((exercise) => exercise.id));\n            const existing = original.current.exercises.map((exercise) => {\n              const edited = editedById.get(exercise.id);\n              if (!edited) return exercise;\n              return { ...edited, completedDate: exerciseAttempted(edited) ? entryDate : edited.completedDate };\n            });\n            const added = draft.exercises.filter((exercise) => !originalIds.has(exercise.id)).map((exercise) => ({ ...exercise, completedDate: exerciseAttempted(exercise) ? entryDate : exercise.completedDate }));\n            return [...existing, ...added].map((exercise, index) => ({ ...exercise, sortOrder: index }));\n          })();',
     id,
   )
 
@@ -43,8 +64,15 @@ function transformWorkoutScreen(code, id) {
 
   next = replaceRequired(
     next,
+    '</div>{error ? <p className="mt-3 text-sm font-medium text-red-600">{error}</p> : null}<div className="mt-6 flex gap-3">',
+    '</div><Button className="mt-3 w-full" variant="outline" onClick={() => setPicker(true)}><Plus className="mr-1 h-4 w-4"/> Add exercise</Button>{error ? <p className="mt-3 text-sm font-medium text-red-600">{error}</p> : null}<div className="mt-6 flex gap-3">',
+    id,
+  )
+
+  next = replaceRequired(
+    next,
     '<Button variant="outline" onClick={onClose}>Cancel</Button></div></section></div>;',
-    '<Button variant="outline" onClick={onClose}>Cancel</Button></div></section>{editing ? <WorkoutExerciseEditor workout={draft} exercise={editing} exercises={exerciseLibrary} onCancel={() => setEditing(null)} onSave={(edited) => { setDraft((current) => ({ ...current, exercises: editWorkoutExerciseList(current, editing.id, edited, completedWorkouts) })); setEditing(null); }}/> : null}</div>;',
+    '<Button variant="outline" onClick={onClose}>Cancel</Button></div></section>{picker ? <WorkoutExercisePicker exercises={exerciseLibrary} replacing={null} onCancel={() => setPicker(false)} onChoose={prepareExerciseToAdd}/> : null}{adding ? <WorkoutExerciseEditor workout={{ ...draft, exercises: [...draft.exercises, adding] }} exercise={adding} exercises={exerciseLibrary} heading="Add exercise" description="Set up this exercise for this workout. Your Programme stays unchanged." actionLabel="Add exercise" onCancel={() => setAdding(null)} onSave={(edited) => { setDraft((current) => ({ ...current, exercises: editWorkoutExerciseList({ ...current, exercises: [...current.exercises, adding] }, adding.id, edited, completedWorkouts) })); setAdding(null); }}/> : null}{editing ? <WorkoutExerciseEditor workout={draft} exercise={editing} exercises={exerciseLibrary} onCancel={() => setEditing(null)} onSave={(edited) => { setDraft((current) => ({ ...current, exercises: editWorkoutExerciseList(current, editing.id, edited, completedWorkouts) })); setEditing(null); }}/> : null}</div>;',
     id,
   )
 

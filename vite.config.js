@@ -29,6 +29,7 @@ import { workoutActionTextBuildPlugin } from './src/workoutActionTextBuildPlugin
 import { repeatedIntervalBlocksPlugin } from './src/repeatedIntervalBlocksPlugin.js'
 import { intervalSummaryGrammarBuildPlugin } from './src/intervalSummaryGrammarBuildPlugin.js'
 import { verticalIntervalWorkoutDisplayPlugin } from './src/verticalIntervalWorkoutDisplayPlugin.js'
+import { unifiedAddExerciseSetupBuildPlugin } from './src/unifiedAddExerciseSetupBuildPlugin.js'
 
 export default defineConfig({
   plugins: [
@@ -59,6 +60,7 @@ export default defineConfig({
     setFieldFloatingLabelsBuildPlugin(),
     exerciseMetaHierarchyBuildPlugin(),
     workoutActionTextBuildPlugin(),
+    unifiedAddExerciseSetupBuildPlugin(),
     react(),
     tailwindcss(),
     VitePWA({

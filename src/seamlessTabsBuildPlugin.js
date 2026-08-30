@@ -3,7 +3,7 @@ function transformApp(code) {
 
   next = next.replace(
     'const [workoutIntent, setWorkoutIntent] = useState(null);',
-    'const [workoutIntent, setWorkoutIntent] = useState(null);\n  useEffect(() => {\n    const returnToWorkoutHistory = () => { setWorkoutIntent(null); setActiveTab("progress"); };\n    window.addEventListener("acl-return-to-workout-history", returnToWorkoutHistory);\n    return () => window.removeEventListener("acl-return-to-workout-history", returnToWorkoutHistory);\n  }, []);',
+    'const [workoutIntent, setWorkoutIntent] = useState(null);\n  useEffect(() => {\n    const returnToWorkoutHistory = () => { setWorkoutIntent(null); setActiveTab("progress"); };\n    const returnHome = () => { setWorkoutIntent(null); setActiveTab("home"); };\n    window.addEventListener("acl-return-to-workout-history", returnToWorkoutHistory);\n    window.addEventListener("acl-return-home", returnHome);\n    return () => { window.removeEventListener("acl-return-to-workout-history", returnToWorkoutHistory); window.removeEventListener("acl-return-home", returnHome); };\n  }, []);',
   )
 
   next = next.replace(
@@ -82,7 +82,7 @@ function transformWorkoutScreen(code) {
   const end = start >= 0 ? next.indexOf('\n  if (workout)', start) : -1
   if (start < 0 || end < 0) return next
 
-  const editorBlock = `  const intentEditor = intent && ["catch_up", "edit_completed"].includes(intent.mode) ? { mode: intent.mode, workoutId: intent.workoutId } : null;\n  const requestedEditor = intentEditor || editor;\n  const editorWorkout = requestedEditor ? workouts.find((item) => item.id === requestedEditor.workoutId && item.status === "completed") : null;\n  if (requestedEditor && !editorWorkout) return <section className="rounded-2xl border border-slate-200 bg-white p-5 text-sm font-medium text-slate-600">Loading workout…</section>;\n  if (requestedEditor && editorWorkout) return <CompletedWorkoutEditor user={user} saved={normalizeWorkoutForDisplay(editorWorkout)} mode={requestedEditor.mode} exerciseLibrary={library} completedWorkouts={completedWorkouts} onClose={() => { sessionStorage.removeItem("completedWorkoutIntent"); setEditor(null); window.dispatchEvent(new Event("acl-return-to-workout-history")); }}/ >;`
+  const editorBlock = `  const intentEditor = intent && ["catch_up", "edit_completed"].includes(intent.mode) ? { mode: intent.mode, workoutId: intent.workoutId } : null;\n  const requestedEditor = intentEditor || editor;\n  const editorWorkout = requestedEditor ? workouts.find((item) => item.id === requestedEditor.workoutId && item.status === "completed") : null;\n  if (requestedEditor && !editorWorkout) return <section className="rounded-2xl border border-slate-200 bg-white p-5 text-sm font-medium text-slate-600">Loading workout…</section>;\n  if (requestedEditor && editorWorkout) return <CompletedWorkoutEditor user={user} saved={normalizeWorkoutForDisplay(editorWorkout)} mode={requestedEditor.mode} exerciseLibrary={library} completedWorkouts={completedWorkouts} onClose={() => { sessionStorage.removeItem("completedWorkoutIntent"); setEditor(null); window.dispatchEvent(new Event(requestedEditor.mode === "catch_up" ? "acl-return-home" : "acl-return-to-workout-history")); }}/ >;`
 
   return `${next.slice(0, start)}${editorBlock}${next.slice(end)}`
 }

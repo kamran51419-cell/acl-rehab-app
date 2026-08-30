@@ -5,50 +5,93 @@ function replaceRequired(code, oldText, newText, id) {
 
 function transformQuickWorkoutBuilder(code, id) {
   let next = code
+
+  next = replaceRequired(
+    next,
+    'import { createWorkoutExerciseSnapshot } from "../../lib/domain/workoutSession";',
+    'import { createWorkoutExerciseSnapshot } from "../../lib/domain/workoutSession";\nimport { previousRepsForExercise, previousWeightsForExercise } from "../../lib/domain/workoutDisplay";',
+    id,
+  )
+
+  next = replaceRequired(
+    next,
+    'function createSelectedExercise(definition, index) {',
+    `function latestEquipmentForExercise(workouts = [], exerciseId) {
+  const timestamp = (workout) => {
+    const completed = workout?.completedAt?.seconds ? Number(workout.completedAt.seconds) * 1000 : Date.parse(workout?.completedAt || "");
+    return Number.isFinite(completed) ? completed : 0;
+  };
+  const orderedWorkouts = (workouts || []).slice().sort((a, b) => String(b.date || b.workoutDate || "").localeCompare(String(a.date || a.workoutDate || "")) || timestamp(b) - timestamp(a));
+  for (const workout of orderedWorkouts) {
+    const match = (workout.exercises || []).find((exercise) => exercise.exerciseId === exerciseId);
+    if (match) return match.equipmentType || "standard";
+  }
+  return "standard";
+}
+
+function createSelectedExercise(definition, index, completedWorkouts = []) {`,
+    id,
+  )
+
+  next = replaceRequired(
+    next,
+    '    equipmentType: exerciseType === EXERCISE_TYPE.STRENGTH ? "standard" : undefined,',
+    '    equipmentType: exerciseType === EXERCISE_TYPE.STRENGTH ? latestEquipmentForExercise(completedWorkouts, definition.id) : undefined,',
+    id,
+  )
+
   next = replaceRequired(
     next,
     'export function buildQuickWorkout({ id, userId, name, exercises, date, startedAt = new Date().toISOString() }) {',
-    'export function buildQuickWorkout({ id, userId, name, exercises, date, previousWeightsByExercise = {}, previousRepsByExercise = {}, startedAt = new Date().toISOString() }) {',
+    'export function buildQuickWorkout({ id, userId, name, exercises, date, completedWorkouts = [], startedAt = new Date().toISOString() }) {',
     id,
   )
+
+  const buildStart = next.indexOf('export function buildQuickWorkout(')
+  const buildEnd = buildStart >= 0 ? next.indexOf('\n\nexport default function QuickWorkoutBuilder', buildStart) : -1
+  if (buildStart < 0 || buildEnd < 0) throw new Error(`Quick workout previous-performance transform could not isolate buildQuickWorkout in ${id}`)
+
+  const buildFunction = `export function buildQuickWorkout({ id, userId, name, exercises, date, completedWorkouts = [], startedAt = new Date().toISOString() }) {
+  const title = name.trim() || "Quick Workout";
+  const snapshots = exercises.flatMap((exercise, index) => {
+    const base = { id: exercise.instanceId, exerciseId: exercise.exerciseId, exerciseNameSnapshot: exercise.exerciseNameSnapshot, exerciseType: exercise.exerciseType, loggingMethod: exercise.loggingMethod, equipmentType: exercise.equipmentType, prescription: exercise.prescription, notes: exercise.notes, sortOrder: index };
+    if (supportsSides(exercise.exerciseType) && exercise.prescription?.side === SIDE.SEPARATE) {
+      return [SIDE.LEFT, SIDE.RIGHT].map((side, sideIndex) => {
+        const target = { ...base, id: exercise.instanceId + "-" + side, prescription: { ...exercise.prescription, side }, sideSnapshot: side, sortOrder: index * 2 + sideIndex };
+        return createWorkoutExerciseSnapshot(target, previousWeightsForExercise(completedWorkouts, target), previousRepsForExercise(completedWorkouts, target));
+      });
+    }
+    return [createWorkoutExerciseSnapshot(base, previousWeightsForExercise(completedWorkouts, base), previousRepsForExercise(completedWorkouts, base))];
+  }).map((exercise, index) => ({ ...exercise, sortOrder: index }));
+  return { id, userId, date, createdAt: null, updatedAt: null, completedAt: null, startedAt, status: WORKOUT_STATUS.IN_PROGRESS, sourceType: "one_off", name: title, sessionNameSnapshot: title, exercises: snapshots, notes: "" };
+}`
+
+  next = `${next.slice(0, buildStart)}${buildFunction}${next.slice(buildEnd)}`
+
   next = replaceRequired(
     next,
-    'return [SIDE.LEFT, SIDE.RIGHT].map((side, sideIndex) => createWorkoutExerciseSnapshot({ ...base, id: `${exercise.instanceId}-${side}`, prescription: { ...exercise.prescription, side }, sortOrder: index * 2 + sideIndex }, {}));',
-    'return [SIDE.LEFT, SIDE.RIGHT].map((side, sideIndex) => createWorkoutExerciseSnapshot({ ...base, id: `${exercise.instanceId}-${side}`, prescription: { ...exercise.prescription, side }, sortOrder: index * 2 + sideIndex }, previousWeightsByExercise[exercise.instanceId + "-" + side] || {}, previousRepsByExercise[exercise.instanceId + "-" + side] || {}));',
+    'export default function QuickWorkoutBuilder({ exercises, trainingMode = "gym", onCancel, onStart }) {',
+    'export default function QuickWorkoutBuilder({ exercises, completedWorkouts = [], trainingMode = "gym", onCancel, onStart }) {',
     id,
   )
-  next = replaceRequired(
-    next,
-    'return [createWorkoutExerciseSnapshot(base, {})];',
-    'return [createWorkoutExerciseSnapshot(base, previousWeightsByExercise[base.id] || {}, previousRepsByExercise[base.id] || {})];',
-    id,
-  )
+
+  next = next.replaceAll('createSelectedExercise(definition, index)', 'createSelectedExercise(definition, index, completedWorkouts)')
+  next = next.replaceAll('createSelectedExercise(definition, items.length)', 'createSelectedExercise(definition, items.length, completedWorkouts)')
+
   return next
 }
 
 function transformWorkoutScreen(code, id) {
-  const start = code.indexOf('  const startQuick = async (name, exercises) => {')
-  const end = start >= 0 ? code.indexOf('\n  useEffect(() => {', start) : -1
+  let next = code
+  const start = next.indexOf('  const startQuick = async (name, exercises) => {')
+  const end = start >= 0 ? next.indexOf('\n  useEffect(() => {', start) : -1
   if (start < 0 || end < 0) throw new Error(`Quick workout previous-performance transform could not isolate startQuick in ${id}`)
+
   const replacement = `  const startQuick = async (name, exercises) => {
     if (unfinished) return openSaved(unfinished);
     setStartingWorkout(true);
     try {
-      const previousWeightsByExercise = {};
-      const previousRepsByExercise = {};
-      (exercises || []).forEach((exercise) => {
-        const separate = supportsSides(exercise) && exercise.prescription?.side === SIDE.SEPARATE;
-        const sides = separate ? [SIDE.LEFT, SIDE.RIGHT] : [exercise.prescription?.side];
-        sides.forEach((side) => {
-          const id = separate ? exercise.instanceId + "-" + side : exercise.instanceId;
-          const target = side
-            ? { ...exercise, id, sideSnapshot: side, prescription: { ...(exercise.prescription || {}), side } }
-            : { ...exercise, id };
-          previousWeightsByExercise[id] = previousWeightsForExercise(completedWorkouts, target);
-          previousRepsByExercise[id] = previousRepsForExercise(completedWorkouts, target);
-        });
-      });
-      const next = buildQuickWorkout({ id: \`workout-\${makeId()}\`, userId: user.uid, name, exercises, date: todayString(), previousWeightsByExercise, previousRepsByExercise });
+      const next = buildQuickWorkout({ id: \`workout-\${makeId()}\`, userId: user.uid, name, exercises, date: todayString(), completedWorkouts });
       await repository.createInProgressWorkoutDocument(db, user.uid, next);
       setWorkouts((items) => items.some((item) => item.id === next.id) ? items : [...items, next]);
       openSaved(next);
@@ -56,7 +99,15 @@ function transformWorkoutScreen(code, id) {
       setStartingWorkout(false);
     }
   };`
-  return `${code.slice(0, start)}${replacement}${code.slice(end)}`
+
+  next = `${next.slice(0, start)}${replacement}${next.slice(end)}`
+  next = replaceRequired(
+    next,
+    '<QuickWorkoutBuilder exercises={library} trainingMode={trainingMode} onCancel={() => setBuilder(false)} onStart={startQuick}/>',
+    '<QuickWorkoutBuilder exercises={library} completedWorkouts={completedWorkouts} trainingMode={trainingMode} onCancel={() => setBuilder(false)} onStart={startQuick}/>',
+    id,
+  )
+  return next
 }
 
 function transformProgressScreen(code, id) {

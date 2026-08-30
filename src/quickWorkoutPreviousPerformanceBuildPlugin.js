@@ -59,6 +59,10 @@ function transformWorkoutScreen(code, id) {
   return `${code.slice(0, start)}${replacement}${code.slice(end)}`
 }
 
+function transformProgressScreen(code, id) {
+  return replaceRequired(code, '${prefix}Best set', '${prefix}Personal best', id)
+}
+
 export function quickWorkoutPreviousPerformanceBuildPlugin() {
   return {
     name: 'quick-workout-previous-performance',
@@ -67,6 +71,7 @@ export function quickWorkoutPreviousPerformanceBuildPlugin() {
       const cleanId = id.split('?')[0].replaceAll('\\\\', '/')
       if (cleanId.endsWith('/src/features/workout/QuickWorkoutBuilder.jsx')) return transformQuickWorkoutBuilder(code, id)
       if (cleanId.endsWith('/src/features/workout/WorkoutScreen.jsx')) return transformWorkoutScreen(code, id)
+      if (cleanId.endsWith('/src/features/progress/ProgressScreen.jsx')) return transformProgressScreen(code, id)
       return null
     },
   }

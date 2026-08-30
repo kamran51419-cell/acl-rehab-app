@@ -14,21 +14,72 @@ function transformWorkoutScreen(code) {
   return next;
 }
 
+function transformQuickWorkoutBuilder(code) {
+  let next = code;
+
+  if (!next.includes('const [pickerCycle, setPickerCycle] = useState(0);')) {
+    next = next.replace(
+      '  const [replaceIndex, setReplaceIndex] = useState(null);',
+      '  const [replaceIndex, setReplaceIndex] = useState(null);\n  const [pickerCycle, setPickerCycle] = useState(0);',
+    );
+  }
+
+  if (!next.includes('const openExercisePicker = (replacementIndex = null) =>')) {
+    next = next.replace(
+      '  const update = (index, value) => setSelected((items) => items.map((item, itemIndex) => itemIndex === index ? value : item));',
+      `  const update = (index, value) => setSelected((items) => items.map((item, itemIndex) => itemIndex === index ? value : item));
+  const revealExercisePicker = () => {
+    const reveal = () => document.querySelector('[data-quick-exercise-picker="true"]')?.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+    requestAnimationFrame(() => requestAnimationFrame(reveal));
+    window.setTimeout(reveal, 80);
+  };
+  const openExercisePicker = (replacementIndex = null) => {
+    setReplaceIndex(replacementIndex);
+    setQuery("");
+    setPickerCycle((value) => value + 1);
+    setPickerOpen(true);
+    revealExercisePicker();
+  };
+  const closeExercisePicker = () => {
+    setPickerOpen(false);
+    setReplaceIndex(null);
+    setQuery("");
+  };`,
+    );
+  }
+
+  next = next.replaceAll(
+    'onClick={() => { setReplaceIndex(index); setPickerOpen(true); setQuery(""); }}',
+    'onClick={() => openExercisePicker(index)}',
+  );
+  next = next.replaceAll(
+    'onClick={() => { setPickerOpen(false); setReplaceIndex(null); }}',
+    'onClick={closeExercisePicker}',
+  );
+  next = next.replaceAll(
+    'onClick={() => { setPickerOpen(true); setReplaceIndex(null); setQuery(""); }}',
+    'onClick={() => openExercisePicker(null)}',
+  );
+
+  if (!next.includes('data-quick-exercise-picker="true"')) {
+    next = next.replace(
+      '<div className="rounded-xl border border-dashed border-slate-300 bg-white p-3">',
+      '<div key={pickerCycle} data-quick-exercise-picker="true" className="scroll-mt-4 rounded-xl border border-dashed border-slate-300 bg-white p-3">',
+    );
+  }
+
+  return next;
+}
+
 function transformBuilderUxEnhancements(code) {
   return code.replace(
-    `function pickerInSession(session) {
-  if (!session) return null
-  return [...session.querySelectorAll('div.rounded-xl.border-dashed, [data-exercise-picker]')].find((item) =>
-    /Exercise picker|Change exercise|Search exercises/i.test(textOf(item)),
-  ) || null
-}`,
-    `function pickerInSession(session) {
-  const scope = session || builderRoot()
-  if (!scope) return null
-  return [...scope.querySelectorAll('div.rounded-xl.border-dashed, [data-exercise-picker]')].find((item) =>
-    /Exercise picker|Change exercise|Search exercises/i.test(textOf(item)),
-  ) || null
-}`,
+    `    if (label === 'Add exercise' || label === 'Change exercise') {
+      const session = programmeSession(button)
+      collapseExercises(root, session)`,
+    `    if (label === 'Add exercise' || label === 'Change exercise') {
+      const session = programmeSession(button)
+      if (!session) return
+      collapseExercises(root, session)`,
   );
 }
 
@@ -39,6 +90,7 @@ export function addExerciseUxFixBuildPlugin() {
     transform(code, id) {
       const cleanId = id.split('?')[0].replaceAll('\\\\', '/');
       if (cleanId.endsWith('/src/features/workout/WorkoutScreen.jsx')) return transformWorkoutScreen(code);
+      if (cleanId.endsWith('/src/features/workout/QuickWorkoutBuilder.jsx')) return transformQuickWorkoutBuilder(code);
       if (cleanId.endsWith('/src/builderUxEnhancements.js')) return transformBuilderUxEnhancements(code);
       return null;
     },

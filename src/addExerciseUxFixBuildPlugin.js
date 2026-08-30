@@ -17,101 +17,41 @@ function transformWorkoutScreen(code) {
 function transformQuickWorkoutBuilder(code) {
   let next = code;
 
-  if (!next.includes('const [pickerCycle, setPickerCycle] = useState(0);')) {
-    next = next.replace(
-      '  const [replaceIndex, setReplaceIndex] = useState(null);',
-      '  const [replaceIndex, setReplaceIndex] = useState(null);\n  const [pickerCycle, setPickerCycle] = useState(0);\n  const pickerRef = React.useRef(null);',
-    );
-  } else if (!next.includes('const pickerRef = React.useRef(null);')) {
-    next = next.replace(
-      '  const [pickerCycle, setPickerCycle] = useState(0);',
-      '  const [pickerCycle, setPickerCycle] = useState(0);\n  const pickerRef = React.useRef(null);',
-    );
-  }
+  const pickerStart = next.indexOf('        {pickerOpen ? (');
+  const pickerEndMarker = '        ) : null}';
+  const pickerEnd = pickerStart >= 0 ? next.indexOf(pickerEndMarker, pickerStart) : -1;
 
-  if (!next.includes('React.useEffect(() => {\n    if (!pickerOpen) return undefined;')) {
-    next = next.replace(
-      '  const update = (index, value) => setSelected((items) => items.map((item, itemIndex) => itemIndex === index ? value : item));',
-      `  React.useEffect(() => {
-    if (!pickerOpen) return undefined;
-    const reveal = () => pickerRef.current?.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
-    const firstFrame = requestAnimationFrame(() => requestAnimationFrame(reveal));
-    const timer = window.setTimeout(reveal, 140);
-    return () => { cancelAnimationFrame(firstFrame); window.clearTimeout(timer); };
-  }, [pickerOpen, pickerCycle]);
+  if (pickerStart >= 0 && pickerEnd > pickerStart) {
+    const pickerBlockEnd = pickerEnd + pickerEndMarker.length;
+    const addButtonStartCandidates = [
+      next.indexOf('        <Button variant="secondary"', pickerBlockEnd),
+      next.indexOf('        <Button variant="outline"', pickerBlockEnd),
+    ].filter((index) => index >= 0);
+    const addButtonStart = addButtonStartCandidates.length ? Math.min(...addButtonStartCandidates) : -1;
 
-  const update = (index, value) => setSelected((items) => items.map((item, itemIndex) => itemIndex === index ? value : item));`,
-    );
-  }
+    if (addButtonStart >= 0 && addButtonStart - pickerBlockEnd < 400) {
+      const addButtonEndMarker = '</Button>';
+      const addButtonEndIndex = next.indexOf(addButtonEndMarker, addButtonStart);
+      const addButtonEnd = addButtonEndIndex >= 0 ? addButtonEndIndex + addButtonEndMarker.length : -1;
+      const addButton = addButtonEnd > addButtonStart ? next.slice(addButtonStart, addButtonEnd) : '';
 
-  if (!next.includes('const openExercisePicker = (replacementIndex = null) =>')) {
-    next = next.replace(
-      '  const update = (index, value) => setSelected((items) => items.map((item, itemIndex) => itemIndex === index ? value : item));',
-      `  const update = (index, value) => setSelected((items) => items.map((item, itemIndex) => itemIndex === index ? value : item));
-  const openExercisePicker = (replacementIndex = null) => {
-    setReplaceIndex(replacementIndex);
-    setQuery("");
-    setPickerCycle((value) => value + 1);
-    setPickerOpen(true);
-  };
-  const closeExercisePicker = () => {
-    setPickerOpen(false);
-    setReplaceIndex(null);
-    setQuery("");
-  };`,
-    );
-  } else {
-    const openStart = next.indexOf('  const revealExercisePicker = () => {');
-    const updateMarker = '  const update = (index, value) => setSelected((items) => items.map((item, itemIndex) => itemIndex === index ? value : item));';
-    const updateIndex = next.indexOf(updateMarker);
-    const chooseIndex = updateIndex >= 0 ? next.indexOf('\n  const chooseExercise =', updateIndex) : -1;
-    if (openStart >= 0 && chooseIndex > openStart) {
-      const handlers = `${updateMarker}
-  const openExercisePicker = (replacementIndex = null) => {
-    setReplaceIndex(replacementIndex);
-    setQuery("");
-    setPickerCycle((value) => value + 1);
-    setPickerOpen(true);
-  };
-  const closeExercisePicker = () => {
-    setPickerOpen(false);
-    setReplaceIndex(null);
-    setQuery("");
-  };`;
-      next = next.slice(0, updateIndex) + handlers + next.slice(chooseIndex);
+      if (addButton.includes('Add exercise')) {
+        const pickerBlock = next.slice(pickerStart, pickerBlockEnd);
+        const between = next.slice(pickerBlockEnd, addButtonStart);
+        next = next.slice(0, pickerStart)
+          + addButton
+          + between
+          + pickerBlock
+          + next.slice(addButtonEnd);
+      }
     }
-  }
-
-  next = next.replaceAll(
-    'onClick={() => { setReplaceIndex(index); setPickerOpen(true); setQuery(""); }}',
-    'onClick={() => openExercisePicker(index)}',
-  );
-  next = next.replaceAll(
-    'onClick={() => { setPickerOpen(false); setReplaceIndex(null); }}',
-    'onClick={closeExercisePicker}',
-  );
-  next = next.replaceAll(
-    'onClick={() => { setPickerOpen(true); setReplaceIndex(null); setQuery(""); }}',
-    'onClick={() => openExercisePicker(null)}',
-  );
-
-  if (!next.includes('data-quick-exercise-picker="true"')) {
-    next = next.replace(
-      '<div className="rounded-xl border border-dashed border-slate-300 bg-white p-3">',
-      '<div ref={pickerRef} key={pickerCycle} data-quick-exercise-picker="true" className="scroll-mt-4 rounded-xl border border-dashed border-slate-300 bg-white p-3">',
-    );
-  } else if (!next.includes('ref={pickerRef} key={pickerCycle} data-quick-exercise-picker="true"')) {
-    next = next.replace(
-      '<div key={pickerCycle} data-quick-exercise-picker="true"',
-      '<div ref={pickerRef} key={pickerCycle} data-quick-exercise-picker="true"',
-    );
   }
 
   return next;
 }
 
 function transformBuilderUxEnhancements(code) {
-  let next = code.replace(
+  return code.replace(
     `    if (label === 'Add exercise' || label === 'Change exercise') {
       const session = programmeSession(button)
       collapseExercises(root, session)`,
@@ -120,16 +60,6 @@ function transformBuilderUxEnhancements(code) {
       if (!session) return
       collapseExercises(root, session)`,
   );
-
-  next = next.replace(
-    `    if (label === 'Close') {
-      const root = builderRoot()`,
-    `    if (label === 'Close') {
-      if (button.closest?.('[data-quick-exercise-picker="true"]')) return
-      const root = builderRoot()`,
-  );
-
-  return next;
 }
 
 export function addExerciseUxFixBuildPlugin() {

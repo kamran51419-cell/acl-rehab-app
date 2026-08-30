@@ -32,6 +32,7 @@ import { verticalIntervalWorkoutDisplayPlugin } from './src/verticalIntervalWork
 import { unifiedAddExerciseSetupBuildPlugin } from './src/unifiedAddExerciseSetupBuildPlugin.js'
 import { intervalMeasurementChoiceBuildPlugin } from './src/intervalMeasurementChoiceBuildPlugin.js'
 import { quickWorkoutPreviousPerformanceBuildPlugin } from './src/quickWorkoutPreviousPerformanceBuildPlugin.js'
+import { addExerciseUxFixBuildPlugin } from './src/addExerciseUxFixBuildPlugin.js'
 import { statsImprovementPercentageBuildPlugin } from './src/statsImprovementPercentageBuildPlugin.js'
 import { inProgressWorkoutCleanupBuildPlugin } from './src/inProgressWorkoutCleanupBuildPlugin.js'
 
@@ -68,6 +69,7 @@ export default defineConfig({
     unifiedAddExerciseSetupBuildPlugin(),
     intervalMeasurementChoiceBuildPlugin(),
     quickWorkoutPreviousPerformanceBuildPlugin(),
+    addExerciseUxFixBuildPlugin(),
     statsImprovementPercentageBuildPlugin(),
     react(),
     tailwindcss(),

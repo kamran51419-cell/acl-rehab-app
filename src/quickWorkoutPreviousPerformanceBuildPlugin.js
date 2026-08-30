@@ -107,7 +107,42 @@ function transformWorkoutScreen(code, id) {
     '<QuickWorkoutBuilder exercises={library} completedWorkouts={completedWorkouts} trainingMode={trainingMode} onCancel={() => setBuilder(false)} onStart={startQuick}/>',
     id,
   )
+
+  next = replaceRequired(
+    next,
+    'const programme = useMemo(() => plans.find((plan) => plan.isActive && !plan.isArchived), [plans]); const unfinished = workouts.find((item) => item.status === "in_progress" && item.id !== suppressedWorkoutId);',
+    'const programme = useMemo(() => plans.find((plan) => plan.isActive && !plan.isArchived), [plans]); const unfinished = workouts.find((item) => item.status === "in_progress" && item.completed !== true && !item.completedAt && item.id !== suppressedWorkoutId);',
+    id,
+  )
+
+  const formStart = next.indexOf('export function WorkoutForm(')
+  const formEnd = formStart >= 0 ? next.indexOf('\n}\n\nexport function DiscardWorkoutDialog', formStart) : -1
+  if (formStart < 0 || formEnd < 0) throw new Error(`Quick workout previous-performance transform could not isolate WorkoutForm in ${id}`)
+  const formBlock = next.slice(formStart, formEnd)
+  const oldShell = '<section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">'
+  if (!formBlock.includes(oldShell)) throw new Error(`Quick workout previous-performance transform could not find workout shell in ${id}`)
+  const polishedForm = formBlock.replace(oldShell, '<section className={workout.sourceType === "one_off" ? "p-0" : "rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"}>')
+  next = `${next.slice(0, formStart)}${polishedForm}${next.slice(formEnd)}`
+
   return next
+}
+
+function transformHomeScreen(code, id) {
+  return replaceRequired(
+    code,
+    '  const unfinishedWorkout = useMemo(() => workouts.find((item) => item.status === "in_progress") || null, [workouts]);',
+    '  const unfinishedWorkout = useMemo(() => workouts.find((item) => item.status === "in_progress" && item.completed !== true && !item.completedAt) || null, [workouts]);',
+    id,
+  )
+}
+
+function transformPlanRepository(code, id) {
+  return replaceRequired(
+    code,
+    '  if (existing.docs.some((item) => item.data()?.status === "in_progress" && item.id !== workout.id)) {',
+    '  if (existing.docs.some((item) => item.data()?.status === "in_progress" && item.data()?.completed !== true && !item.data()?.completedAt && item.id !== workout.id)) {',
+    id,
+  )
 }
 
 function transformProgressScreen(code, id) {
@@ -122,6 +157,8 @@ export function quickWorkoutPreviousPerformanceBuildPlugin() {
       const cleanId = id.split('?')[0].replaceAll('\\\\', '/')
       if (cleanId.endsWith('/src/features/workout/QuickWorkoutBuilder.jsx')) return transformQuickWorkoutBuilder(code, id)
       if (cleanId.endsWith('/src/features/workout/WorkoutScreen.jsx')) return transformWorkoutScreen(code, id)
+      if (cleanId.endsWith('/src/features/home/HomeScreen.jsx')) return transformHomeScreen(code, id)
+      if (cleanId.endsWith('/src/lib/firebase/planRepository.js')) return transformPlanRepository(code, id)
       if (cleanId.endsWith('/src/features/progress/ProgressScreen.jsx')) return transformProgressScreen(code, id)
       return null
     },

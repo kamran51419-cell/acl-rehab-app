@@ -20,7 +20,27 @@ function transformQuickWorkoutBuilder(code) {
   if (!next.includes('const [pickerCycle, setPickerCycle] = useState(0);')) {
     next = next.replace(
       '  const [replaceIndex, setReplaceIndex] = useState(null);',
-      '  const [replaceIndex, setReplaceIndex] = useState(null);\n  const [pickerCycle, setPickerCycle] = useState(0);',
+      '  const [replaceIndex, setReplaceIndex] = useState(null);\n  const [pickerCycle, setPickerCycle] = useState(0);\n  const pickerRef = React.useRef(null);',
+    );
+  } else if (!next.includes('const pickerRef = React.useRef(null);')) {
+    next = next.replace(
+      '  const [pickerCycle, setPickerCycle] = useState(0);',
+      '  const [pickerCycle, setPickerCycle] = useState(0);\n  const pickerRef = React.useRef(null);',
+    );
+  }
+
+  if (!next.includes('React.useEffect(() => {\n    if (!pickerOpen) return undefined;')) {
+    next = next.replace(
+      '  const update = (index, value) => setSelected((items) => items.map((item, itemIndex) => itemIndex === index ? value : item));',
+      `  React.useEffect(() => {
+    if (!pickerOpen) return undefined;
+    const reveal = () => pickerRef.current?.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+    const firstFrame = requestAnimationFrame(() => requestAnimationFrame(reveal));
+    const timer = window.setTimeout(reveal, 140);
+    return () => { cancelAnimationFrame(firstFrame); window.clearTimeout(timer); };
+  }, [pickerOpen, pickerCycle]);
+
+  const update = (index, value) => setSelected((items) => items.map((item, itemIndex) => itemIndex === index ? value : item));`,
     );
   }
 
@@ -28,18 +48,11 @@ function transformQuickWorkoutBuilder(code) {
     next = next.replace(
       '  const update = (index, value) => setSelected((items) => items.map((item, itemIndex) => itemIndex === index ? value : item));',
       `  const update = (index, value) => setSelected((items) => items.map((item, itemIndex) => itemIndex === index ? value : item));
-  const revealExercisePicker = () => {
-    if (typeof document === "undefined") return;
-    const reveal = () => document.querySelector('[data-quick-exercise-picker="true"]')?.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
-    requestAnimationFrame(() => requestAnimationFrame(reveal));
-    window.setTimeout(reveal, 80);
-  };
   const openExercisePicker = (replacementIndex = null) => {
     setReplaceIndex(replacementIndex);
     setQuery("");
     setPickerCycle((value) => value + 1);
     setPickerOpen(true);
-    revealExercisePicker();
   };
   const closeExercisePicker = () => {
     setPickerOpen(false);
@@ -47,6 +60,26 @@ function transformQuickWorkoutBuilder(code) {
     setQuery("");
   };`,
     );
+  } else {
+    const openStart = next.indexOf('  const revealExercisePicker = () => {');
+    const updateMarker = '  const update = (index, value) => setSelected((items) => items.map((item, itemIndex) => itemIndex === index ? value : item));';
+    const updateIndex = next.indexOf(updateMarker);
+    const chooseIndex = updateIndex >= 0 ? next.indexOf('\n  const chooseExercise =', updateIndex) : -1;
+    if (openStart >= 0 && chooseIndex > openStart) {
+      const handlers = `${updateMarker}
+  const openExercisePicker = (replacementIndex = null) => {
+    setReplaceIndex(replacementIndex);
+    setQuery("");
+    setPickerCycle((value) => value + 1);
+    setPickerOpen(true);
+  };
+  const closeExercisePicker = () => {
+    setPickerOpen(false);
+    setReplaceIndex(null);
+    setQuery("");
+  };`;
+      next = next.slice(0, updateIndex) + handlers + next.slice(chooseIndex);
+    }
   }
 
   next = next.replaceAll(
@@ -65,7 +98,12 @@ function transformQuickWorkoutBuilder(code) {
   if (!next.includes('data-quick-exercise-picker="true"')) {
     next = next.replace(
       '<div className="rounded-xl border border-dashed border-slate-300 bg-white p-3">',
-      '<div key={pickerCycle} data-quick-exercise-picker="true" className="scroll-mt-4 rounded-xl border border-dashed border-slate-300 bg-white p-3">',
+      '<div ref={pickerRef} key={pickerCycle} data-quick-exercise-picker="true" className="scroll-mt-4 rounded-xl border border-dashed border-slate-300 bg-white p-3">',
+    );
+  } else if (!next.includes('ref={pickerRef} key={pickerCycle} data-quick-exercise-picker="true"')) {
+    next = next.replace(
+      '<div key={pickerCycle} data-quick-exercise-picker="true"',
+      '<div ref={pickerRef} key={pickerCycle} data-quick-exercise-picker="true"',
     );
   }
 
@@ -73,7 +111,7 @@ function transformQuickWorkoutBuilder(code) {
 }
 
 function transformBuilderUxEnhancements(code) {
-  return code.replace(
+  let next = code.replace(
     `    if (label === 'Add exercise' || label === 'Change exercise') {
       const session = programmeSession(button)
       collapseExercises(root, session)`,
@@ -82,6 +120,16 @@ function transformBuilderUxEnhancements(code) {
       if (!session) return
       collapseExercises(root, session)`,
   );
+
+  next = next.replace(
+    `    if (label === 'Close') {
+      const root = builderRoot()`,
+    `    if (label === 'Close') {
+      if (button.closest?.('[data-quick-exercise-picker="true"]')) return
+      const root = builderRoot()`,
+  );
+
+  return next;
 }
 
 export function addExerciseUxFixBuildPlugin() {

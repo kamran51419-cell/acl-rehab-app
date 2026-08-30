@@ -2,6 +2,11 @@ function transformApp(code) {
   let next = code
 
   next = next.replace(
+    'const [workoutIntent, setWorkoutIntent] = useState(null);',
+    'const [workoutIntent, setWorkoutIntent] = useState(null);\n  useEffect(() => {\n    const returnToWorkoutHistory = () => { setWorkoutIntent(null); setActiveTab("progress"); };\n    window.addEventListener("acl-return-to-workout-history", returnToWorkoutHistory);\n    return () => window.removeEventListener("acl-return-to-workout-history", returnToWorkoutHistory);\n  }, []);',
+  )
+
+  next = next.replace(
     '{activeTab === "home" && <HomeScreen user={user} surgeryDate={surgeryDate} trainingMode={trainingMode} fromProgramme={libraryFromProgramme} onBackToProgramme={() => { setLibraryFromProgramme(false); setActiveTab("programme"); }} onOpenWorkout={(intent) => { setWorkoutIntent({ ...intent, token: Date.now() }); setActiveTab("workout"); }} />}',
     '<div className={activeTab === "home" ? "block" : "hidden"} aria-hidden={activeTab !== "home"}><HomeScreen user={user} surgeryDate={surgeryDate} trainingMode={trainingMode} fromProgramme={libraryFromProgramme} onBackToProgramme={() => { setLibraryFromProgramme(false); setActiveTab("programme"); }} onOpenWorkout={(intent) => { setWorkoutIntent({ ...intent, token: Date.now() }); setActiveTab("workout"); }} /></div>',
   )
@@ -13,7 +18,7 @@ function transformApp(code) {
 
   next = next.replace(
     '{activeTab === "workout" && <WorkoutScreen user={user} intent={workoutIntent} trainingMode={trainingMode} />}',
-    '<div className={activeTab === "workout" ? "block" : "hidden"} aria-hidden={activeTab !== "workout"}><WorkoutScreen user={user} intent={workoutIntent} trainingMode={trainingMode} onCompletedEditorClosed={() => { setWorkoutIntent(null); setActiveTab("progress"); }} /></div>',
+    '<div className={activeTab === "workout" ? "block" : "hidden"} aria-hidden={activeTab !== "workout"}><WorkoutScreen user={user} intent={workoutIntent} trainingMode={trainingMode} /></div>',
   )
 
   next = next.replace(
@@ -74,12 +79,8 @@ function transformWorkoutHistoryScreen(code) {
 function transformWorkoutScreen(code) {
   let next = code
   next = next.replace(
-    'export default function WorkoutScreen({ user, repository = defaultRepository, intent, onIntentHandled = noop, onFinished = noop, onDiscarded = noop }) {',
-    'export default function WorkoutScreen({ user, repository = defaultRepository, intent, onIntentHandled = noop, onFinished = noop, onDiscarded = noop, onCompletedEditorClosed = noop }) {',
-  )
-  next = next.replace(
     'const editorWorkout = editor ? workouts.find((item) => item.id === editor.workoutId && item.status === "completed") : null;\n  if (editor && editorWorkout) return <CompletedWorkoutEditor user={user} saved={normalizeWorkoutForDisplay(editorWorkout)} mode={editor.mode} onClose={() => { sessionStorage.removeItem("completedWorkoutIntent"); setEditor(null); }}/ >;',
-    'const intentEditor = intent && ["catch_up", "edit_completed"].includes(intent.mode) ? { mode: intent.mode, workoutId: intent.workoutId } : null;\n  const requestedEditor = intentEditor || editor;\n  const editorWorkout = requestedEditor ? workouts.find((item) => item.id === requestedEditor.workoutId && item.status === "completed") : null;\n  if (requestedEditor && !editorWorkout) return <section className="rounded-2xl border border-slate-200 bg-white p-5 text-sm font-medium text-slate-600">Loading workout…</section>;\n  if (requestedEditor && editorWorkout) return <CompletedWorkoutEditor user={user} saved={normalizeWorkoutForDisplay(editorWorkout)} mode={requestedEditor.mode} onClose={() => { sessionStorage.removeItem("completedWorkoutIntent"); setEditor(null); onCompletedEditorClosed(); }}/ >;',
+    'const intentEditor = intent && ["catch_up", "edit_completed"].includes(intent.mode) ? { mode: intent.mode, workoutId: intent.workoutId } : null;\n  const requestedEditor = intentEditor || editor;\n  const editorWorkout = requestedEditor ? workouts.find((item) => item.id === requestedEditor.workoutId && item.status === "completed") : null;\n  if (requestedEditor && !editorWorkout) return <section className="rounded-2xl border border-slate-200 bg-white p-5 text-sm font-medium text-slate-600">Loading workout…</section>;\n  if (requestedEditor && editorWorkout) return <CompletedWorkoutEditor user={user} saved={normalizeWorkoutForDisplay(editorWorkout)} mode={requestedEditor.mode} onClose={() => { sessionStorage.removeItem("completedWorkoutIntent"); setEditor(null); window.dispatchEvent(new Event("acl-return-to-workout-history")); }}/ >;',
   )
   return next
 }

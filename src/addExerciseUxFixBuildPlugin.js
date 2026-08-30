@@ -29,6 +29,7 @@ function transformQuickWorkoutBuilder(code) {
       '  const update = (index, value) => setSelected((items) => items.map((item, itemIndex) => itemIndex === index ? value : item));',
       `  const update = (index, value) => setSelected((items) => items.map((item, itemIndex) => itemIndex === index ? value : item));
   const revealExercisePicker = () => {
+    if (typeof document === "undefined") return;
     const reveal = () => document.querySelector('[data-quick-exercise-picker="true"]')?.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
     requestAnimationFrame(() => requestAnimationFrame(reveal));
     window.setTimeout(reveal, 80);

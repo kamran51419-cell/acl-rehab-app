@@ -2,6 +2,11 @@ function transformApp(code) {
   let next = code
 
   next = next.replace(
+    'const [workoutIntent, setWorkoutIntent] = useState(null);',
+    'const [workoutIntent, setWorkoutIntent] = useState(null);\n  useEffect(() => {\n    const returnToWorkoutHistory = () => { setWorkoutIntent(null); setActiveTab("progress"); };\n    window.addEventListener("acl-return-to-workout-history", returnToWorkoutHistory);\n    return () => window.removeEventListener("acl-return-to-workout-history", returnToWorkoutHistory);\n  }, []);',
+  )
+
+  next = next.replace(
     '{activeTab === "home" && <HomeScreen user={user} surgeryDate={surgeryDate} trainingMode={trainingMode} fromProgramme={libraryFromProgramme} onBackToProgramme={() => { setLibraryFromProgramme(false); setActiveTab("programme"); }} onOpenWorkout={(intent) => { setWorkoutIntent({ ...intent, token: Date.now() }); setActiveTab("workout"); }} />}',
     '<div className={activeTab === "home" ? "block" : "hidden"} aria-hidden={activeTab !== "home"}><HomeScreen user={user} surgeryDate={surgeryDate} trainingMode={trainingMode} fromProgramme={libraryFromProgramme} onBackToProgramme={() => { setLibraryFromProgramme(false); setActiveTab("programme"); }} onOpenWorkout={(intent) => { setWorkoutIntent({ ...intent, token: Date.now() }); setActiveTab("workout"); }} /></div>',
   )
@@ -18,7 +23,7 @@ function transformApp(code) {
 
   next = next.replace(
     '{activeTab === "progress" && <ProgressScreen user={user} trainingMode={trainingMode} />}',
-    '<div className={activeTab === "progress" ? "block" : "hidden"} aria-hidden={activeTab !== "progress"}><ProgressScreen user={user} trainingMode={trainingMode} /></div>',
+    '<div className={activeTab === "progress" ? "block" : "hidden"} aria-hidden={activeTab !== "progress"}><ProgressScreen user={user} trainingMode={trainingMode} onEditWorkout={(workout) => { sessionStorage.removeItem("completedWorkoutIntent"); setWorkoutIntent({ mode: "edit_completed", workoutId: workout.id, token: Date.now() }); setActiveTab("workout"); }} /></div>',
   )
 
   next = next.replace(
@@ -29,6 +34,59 @@ function transformApp(code) {
   return next
 }
 
+function transformProgressScreen(code) {
+  let next = code
+  next = next.replace(
+    'export function ProgressLayout({ user, workouts, trainingMode, initialTab = "stats" }) {',
+    'export function ProgressLayout({ user, workouts, trainingMode, initialTab = "stats", onEditWorkout }) {',
+  )
+  next = next.replace(
+    '<WorkoutHistoryScreen user={user} showNavigation={false}/>',
+    '<WorkoutHistoryScreen user={user} showNavigation={false} onEditWorkout={onEditWorkout}/>',
+  )
+  next = next.replace(
+    'export default function ProgressScreen({ user, trainingMode, initialTab = "stats", repository = defaultRepository }) {',
+    'export default function ProgressScreen({ user, trainingMode, initialTab = "stats", onEditWorkout, repository = defaultRepository }) {',
+  )
+  next = next.replace(
+    '<ProgressLayout user={user} workouts={workouts} trainingMode={trainingMode} initialTab={initialTab}/>',
+    '<ProgressLayout user={user} workouts={workouts} trainingMode={trainingMode} initialTab={initialTab} onEditWorkout={onEditWorkout}/>',
+  )
+  return next
+}
+
+function transformWorkoutHistoryScreen(code) {
+  let next = code
+  next = next.replace(
+    'export function WorkoutHistoryView({ workouts, deletingId, deleteError, onRequestDelete, onCancelDelete, onConfirmDelete, showNavigation = true }) {',
+    'export function WorkoutHistoryView({ workouts, deletingId, deleteError, onRequestDelete, onCancelDelete, onConfirmDelete, onEditWorkout, showNavigation = true }) {',
+  )
+  next = next.replace(
+    'onClick={() => editWorkout(workout)}>Edit</Button>',
+    'onClick={() => onEditWorkout ? onEditWorkout(workout) : editWorkout(workout)}>Edit</Button>',
+  )
+  next = next.replace(
+    'export default function WorkoutHistoryScreen({ user, repository = defaultRepository, showNavigation = true }) {',
+    'export default function WorkoutHistoryScreen({ user, repository = defaultRepository, showNavigation = true, onEditWorkout }) {',
+  )
+  next = next.replace(
+    'onConfirmDelete={confirmDelete} showNavigation={showNavigation}/>;',
+    'onConfirmDelete={confirmDelete} onEditWorkout={onEditWorkout} showNavigation={showNavigation}/>;',
+  )
+  return next
+}
+
+function transformWorkoutScreen(code) {
+  let next = code
+  const start = next.indexOf('  const editorWorkout = editor ?')
+  const end = start >= 0 ? next.indexOf('\n  if (workout)', start) : -1
+  if (start < 0 || end < 0) return next
+
+  const editorBlock = `  const intentEditor = intent && ["catch_up", "edit_completed"].includes(intent.mode) ? { mode: intent.mode, workoutId: intent.workoutId } : null;\n  const requestedEditor = intentEditor || editor;\n  const editorWorkout = requestedEditor ? workouts.find((item) => item.id === requestedEditor.workoutId && item.status === "completed") : null;\n  if (requestedEditor && !editorWorkout) return <section className="rounded-2xl border border-slate-200 bg-white p-5 text-sm font-medium text-slate-600">Loading workout…</section>;\n  if (requestedEditor && editorWorkout) return <CompletedWorkoutEditor user={user} saved={normalizeWorkoutForDisplay(editorWorkout)} mode={requestedEditor.mode} exerciseLibrary={library} completedWorkouts={completedWorkouts} onClose={() => { sessionStorage.removeItem("completedWorkoutIntent"); setEditor(null); window.dispatchEvent(new Event("acl-return-to-workout-history")); }}/ >;`
+
+  return `${next.slice(0, start)}${editorBlock}${next.slice(end)}`
+}
+
 export function seamlessTabsBuildPlugin() {
   return {
     name: 'seamless-tabs',
@@ -36,6 +94,9 @@ export function seamlessTabsBuildPlugin() {
     transform(code, id) {
       const cleanId = id.split('?')[0].replaceAll('\\\\', '/')
       if (cleanId.endsWith('/src/App.jsx')) return transformApp(code)
+      if (cleanId.endsWith('/src/features/progress/ProgressScreen.jsx')) return transformProgressScreen(code)
+      if (cleanId.endsWith('/src/features/workout/WorkoutHistoryScreen.jsx')) return transformWorkoutHistoryScreen(code)
+      if (cleanId.endsWith('/src/features/workout/WorkoutScreen.jsx')) return transformWorkoutScreen(code)
       return null
     },
   }

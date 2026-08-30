@@ -35,6 +35,7 @@ import { statsImprovementPercentageBuildPlugin } from './src/statsImprovementPer
 
 export default defineConfig({
   plugins: [
+    quickWorkoutPreviousPerformanceBuildPlugin(),
     timeWeightTrackingBuildPlugin(),
     equipmentTrackingBuildPlugin(),
     latestPreviousPerformanceBuildPlugin(),
@@ -63,7 +64,6 @@ export default defineConfig({
     exerciseMetaHierarchyBuildPlugin(),
     workoutActionTextBuildPlugin(),
     unifiedAddExerciseSetupBuildPlugin(),
-    quickWorkoutPreviousPerformanceBuildPlugin(),
     statsImprovementPercentageBuildPlugin(),
     react(),
     tailwindcss(),

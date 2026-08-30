@@ -55,8 +55,8 @@ function transformProgressScreen(code, id) {
     if (index < 0) return [];
     const point = points[index];
     const actualY = point[key];
-    const actualWeight = point[`${key}Weight`];
-    const actualReps = point[`${key}Reps`];
+    const actualWeight = point[key + "Weight"];
+    const actualReps = point[key + "Reps"];
     let y = actualY;
     if (y === undefined || y === null) for (let cursor = index - 1; cursor >= 0; cursor -= 1) if (points[cursor][key] !== undefined && points[cursor][key] !== null) { y = points[cursor][key]; break; }
     if (y === undefined || y === null) for (let cursor = index + 1; cursor < points.length; cursor += 1) if (points[cursor][key] !== undefined && points[cursor][key] !== null) { y = points[cursor][key]; break; }

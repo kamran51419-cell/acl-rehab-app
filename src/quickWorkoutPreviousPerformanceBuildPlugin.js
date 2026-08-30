@@ -60,7 +60,7 @@ function createSelectedExercise(definition, index, completedWorkouts = []) {`
     next = next.slice(0, buildStart) + buildFunction + next.slice(buildEnd);
   }
 
-  if (!next.includes('completedWorkouts = []')) {
+  if (!/export default function QuickWorkoutBuilder\(\{[^}]*completedWorkouts/.test(next)) {
     next = next.replace(
       /export default function QuickWorkoutBuilder\(\{\s*exercises,\s*/,
       'export default function QuickWorkoutBuilder({ exercises, completedWorkouts = [], '

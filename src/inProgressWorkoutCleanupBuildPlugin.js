@@ -3,6 +3,8 @@ function replaceIfPresent(code, oldText, newText) {
 }
 
 function transformPlanRepository(code) {
+  let next = code;
+
   const oldStart = `export async function createInProgressWorkoutDocument(db, uid, workout) {
   const existing = await getDocs(collection(db, "users", uid, "workouts"));
   if (existing.docs.some((item) => item.data()?.status === "in_progress" && item.id !== workout.id)) {`;
@@ -40,7 +42,35 @@ export async function createInProgressWorkoutDocument(db, uid, workout) {
     return item.id !== workout.id && saved?.status === "in_progress" && saved?.completed !== true && !saved?.completedAt && inProgressWorkoutHasProgress(saved);
   })) {`;
 
-  return replaceIfPresent(code, oldStart, newStart);
+  next = replaceIfPresent(next, oldStart, newStart);
+
+  next = replaceIfPresent(
+    next,
+    '  const recent = [...recentWorkoutSnapshots.entries()].filter(([key]) => key.startsWith(`${uid}:`)).map(([, workout]) => workout).filter((workout) => workout.status === "in_progress" && !remoteIds.has(workout.id));',
+    '  const recent = [...recentWorkoutSnapshots.entries()].filter(([key]) => key.startsWith(`${uid}:`) && !deletedWorkoutIds.has(key)).map(([, workout]) => workout).filter((workout) => workout.status === "in_progress" && !remoteIds.has(workout.id));',
+  );
+
+  next = replaceIfPresent(
+    next,
+    `export async function deleteWorkoutDocument(db, uid, workoutId, { deleteDocument = deleteDoc, referenceFactory = workoutRef } = {}) {
+  await deleteDocument(referenceFactory(db, uid, workoutId));
+  recentWorkoutSnapshots.delete(workoutCacheKey(uid, workoutId));
+  deletedWorkoutIds.add(workoutCacheKey(uid, workoutId));
+}`,
+    `export async function deleteWorkoutDocument(db, uid, workoutId, { deleteDocument = deleteDoc, referenceFactory = workoutRef } = {}) {
+  const key = workoutCacheKey(uid, workoutId);
+  recentWorkoutSnapshots.delete(key);
+  deletedWorkoutIds.add(key);
+  try {
+    await deleteDocument(referenceFactory(db, uid, workoutId));
+  } catch (error) {
+    deletedWorkoutIds.delete(key);
+    throw error;
+  }
+}`,
+  );
+
+  return next;
 }
 
 export function inProgressWorkoutCleanupBuildPlugin() {

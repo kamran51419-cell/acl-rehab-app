@@ -12,7 +12,7 @@ function transformWorkoutScreen(code) {
   );
 
   next = next.replace(
-    'const unfinished = workouts.find((item) => item.status === "in_progress" && item.completed !== true && !item.completedAt && (item.exercises || []).some(exerciseAttempted) && item.id !== suppressedWorkoutId);',
+    /const unfinished = workouts\.find\(\(item\) => item\.status === "in_progress" && item\.completed !== true && !item\.completedAt && \(item\.exercises \|\| \[\]\)\.some\(exerciseAttempted\) && item\.id !== suppressedWorkoutId\);/,
     'const unfinished = workouts.find((item) => item.status === "in_progress" && item.completed !== true && !item.completedAt && item.id !== suppressedWorkoutId);',
   );
 
@@ -23,7 +23,7 @@ function transformHomeScreen(code) {
   let next = code;
 
   next = next.replace(
-    'const unfinishedWorkout = useMemo(() => workouts.find((item) => item.status === "in_progress" && item.completed !== true && !item.completedAt && (item.exercises || []).some(exerciseAttempted)) || null, [workouts]);',
+    /const unfinishedWorkout = useMemo\(\(\) => workouts\.find\(\(item\) => item\.status === "in_progress" && item\.completed !== true && !item\.completedAt && \(item\.exercises \|\| \[\]\)\.some\(exerciseAttempted\)\) \|\| null, \[workouts\]\);/,
     'const unfinishedWorkout = useMemo(() => workouts.find((item) => item.status === "in_progress" && item.completed !== true && !item.completedAt) || null, [workouts]);',
   );
 

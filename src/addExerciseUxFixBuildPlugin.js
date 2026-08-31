@@ -11,19 +11,21 @@ function transformWorkoutScreen(code) {
     '<div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">',
   );
 
+  next = next.replace(
+    'const unfinished = workouts.find((item) => item.status === "in_progress" && item.completed !== true && !item.completedAt && (item.exercises || []).some(exerciseAttempted) && item.id !== suppressedWorkoutId);',
+    'const unfinished = workouts.find((item) => item.status === "in_progress" && item.completed !== true && !item.completedAt && item.id !== suppressedWorkoutId);',
+  );
+
   return next;
 }
 
 function transformHomeScreen(code) {
   let next = code;
-  if (!next.includes('function activeHomeWorkout(')) return next;
 
-  const start = next.indexOf('const unfinishedWorkout = useMemo(');
-  const endMarker = '\n  const incompleteWorkoutList';
-  const end = start >= 0 ? next.indexOf(endMarker, start) : -1;
-  if (start >= 0 && end > start) {
-    next = `${next.slice(0, start)}const unfinishedWorkout = useMemo(() => activeHomeWorkout(workouts), [workouts]);${next.slice(end)}`;
-  }
+  next = next.replace(
+    'const unfinishedWorkout = useMemo(() => workouts.find((item) => item.status === "in_progress" && item.completed !== true && !item.completedAt && (item.exercises || []).some(exerciseAttempted)) || null, [workouts]);',
+    'const unfinishedWorkout = useMemo(() => workouts.find((item) => item.status === "in_progress" && item.completed !== true && !item.completedAt) || null, [workouts]);',
+  );
 
   return next;
 }

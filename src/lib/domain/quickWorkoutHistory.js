@@ -41,8 +41,8 @@ function exerciseCandidates(workout, target) {
   if (!candidates.length) return [];
 
   const targetEquipment = target?.equipmentType || "standard";
-  const sameEquipment = candidates.filter((exercise) => (exercise?.equipmentType || "standard") === targetEquipment);
-  const equipmentCandidates = sameEquipment.length ? sameEquipment : candidates;
+  const equipmentCandidates = candidates.filter((exercise) => (exercise?.equipmentType || "standard") === targetEquipment);
+  if (!equipmentCandidates.length) return [];
 
   const targetSide = resolveWorkoutExerciseSide(target);
   const sameSide = equipmentCandidates.filter((exercise) => resolveWorkoutExerciseSide(exercise) === targetSide);

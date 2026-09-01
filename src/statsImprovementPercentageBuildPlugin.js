@@ -25,25 +25,14 @@ export function statsImprovementPercentageBuildPlugin() {
         id,
       )
 
-      next = replaceRequired(
-        next,
+      next = next.replace(
         '<div className="flex flex-wrap gap-2">{equipmentTypes.map((type) => <Button key={type} size="sm" variant={equipment === type ? "primary" : "outline"} onClick={() => setEquipment(type)}>{EQUIPMENT_LABELS[type]}</Button>)}</div>',
         '<div className="flex flex-wrap gap-2">{equipmentTypes.map((type) => <button type="button" key={type} className={`rounded-full border px-3 py-1.5 text-sm font-semibold transition ${equipment === type ? "border-blue-600 bg-blue-600 text-white shadow-sm" : "border-blue-200 bg-white text-blue-700 hover:bg-blue-50"}`} onClick={() => setEquipment(type)}>{EQUIPMENT_LABELS[type]}</button>)}</div>',
-        id,
       )
 
-      next = replaceRequired(
-        next,
+      next = next.replaceAll(
         '<div className="flex flex-wrap gap-2">{availableModes.map((item) => <Button key={item} variant={mode === item ? "primary" : "outline"} onClick={() => setMode(item)}>{SIDE_MODE_LABELS[item]}</Button>)}</div>',
         '<div className="flex flex-wrap gap-2">{availableModes.map((item) => <button type="button" key={item} className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition ${mode === item ? "border-slate-300 bg-slate-100 text-slate-900" : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"}`} onClick={() => setMode(item)}>{SIDE_MODE_LABELS[item]}</button>)}</div>',
-        id,
-      )
-
-      next = replaceRequired(
-        next,
-        '<div className="flex flex-wrap gap-2">{availableModes.map((item) => <Button key={item} variant={mode === item ? "primary" : "outline"} onClick={() => setMode(item)}>{SIDE_MODE_LABELS[item]}</Button>)}</div>',
-        '<div className="flex flex-wrap gap-2">{availableModes.map((item) => <button type="button" key={item} className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition ${mode === item ? "border-slate-300 bg-slate-100 text-slate-900" : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"}`} onClick={() => setMode(item)}>{SIDE_MODE_LABELS[item]}</button>)}</div>',
-        id,
       )
 
       next = replaceRequired(

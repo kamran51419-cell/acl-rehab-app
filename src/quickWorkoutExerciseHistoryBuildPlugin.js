@@ -50,8 +50,8 @@ function transformWorkoutScreen(code, id) {
 
   next = replaceRequired(
     next,
-    '<ExerciseCard exercise={exercise} oneOff={false} index={index} total={draft.exercises.length} onChange={(...args) => changeWorkout(setDraft, ...args)}',
-    '<ExerciseCard exercise={hydrateExercisePreviousPerformance(exercise, editorPreviousWorkouts)} oneOff={false} index={index} total={draft.exercises.length} onChange={(...args) => changeWorkout(setDraft, ...args)}',
+    '<WorkoutExerciseDisplay list={ordered(draft.exercises)} exercise={exercise} oneOff={false} index={index} total={draft.exercises.length} onChange={(...args) => changeWorkout(setDraft, ...args)}',
+    '<WorkoutExerciseDisplay list={ordered(draft.exercises).map((item) => hydrateExercisePreviousPerformance(item, editorPreviousWorkouts))} exercise={hydrateExercisePreviousPerformance(exercise, editorPreviousWorkouts)} oneOff={false} index={index} total={draft.exercises.length} onChange={(...args) => changeWorkout(setDraft, ...args)}',
     id,
   );
 

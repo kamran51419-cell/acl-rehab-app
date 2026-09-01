@@ -74,20 +74,22 @@ export function quickPreviousPerformanceForExercise(workouts = [], target = {}) 
   return { weights: {}, reps: {} };
 }
 
+export function hydrateExercisePreviousPerformance(exercise, completedWorkouts = []) {
+  const previous = quickPreviousPerformanceForExercise(completedWorkouts, exercise);
+  return {
+    ...exercise,
+    recordedSets: (exercise?.recordedSets || []).map((set) => ({
+      ...set,
+      previousWeight: previous.weights[set.setNumber] ?? "",
+      previousReps: previous.reps[set.setNumber] ?? "",
+    })),
+  };
+}
+
 export function hydrateQuickWorkoutPreviousPerformance(workout, completedWorkouts = []) {
   if (!workout) return workout;
   return {
     ...workout,
-    exercises: (workout.exercises || []).map((exercise) => {
-      const previous = quickPreviousPerformanceForExercise(completedWorkouts, exercise);
-      return {
-        ...exercise,
-        recordedSets: (exercise.recordedSets || []).map((set) => ({
-          ...set,
-          previousWeight: previous.weights[set.setNumber] ?? "",
-          previousReps: previous.reps[set.setNumber] ?? "",
-        })),
-      };
-    }),
+    exercises: (workout.exercises || []).map((exercise) => hydrateExercisePreviousPerformance(exercise, completedWorkouts)),
   };
 }

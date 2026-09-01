@@ -1,5 +1,7 @@
 import { resolveWorkoutExerciseSide } from "./workoutDisplay.js";
 
+export const EQUIPMENT_TRACKING_START_DATE = "2026-08-28";
+
 function normalizedName(value) {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
@@ -32,6 +34,12 @@ function valueMap(sets, getter) {
   return entries.length ? Object.fromEntries(entries) : {};
 }
 
+export function historicalEquipmentType(workout, exercise = {}) {
+  const workoutDate = String(exercise?.completedDate || workout?.date || workout?.workoutDate || "");
+  if (workoutDate && workoutDate < EQUIPMENT_TRACKING_START_DATE && exercise?.equipmentSource !== "manual") return "standard";
+  return exercise?.equipmentType || "standard";
+}
+
 function exerciseCandidates(workout, target) {
   const targetId = String(target?.exerciseId || "");
   const targetName = normalizedName(target?.exerciseNameSnapshot);
@@ -41,8 +49,8 @@ function exerciseCandidates(workout, target) {
   if (!candidates.length) return [];
 
   const targetEquipment = target?.equipmentType || "standard";
-  const sameEquipment = candidates.filter((exercise) => (exercise?.equipmentType || "standard") === targetEquipment);
-  const equipmentCandidates = sameEquipment.length ? sameEquipment : candidates;
+  const equipmentCandidates = candidates.filter((exercise) => historicalEquipmentType(workout, exercise) === targetEquipment);
+  if (!equipmentCandidates.length) return [];
 
   const targetSide = resolveWorkoutExerciseSide(target);
   const sameSide = equipmentCandidates.filter((exercise) => resolveWorkoutExerciseSide(exercise) === targetSide);
@@ -66,20 +74,22 @@ export function quickPreviousPerformanceForExercise(workouts = [], target = {}) 
   return { weights: {}, reps: {} };
 }
 
+export function hydrateExercisePreviousPerformance(exercise, completedWorkouts = []) {
+  const previous = quickPreviousPerformanceForExercise(completedWorkouts, exercise);
+  return {
+    ...exercise,
+    recordedSets: (exercise?.recordedSets || []).map((set) => ({
+      ...set,
+      previousWeight: previous.weights[set.setNumber] ?? "",
+      previousReps: previous.reps[set.setNumber] ?? "",
+    })),
+  };
+}
+
 export function hydrateQuickWorkoutPreviousPerformance(workout, completedWorkouts = []) {
-  if (!workout || workout.sourceType !== "one_off") return workout;
+  if (!workout) return workout;
   return {
     ...workout,
-    exercises: (workout.exercises || []).map((exercise) => {
-      const previous = quickPreviousPerformanceForExercise(completedWorkouts, exercise);
-      return {
-        ...exercise,
-        recordedSets: (exercise.recordedSets || []).map((set) => ({
-          ...set,
-          previousWeight: previous.weights[set.setNumber] ?? "",
-          previousReps: previous.reps[set.setNumber] ?? "",
-        })),
-      };
-    }),
+    exercises: (workout.exercises || []).map((exercise) => hydrateExercisePreviousPerformance(exercise, completedWorkouts)),
   };
 }

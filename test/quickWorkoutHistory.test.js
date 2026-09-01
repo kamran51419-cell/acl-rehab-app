@@ -79,3 +79,32 @@ test("exercise added during a programme workout gets previous performance", () =
   assert.equal(hydrated.exercises[1].recordedSets[0].previousReps, 8);
   assert.equal(hydrated.exercises[1].recordedSets[0].previousWeight, 90);
 });
+
+test("previous performance is blank when selected equipment has no history", () => {
+  const history = [completedWorkout("2026-08-31", weightedExercise({ id: "machine-copy", exerciseId: "exercise-leg-press", equipmentType: "machine", reps: 8, weight: 90 }))];
+  const cable = weightedExercise({ id: "cable-copy", exerciseId: "exercise-leg-press", equipmentType: "cable", reps: "", weight: "" });
+  assert.deepEqual(quickPreviousPerformanceForExercise(history, cable), { weights: {}, reps: {} });
+});
+
+test("previous performance follows the selected equipment type", () => {
+  const history = [
+    completedWorkout("2026-08-31", weightedExercise({ id: "machine-copy", exerciseId: "exercise-leg-press", equipmentType: "machine", reps: 8, weight: 90 })),
+    completedWorkout("2026-08-30", weightedExercise({ id: "cable-copy", exerciseId: "exercise-leg-press", equipmentType: "cable", reps: 12, weight: 55 })),
+  ];
+  const cable = weightedExercise({ id: "current-cable", exerciseId: "exercise-leg-press", equipmentType: "cable", reps: "", weight: "" });
+  assert.deepEqual(quickPreviousPerformanceForExercise(history, cable), { weights: { 1: 55 }, reps: { 1: 12 } });
+});
+
+test("changing equipment clears stale previous values when that equipment has no history", () => {
+  const history = [completedWorkout("2026-08-31", weightedExercise({ id: "machine-copy", exerciseId: "exercise-leg-press", equipmentType: "machine", reps: 8, weight: 90 }))];
+  const workout = {
+    sourceType: "one_off",
+    exercises: [{
+      ...weightedExercise({ id: "current-cable", exerciseId: "exercise-leg-press", equipmentType: "cable", reps: "", weight: "" }),
+      recordedSets: [{ id: "set-1", setNumber: 1, previousReps: 8, previousWeight: 90, actualReps: "", rawReps: "", weight: "", rawWeight: "" }],
+    }],
+  };
+  const hydrated = hydrateQuickWorkoutPreviousPerformance(workout, history);
+  assert.equal(hydrated.exercises[0].recordedSets[0].previousReps, "");
+  assert.equal(hydrated.exercises[0].recordedSets[0].previousWeight, "");
+});

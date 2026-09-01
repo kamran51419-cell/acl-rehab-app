@@ -112,6 +112,106 @@ function transformExerciseProgress(code) {
   );
 }
 
+function transformPlanRepository(code, id) {
+  let next = replaceRequired(
+    code,
+    'import { duplicatePlan, nextPlanForSave } from "../domain/plans.js";',
+    'import { duplicatePlan, nextPlanForSave } from "../domain/plans.js";\nimport { renameExerciseNameSnapshots } from "../domain/exerciseNameSync.js";',
+    id,
+  );
+
+  const oldSave = `export async function saveExerciseDefinition(db, uid, exercise, { updatedAtToken }) {
+  const path = \`${'${exerciseCollectionPath(uid)}'}/${'${exercise.id}'}\`;
+  logExerciseRepository("save start", { uid, path });
+  try {
+    await setDoc(
+      exerciseRef(db, uid, exercise.id),
+      stripUndefined({ ...exercise, userId: uid, updatedAt: serverTimestamp(), updatedAtToken }),
+      { merge: true }
+    );
+    logExerciseRepository("save complete", { uid, path });
+  } catch (error) {
+    console.error("Exercise library Firestore save failed", { uid, path, code: error?.code, message: error?.message, error });
+    throw error;
+  }
+}`;
+
+  const newSave = `const repairedExerciseNameUsers = new Set();
+
+async function writeExerciseNameSnapshotUpdates(db, uid, renameRecord) {
+  const [plansSnapshot, workoutsSnapshot] = await Promise.all([
+    getDocs(plansCollection(db, uid)),
+    getDocs(collection(db, "users", uid, "workouts")),
+  ]);
+  const updates = [];
+
+  plansSnapshot.docs.forEach((item) => {
+    const current = item.data();
+    const renamed = renameRecord(current);
+    if (renamed !== current) updates.push({ ref: item.ref, data: { sessions: renamed.sessions } });
+  });
+
+  workoutsSnapshot.docs.forEach((item) => {
+    const current = item.data();
+    const renamed = renameRecord(current);
+    if (renamed !== current) updates.push({ ref: item.ref, data: { exercises: renamed.exercises } });
+  });
+
+  for (let index = 0; index < updates.length; index += 400) {
+    const batch = writeBatch(db);
+    updates.slice(index, index + 400).forEach((update) => batch.update(update.ref, stripUndefined(update.data)));
+    await batch.commit();
+  }
+
+  for (const [key, cached] of recentWorkoutSnapshots.entries()) {
+    if (!key.startsWith(\`${'${uid}'}:\`)) continue;
+    const renamed = renameRecord(cached);
+    if (renamed !== cached) recentWorkoutSnapshots.set(key, renamed);
+  }
+}
+
+async function syncExerciseNameSnapshots(db, uid, exerciseId, exerciseName) {
+  return writeExerciseNameSnapshotUpdates(db, uid, (record) => renameExerciseNameSnapshots(record, exerciseId, exerciseName));
+}
+
+async function repairExerciseNameSnapshots(db, uid, definitions) {
+  const named = definitions.filter((exercise) => exercise?.id && String(exercise?.name || "").trim());
+  if (!named.length) return;
+  return writeExerciseNameSnapshotUpdates(db, uid, (record) => named.reduce(
+    (current, exercise) => renameExerciseNameSnapshots(current, exercise.id, exercise.name),
+    record,
+  ));
+}
+
+export async function saveExerciseDefinition(db, uid, exercise, { updatedAtToken }) {
+  const path = \`${'${exerciseCollectionPath(uid)}'}/${'${exercise.id}'}\`;
+  const ref = exerciseRef(db, uid, exercise.id);
+  logExerciseRepository("save start", { uid, path });
+  try {
+    const existing = await getDoc(ref);
+    await setDoc(
+      ref,
+      stripUndefined({ ...exercise, userId: uid, updatedAt: serverTimestamp(), updatedAtToken }),
+      { merge: true }
+    );
+    if (existing.exists()) await syncExerciseNameSnapshots(db, uid, exercise.id, exercise.name);
+    logExerciseRepository("save complete", { uid, path });
+  } catch (error) {
+    console.error("Exercise library Firestore save failed", { uid, path, code: error?.code, message: error?.message, error });
+    throw error;
+  }
+}`;
+
+  next = replaceRequired(next, oldSave, newSave, id);
+  next = replaceRequired(
+    next,
+    '      logExerciseRepository("subscription snapshot", { uid, path, size: snapshot.size });\n      onNext(snapshot.docs.map((item) => item.data()).sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))));',
+    '      logExerciseRepository("subscription snapshot", { uid, path, size: snapshot.size });\n      const definitions = snapshot.docs.map((item) => item.data()).sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));\n      onNext(definitions);\n      if (!repairedExerciseNameUsers.has(uid)) {\n        repairedExerciseNameUsers.add(uid);\n        repairExerciseNameSnapshots(db, uid, definitions).catch((error) => console.error("Could not repair exercise names", error));\n      }',
+    id,
+  );
+  return next;
+}
+
 export function quickWorkoutExerciseHistoryBuildPlugin() {
   return {
     name: 'quick-workout-exercise-history',
@@ -121,6 +221,7 @@ export function quickWorkoutExerciseHistoryBuildPlugin() {
       if (cleanId.endsWith('/src/features/workout/WorkoutScreen.jsx')) return transformWorkoutScreen(code, id);
       if (cleanId.endsWith('/src/features/plans/PlansScreen.jsx')) return transformPlansScreen(code);
       if (cleanId.endsWith('/src/lib/domain/exerciseProgress.js')) return transformExerciseProgress(code);
+      if (cleanId.endsWith('/src/lib/firebase/planRepository.js')) return transformPlanRepository(code, id);
       return null;
     },
   };

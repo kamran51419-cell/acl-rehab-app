@@ -275,6 +275,11 @@ export function createDebouncedSaver(save, delay = 500, onStatus = () => {}) {
       const currentRevision = revision;
       timer = setTimeout(() => { timer = null; persist(latest, currentRevision).catch(() => {}); }, delay);
     },
+    cancelPending() {
+      clearTimeout(timer);
+      timer = null;
+      revision += 1;
+    },
     async flush() {
       if (!timer) { await queue; return; }
       clearTimeout(timer);
@@ -287,6 +292,7 @@ export function createDebouncedSaver(save, delay = 500, onStatus = () => {}) {
 }
 
 export async function completeWorkout(workout, saver, finish) {
-  await saver.flush();
+  if (typeof saver.cancelPending === "function") saver.cancelPending();
+  else await saver.flush();
   return finish(workout);
 }

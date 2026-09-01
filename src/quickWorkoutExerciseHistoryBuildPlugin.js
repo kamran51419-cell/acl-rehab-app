@@ -16,7 +16,14 @@ function transformWorkoutScreen(code, id) {
   next = replaceRequired(
     next,
     'import QuickWorkoutBuilder, { buildQuickWorkout } from "./QuickWorkoutBuilder";',
-    'import QuickWorkoutBuilder, { buildQuickWorkout } from "./QuickWorkoutBuilder";\nimport { hydrateQuickWorkoutPreviousPerformance } from "../../lib/domain/quickWorkoutHistory";',
+    'import QuickWorkoutBuilder, { buildQuickWorkout } from "./QuickWorkoutBuilder";\nimport { hydrateExercisePreviousPerformance, hydrateQuickWorkoutPreviousPerformance } from "../../lib/domain/quickWorkoutHistory";',
+    id,
+  );
+
+  next = replaceRequired(
+    next,
+    'onEquipment={(exerciseId, equipmentType) => setWorkout((current) => { const changed = withWorkoutOverrides(setLinkedEquipment(current, exerciseId, equipmentType)); const ids = new Set(linkedExerciseIds(changed, exerciseId)); return { ...changed, exercises: changed.exercises.map((exercise) => { if (!ids.has(exercise.id)) return exercise; const previousWeights = previousWeightsForExercise(completedWorkouts, exercise); const previousReps = previousRepsForExercise(completedWorkouts, exercise); return { ...exercise, recordedSets: (exercise.recordedSets || []).map((set) => ({ ...set, previousWeight: previousWeights[set.setNumber] ?? "", previousReps: previousReps[set.setNumber] ?? "" })) }; }) }; })}',
+    'onEquipment={(exerciseId, equipmentType) => setWorkout((current) => { const changed = withWorkoutOverrides(setLinkedEquipment(current, exerciseId, equipmentType)); const ids = new Set(linkedExerciseIds(changed, exerciseId)); return { ...changed, exercises: changed.exercises.map((exercise) => ids.has(exercise.id) ? hydrateExercisePreviousPerformance(exercise, completedWorkouts) : exercise) }; })}',
     id,
   );
 

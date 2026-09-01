@@ -75,7 +75,7 @@ test("exercise added during a programme workout gets previous performance", () =
   };
   const workout = { sourceType: "programme", exercises: [existing, added] };
   const hydrated = hydrateQuickWorkoutPreviousPerformance(workout, history);
-  assert.equal(hydrated.exercises[0], existing);
+  assert.equal(hydrated.exercises[0].exerciseId, existing.exerciseId);
   assert.equal(hydrated.exercises[1].recordedSets[0].previousReps, 8);
   assert.equal(hydrated.exercises[1].recordedSets[0].previousWeight, 90);
 });
@@ -134,4 +134,41 @@ test("manual equipment change in programme workout loads matching equipment hist
   const hydrated = hydrateQuickWorkoutPreviousPerformance({ sourceType: "programme", exercises: [exercise] }, history);
   assert.equal(hydrated.exercises[0].recordedSets[0].previousReps, 11);
   assert.equal(hydrated.exercises[0].recordedSets[0].previousWeight, 60);
+});
+
+test("history before equipment tracking is Standard even if programme sync tagged it differently", () => {
+  const legacy = {
+    ...weightedExercise({ id: "legacy-copy", exerciseId: "exercise-leg-press", equipmentType: "cable", reps: 10, weight: 40 }),
+    equipmentSource: "programme",
+  };
+  const history = [completedWorkout("2026-08-27", legacy)];
+  const cable = weightedExercise({ id: "current-cable", exerciseId: "exercise-leg-press", equipmentType: "cable", reps: "", weight: "" });
+  const standard = weightedExercise({ id: "current-standard", exerciseId: "exercise-leg-press", equipmentType: "standard", reps: "", weight: "" });
+  assert.deepEqual(quickPreviousPerformanceForExercise(history, cable), { weights: {}, reps: {} });
+  assert.deepEqual(quickPreviousPerformanceForExercise(history, standard), { weights: { 1: 40 }, reps: { 1: 10 } });
+});
+
+test("manual equipment assignment on an old workout is still respected", () => {
+  const legacy = {
+    ...weightedExercise({ id: "legacy-copy", exerciseId: "exercise-leg-press", equipmentType: "cable", reps: 10, weight: 40 }),
+    equipmentSource: "manual",
+  };
+  const history = [completedWorkout("2026-08-27", legacy)];
+  const cable = weightedExercise({ id: "current-cable", exerciseId: "exercise-leg-press", equipmentType: "cable", reps: "", weight: "" });
+  assert.deepEqual(quickPreviousPerformanceForExercise(history, cable), { weights: { 1: 40 }, reps: { 1: 10 } });
+});
+
+test("normal programme workout also refreshes Prev using legacy Standard classification", () => {
+  const legacy = {
+    ...weightedExercise({ id: "legacy-copy", exerciseId: "exercise-leg-press", equipmentType: "cable", reps: 10, weight: 40 }),
+    equipmentSource: "programme",
+  };
+  const history = [completedWorkout("2026-08-27", legacy)];
+  const current = {
+    ...weightedExercise({ id: "programme-copy", exerciseId: "exercise-leg-press", equipmentType: "cable", reps: "", weight: "" }),
+    recordedSets: [{ id: "set-1", setNumber: 1, previousReps: 10, previousWeight: 40, actualReps: "", rawReps: "", weight: "", rawWeight: "" }],
+  };
+  const hydrated = hydrateQuickWorkoutPreviousPerformance({ sourceType: "programme", date: "2026-09-01", exercises: [current] }, history);
+  assert.equal(hydrated.exercises[0].recordedSets[0].previousReps, "");
+  assert.equal(hydrated.exercises[0].recordedSets[0].previousWeight, "");
 });

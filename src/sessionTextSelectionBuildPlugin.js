@@ -1,7 +1,6 @@
 export function sessionTextSelectionBuildPlugin() {
   return {
     name: 'session-text-selection',
-    enforce: 'pre',
     transform(code, id) {
       const cleanId = id.split('?')[0].replaceAll('\\\\', '/')
       if (!cleanId.endsWith('/src/features/plans/PlansScreen.jsx')) return null

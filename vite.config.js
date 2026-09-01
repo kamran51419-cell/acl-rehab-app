@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { sourceLineEndingNormalizationBuildPlugin } from './src/sourceLineEndingNormalizationBuildPlugin.js'
 import { timeWeightTrackingBuildPlugin } from './src/timeWeightTrackingBuildPlugin.js'
 import { equipmentTrackingBuildPlugin } from './src/equipmentTrackingBuildPlugin.js'
 import { latestPreviousPerformanceBuildPlugin } from './src/latestPreviousPerformanceBuildPlugin.js'
@@ -39,6 +40,7 @@ import { inProgressWorkoutCleanupBuildPlugin } from './src/inProgressWorkoutClea
 
 export default defineConfig({
   plugins: [
+    sourceLineEndingNormalizationBuildPlugin(),
     inProgressWorkoutCleanupBuildPlugin(),
     timeWeightTrackingBuildPlugin(),
     equipmentTrackingBuildPlugin(),

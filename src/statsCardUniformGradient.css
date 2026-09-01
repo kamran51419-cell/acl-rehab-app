@@ -1,0 +1,5 @@
+/* Keep every summary card in the Stats view on the same blue-to-white treatment. */
+section.grid.gap-3.sm\:grid-cols-2.xl\:grid-cols-4 > div.rounded-2xl.border.border-blue-200 {
+  background: linear-gradient(135deg, #e2ecfb 0%, #ffffff 100%) !important;
+  background-image: linear-gradient(135deg, #e2ecfb 0%, #ffffff 100%) !important;
+}

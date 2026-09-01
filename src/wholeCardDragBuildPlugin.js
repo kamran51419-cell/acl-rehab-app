@@ -9,7 +9,7 @@ function transformPlansScreen(code, id) {
   next = replaceRequired(
     next,
     '            onDragOver={(event) => { event.preventDefault(); setDragOverSession(sessionIndex); }}\n            onDrop={() => { if (draggingSession !== null) moveSession(draggingSession, sessionIndex); setDraggingSession(null); setDragOverSession(null); }}\n            className={cls("reorder-target scroll-mt-4 space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 transition", dragOverSession === sessionIndex && draggingSession !== sessionIndex ? "reorder-over" : "", draggingSession === sessionIndex ? "reorder-dragging" : "")}',
-    '            draggable\n            onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; setDraggingSession(sessionIndex); setDragOverSession(sessionIndex); }}\n            onDragEnd={() => { setDraggingSession(null); setDragOverSession(null); }}\n            onDragOver={(event) => { event.preventDefault(); setDragOverSession(sessionIndex); }}\n            onDrop={() => { if (draggingSession !== null) moveSession(draggingSession, sessionIndex); setDraggingSession(null); setDragOverSession(null); }}\n            className={cls("reorder-target cursor-grab scroll-mt-4 space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 transition active:cursor-grabbing", dragOverSession === sessionIndex && draggingSession !== sessionIndex ? "reorder-over" : "", draggingSession === sessionIndex ? "reorder-dragging" : "")}',
+    '            data-programme-session-card="true"\n            draggable\n            onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; setDraggingSession(sessionIndex); setDragOverSession(sessionIndex); }}\n            onDragEnd={() => { setDraggingSession(null); setDragOverSession(null); }}\n            onDragOver={(event) => { event.preventDefault(); setDragOverSession(sessionIndex); }}\n            onDrop={() => { if (draggingSession !== null) moveSession(draggingSession, sessionIndex); setDraggingSession(null); setDragOverSession(null); }}\n            className={cls("reorder-target cursor-grab scroll-mt-4 space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 transition active:cursor-grabbing", dragOverSession === sessionIndex && draggingSession !== sessionIndex ? "reorder-over" : "", draggingSession === sessionIndex ? "reorder-dragging" : "")}',
     id,
   )
 
@@ -17,6 +17,13 @@ function transformPlansScreen(code, id) {
     next,
     '              <button\n                type="button"\n                draggable\n                onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; setDraggingSession(sessionIndex); setDragOverSession(sessionIndex); }}\n                onDragEnd={() => { setDraggingSession(null); setDragOverSession(null); }}\n                className="mt-6 cursor-grab rounded-lg p-1.5 text-slate-400 hover:bg-white hover:text-slate-600 active:cursor-grabbing"\n                aria-label={`Drag ${session.name || "session"}`}\n              >\n                <GripVertical className="h-5 w-5" />\n              </button>\n',
     '',
+    id,
+  )
+
+  next = replaceRequired(
+    next,
+    '<Field label="Session name"><Input value={session.name} onChange={(event) => updateSession(sessionIndex, { name: event.target.value })} /></Field>',
+    '<Field label="Session name"><Input data-session-name-input="true" onMouseDown={(event) => { const card = event.currentTarget.closest("[data-programme-session-card=\\"true\\"]"); if (card) card.draggable = false; }} onFocus={(event) => { const card = event.currentTarget.closest("[data-programme-session-card=\\"true\\"]"); if (card) card.draggable = false; }} onBlur={(event) => { const card = event.currentTarget.closest("[data-programme-session-card=\\"true\\"]"); if (card) card.draggable = true; }} value={session.name} onChange={(event) => updateSession(sessionIndex, { name: event.target.value })} /></Field>',
     id,
   )
 

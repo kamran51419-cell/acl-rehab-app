@@ -6,7 +6,6 @@ function replaceRequired(code, oldText, newText, id) {
 export function statsSelectorPolishBuildPlugin() {
   return {
     name: 'stats-selector-polish',
-    enforce: 'pre',
     transform(code, id) {
       const cleanId = id.split('?')[0].replaceAll('\\\\', '/')
       if (!cleanId.endsWith('/src/features/progress/ProgressScreen.jsx')) return null

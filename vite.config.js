@@ -34,7 +34,6 @@ import { intervalMeasurementChoiceBuildPlugin } from './src/intervalMeasurementC
 import { quickWorkoutPreviousPerformanceBuildPlugin } from './src/quickWorkoutPreviousPerformanceBuildPlugin.js'
 import { addExerciseUxFixBuildPlugin } from './src/addExerciseUxFixBuildPlugin.js'
 import { quickWorkoutExerciseHistoryBuildPlugin } from './src/quickWorkoutExerciseHistoryBuildPlugin.js'
-import { deletedExerciseStatsBuildPlugin } from './src/deletedExerciseStatsBuildPlugin.js'
 import { statsImprovementPercentageBuildPlugin } from './src/statsImprovementPercentageBuildPlugin.js'
 import { inProgressWorkoutCleanupBuildPlugin } from './src/inProgressWorkoutCleanupBuildPlugin.js'
 
@@ -73,7 +72,6 @@ export default defineConfig({
     quickWorkoutPreviousPerformanceBuildPlugin(),
     addExerciseUxFixBuildPlugin(),
     quickWorkoutExerciseHistoryBuildPlugin(),
-    deletedExerciseStatsBuildPlugin(),
     statsImprovementPercentageBuildPlugin(),
     react(),
     tailwindcss(),

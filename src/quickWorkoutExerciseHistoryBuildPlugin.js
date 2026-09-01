@@ -136,7 +136,9 @@ function transformPlanRepository(code, id) {
   }
 }`;
 
-  const newSave = `async function syncExerciseNameSnapshots(db, uid, exerciseId, exerciseName) {
+  const newSave = `const repairedExerciseNameUsers = new Set();
+
+async function writeExerciseNameSnapshotUpdates(db, uid, renameRecord) {
   const [plansSnapshot, workoutsSnapshot] = await Promise.all([
     getDocs(plansCollection(db, uid)),
     getDocs(collection(db, "users", uid, "workouts")),
@@ -145,13 +147,13 @@ function transformPlanRepository(code, id) {
 
   plansSnapshot.docs.forEach((item) => {
     const current = item.data();
-    const renamed = renameExerciseNameSnapshots(current, exerciseId, exerciseName);
+    const renamed = renameRecord(current);
     if (renamed !== current) updates.push({ ref: item.ref, data: { sessions: renamed.sessions } });
   });
 
   workoutsSnapshot.docs.forEach((item) => {
     const current = item.data();
-    const renamed = renameExerciseNameSnapshots(current, exerciseId, exerciseName);
+    const renamed = renameRecord(current);
     if (renamed !== current) updates.push({ ref: item.ref, data: { exercises: renamed.exercises } });
   });
 
@@ -163,9 +165,22 @@ function transformPlanRepository(code, id) {
 
   for (const [key, cached] of recentWorkoutSnapshots.entries()) {
     if (!key.startsWith(\`${'${uid}'}:\`)) continue;
-    const renamed = renameExerciseNameSnapshots(cached, exerciseId, exerciseName);
+    const renamed = renameRecord(cached);
     if (renamed !== cached) recentWorkoutSnapshots.set(key, renamed);
   }
+}
+
+async function syncExerciseNameSnapshots(db, uid, exerciseId, exerciseName) {
+  return writeExerciseNameSnapshotUpdates(db, uid, (record) => renameExerciseNameSnapshots(record, exerciseId, exerciseName));
+}
+
+async function repairExerciseNameSnapshots(db, uid, definitions) {
+  const named = definitions.filter((exercise) => exercise?.id && String(exercise?.name || "").trim());
+  if (!named.length) return;
+  return writeExerciseNameSnapshotUpdates(db, uid, (record) => named.reduce(
+    (current, exercise) => renameExerciseNameSnapshots(current, exercise.id, exercise.name),
+    record,
+  ));
 }
 
 export async function saveExerciseDefinition(db, uid, exercise, { updatedAtToken }) {
@@ -188,6 +203,12 @@ export async function saveExerciseDefinition(db, uid, exercise, { updatedAtToken
 }`;
 
   next = replaceRequired(next, oldSave, newSave, id);
+  next = replaceRequired(
+    next,
+    '      logExerciseRepository("subscription snapshot", { uid, path, size: snapshot.size });\n      onNext(snapshot.docs.map((item) => item.data()).sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))));',
+    '      logExerciseRepository("subscription snapshot", { uid, path, size: snapshot.size });\n      const definitions = snapshot.docs.map((item) => item.data()).sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));\n      onNext(definitions);\n      if (!repairedExerciseNameUsers.has(uid)) {\n        repairedExerciseNameUsers.add(uid);\n        repairExerciseNameSnapshots(db, uid, definitions).catch((error) => console.error("Could not repair exercise names", error));\n      }',
+    id,
+  );
   return next;
 }
 

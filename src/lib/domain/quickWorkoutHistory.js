@@ -66,16 +66,19 @@ export function quickPreviousPerformanceForExercise(workouts = [], target = {}) 
   return { weights: {}, reps: {} };
 }
 
+function shouldHydratePrevious(workout, exercise) {
+  return workout?.sourceType === "one_off" || exercise?.addedDuringWorkout === true || exercise?.equipmentSource === "manual";
+}
+
 export function hydrateQuickWorkoutPreviousPerformance(workout, completedWorkouts = []) {
   if (!workout) return workout;
-  const hydrateEveryExercise = workout.sourceType === "one_off";
-  const hasAddedExercise = (workout.exercises || []).some((exercise) => exercise?.addedDuringWorkout === true);
-  if (!hydrateEveryExercise && !hasAddedExercise) return workout;
+  const exercises = workout.exercises || [];
+  if (!exercises.some((exercise) => shouldHydratePrevious(workout, exercise))) return workout;
 
   return {
     ...workout,
-    exercises: (workout.exercises || []).map((exercise) => {
-      if (!hydrateEveryExercise && exercise?.addedDuringWorkout !== true) return exercise;
+    exercises: exercises.map((exercise) => {
+      if (!shouldHydratePrevious(workout, exercise)) return exercise;
       const previous = quickPreviousPerformanceForExercise(completedWorkouts, exercise);
       return {
         ...exercise,

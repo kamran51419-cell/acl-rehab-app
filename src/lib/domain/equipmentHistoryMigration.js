@@ -67,7 +67,8 @@ export function buildEquipmentHistoryMigration(plan, workouts = []) {
       }
 
       const targetType = info.equipmentType || "standard";
-      if ((exercise.equipmentType || "standard") === targetType && exercise.equipmentSource === "manual") return exercise;
+      const currentType = exercise.equipmentType || "standard";
+      if (targetType === "standard" && currentType === "standard") return exercise;
 
       changed = true;
       exerciseRecordsChanged += 1;

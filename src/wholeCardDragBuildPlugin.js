@@ -6,20 +6,8 @@ function replaceRequired(code, oldText, newText, id) {
 function transformPlansScreen(code, id) {
   let next = code
 
-  next = replaceRequired(
-    next,
-    '            onDragOver={(event) => { event.preventDefault(); setDragOverSession(sessionIndex); }}\n            onDrop={() => { if (draggingSession !== null) moveSession(draggingSession, sessionIndex); setDraggingSession(null); setDragOverSession(null); }}\n            className={cls("reorder-target scroll-mt-4 space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 transition", dragOverSession === sessionIndex && draggingSession !== sessionIndex ? "reorder-over" : "", draggingSession === sessionIndex ? "reorder-dragging" : "")}',
-    '            draggable\n            onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; setDraggingSession(sessionIndex); setDragOverSession(sessionIndex); }}\n            onDragEnd={() => { setDraggingSession(null); setDragOverSession(null); }}\n            onDragOver={(event) => { event.preventDefault(); setDragOverSession(sessionIndex); }}\n            onDrop={() => { if (draggingSession !== null) moveSession(draggingSession, sessionIndex); setDraggingSession(null); setDragOverSession(null); }}\n            className={cls("reorder-target cursor-grab scroll-mt-4 space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 transition active:cursor-grabbing", dragOverSession === sessionIndex && draggingSession !== sessionIndex ? "reorder-over" : "", draggingSession === sessionIndex ? "reorder-dragging" : "")}',
-    id,
-  )
-
-  next = replaceRequired(
-    next,
-    '              <button\n                type="button"\n                draggable\n                onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; setDraggingSession(sessionIndex); setDragOverSession(sessionIndex); }}\n                onDragEnd={() => { setDraggingSession(null); setDragOverSession(null); }}\n                className="mt-6 cursor-grab rounded-lg p-1.5 text-slate-400 hover:bg-white hover:text-slate-600 active:cursor-grabbing"\n                aria-label={`Drag ${session.name || "session"}`}\n              >\n                <GripVertical className="h-5 w-5" />\n              </button>\n',
-    '',
-    id,
-  )
-
+  // Keep programme sessions handle-only draggable so text inputs remain normally selectable.
+  // Exercise cards still use the existing whole-card drag behaviour below.
   next = replaceRequired(
     next,
     '                  onDragOver={(event) => { event.preventDefault(); if (draggingExercise?.sessionIndex === sessionIndex) setDragOverExercise({ sessionIndex, exerciseIndex }); }}\n                  onDrop={() => { if (draggingExercise?.sessionIndex === sessionIndex) moveExercise(sessionIndex, draggingExercise.exerciseIndex, exerciseIndex); setDraggingExercise(null); setDragOverExercise(null); }}\n                  className={cls("reorder-target space-y-3 rounded-xl border bg-white p-3 transition", activeExerciseId === exercise.id ? "border-emerald-400 ring-2 ring-emerald-100" : "border-slate-200", dragOverExercise?.sessionIndex === sessionIndex && dragOverExercise?.exerciseIndex === exerciseIndex && draggingExercise?.exerciseIndex !== exerciseIndex ? "reorder-over" : "", draggingExercise?.sessionIndex === sessionIndex && draggingExercise?.exerciseIndex === exerciseIndex ? "reorder-dragging" : "")}',

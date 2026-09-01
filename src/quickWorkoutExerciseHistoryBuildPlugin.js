@@ -1,8 +1,16 @@
-function transformWorkoutScreen(code, id) {
-  if (code.includes('withQuickPreviousPerformance')) return code;
+function hidePairedSideRemoveControls(code) {
+  return code.replace(
+    /(<ExerciseCard exercise=\{(?:left|right)\} index=\{[^}]+\} hideExerciseName \{\.\.\.props\})(?! oneOff=\{false\})/g,
+    '$1 oneOff={false}',
+  );
+}
 
-  const openSavedStart = code.indexOf('  const openSaved = useCallback(');
-  const startProgramme = openSavedStart >= 0 ? code.indexOf('\n  const startProgramme', openSavedStart) : -1;
+function transformWorkoutScreen(code, id) {
+  let next = hidePairedSideRemoveControls(code);
+  if (next.includes('withQuickPreviousPerformance')) return next;
+
+  const openSavedStart = next.indexOf('  const openSaved = useCallback(');
+  const startProgramme = openSavedStart >= 0 ? next.indexOf('\n  const startProgramme', openSavedStart) : -1;
   if (openSavedStart < 0 || startProgramme < 0) {
     throw new Error(`Quick Workout exercise-history transform could not find openSaved in ${id}`);
   }
@@ -27,7 +35,8 @@ function transformWorkoutScreen(code, id) {
   }, [completedWorkouts]);
   const openSaved = useCallback((saved) => { setWorkout(normalizeWorkoutForDisplay(syncSavedWithProgramme(withQuickPreviousPerformance(saved)))); setBuilder(false); setOverviewDiscardConfirm(false); onIntentHandled(); }, [onIntentHandled, syncSavedWithProgramme, withQuickPreviousPerformance]);`;
 
-  return code.slice(0, openSavedStart) + replacement + code.slice(startProgramme);
+  next = next.slice(0, openSavedStart) + replacement + next.slice(startProgramme);
+  return next;
 }
 
 export function quickWorkoutExerciseHistoryBuildPlugin() {

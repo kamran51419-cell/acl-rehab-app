@@ -49,7 +49,7 @@ export function buildEquipmentHistoryMigration(plan, workouts = []) {
 
   (workouts || []).forEach((workout) => {
     const date = workoutDate(workout);
-    if (!isCompleted(workout) || workoutPlanId(workout) !== plan?.id || !workout?.sessionId || !date || date >= EQUIPMENT_HISTORY_MIGRATION_CUTOFF) return;
+    if (!isCompleted(workout) || workout?.sourceType === "one_off" || workoutPlanId(workout) !== plan?.id || !workout?.sessionId || !date || date >= EQUIPMENT_HISTORY_MIGRATION_CUTOFF) return;
 
     let changed = false;
     const changedOccurrences = new Set();

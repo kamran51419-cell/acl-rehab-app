@@ -95,21 +95,53 @@ function transformWorkoutScreen(code, id) {
   return next;
 }
 
-function transformPlansScreen(code) {
-  return code
+function transformPlansScreen(code, id) {
+  let next = code
     .replace('  syncProgrammeEquipmentHistory,\n', '')
     .replace('      await syncProgrammeEquipmentHistory(db, user.uid, saved);\n', '')
     .replace(
       'Previous programme history follows this unless you changed that workout manually.',
       'Default for new workouts. Completed workout history keeps the equipment used at the time.',
     );
+
+  next = replaceRequired(
+    next,
+    'setMessage("Exercise permanently deleted from the library. Existing programme and workout records were not changed.");',
+    'setMessage("Exercise permanently deleted from the library and removed from Stats. Existing programme entries and workout history remain.");',
+    id,
+  );
+
+  next = replaceRequired(
+    next,
+    '<p className="mt-2 text-sm text-slate-600">It will be removed from your Exercise Library. Existing programme and workout records will not be rewritten.</p>',
+    '<p className="mt-2 text-sm text-slate-600">It will be removed from your Exercise Library and Stats. Existing programme entries and completed workout history will remain.</p>',
+    id,
+  );
+
+  return next;
 }
 
-function transformExerciseProgress(code) {
-  return code.replace(
+function transformExerciseProgress(code, id) {
+  let next = code.replace(
     /equipmentType:\s*exercise\.equipmentType\s*\|\|\s*"standard",\s*weight:\s*set\.weight,/,
     'equipmentType: date && String(date) < "2026-08-28" && exercise.equipmentSource !== "manual" ? "standard" : (exercise.equipmentType || "standard"), weight: set.weight,',
   );
+
+  next = replaceRequired(
+    next,
+    '    const weightedExercises = (workout.exercises || []).filter((exercise) => exercise.loggingMethod === EXERCISE_LOGGING_METHOD.REPS_WEIGHT);',
+    '    const weightedExercises = (workout.exercises || []).filter((exercise) => !exercise.hiddenFromStats && exercise.loggingMethod === EXERCISE_LOGGING_METHOD.REPS_WEIGHT);',
+    id,
+  );
+
+  next = replaceRequired(
+    next,
+    '      if (!exercise.exerciseId) return;',
+    '      if (!exercise.exerciseId || exercise.hiddenFromStats) return;',
+    id,
+  );
+
+  return next;
 }
 
 function transformPlanRepository(code, id) {
@@ -136,7 +168,20 @@ function transformPlanRepository(code, id) {
   }
 }`;
 
-  const newSave = `const repairedExerciseNameUsers = new Set();
+  const newSave = `const repairedExerciseNameSignatures = new Map();
+
+function syncStatsVisibility(record, activeExerciseIds) {
+  if (!Array.isArray(record?.exercises)) return record;
+  let changed = false;
+  const exercises = record.exercises.map((exercise) => {
+    if (!exercise?.exerciseId) return exercise;
+    const hiddenFromStats = !activeExerciseIds.has(String(exercise.exerciseId));
+    if (Boolean(exercise.hiddenFromStats) === hiddenFromStats) return exercise;
+    changed = true;
+    return { ...exercise, hiddenFromStats };
+  });
+  return changed ? { ...record, exercises } : record;
+}
 
 async function writeExerciseNameSnapshotUpdates(db, uid, renameRecord) {
   const [plansSnapshot, workoutsSnapshot] = await Promise.all([
@@ -176,11 +221,14 @@ async function syncExerciseNameSnapshots(db, uid, exerciseId, exerciseName) {
 
 async function repairExerciseNameSnapshots(db, uid, definitions) {
   const named = definitions.filter((exercise) => exercise?.id && String(exercise?.name || "").trim());
-  if (!named.length) return;
-  return writeExerciseNameSnapshotUpdates(db, uid, (record) => named.reduce(
-    (current, exercise) => renameExerciseNameSnapshots(current, exercise.id, exercise.name),
-    record,
-  ));
+  const activeExerciseIds = new Set(definitions.filter((exercise) => exercise?.id).map((exercise) => String(exercise.id)));
+  return writeExerciseNameSnapshotUpdates(db, uid, (record) => {
+    const renamed = named.reduce(
+      (current, exercise) => renameExerciseNameSnapshots(current, exercise.id, exercise.name),
+      record,
+    );
+    return syncStatsVisibility(renamed, activeExerciseIds);
+  });
 }
 
 export async function saveExerciseDefinition(db, uid, exercise, { updatedAtToken }) {
@@ -206,7 +254,7 @@ export async function saveExerciseDefinition(db, uid, exercise, { updatedAtToken
   next = replaceRequired(
     next,
     '      logExerciseRepository("subscription snapshot", { uid, path, size: snapshot.size });\n      onNext(snapshot.docs.map((item) => item.data()).sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))));',
-    '      logExerciseRepository("subscription snapshot", { uid, path, size: snapshot.size });\n      const definitions = snapshot.docs.map((item) => item.data()).sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));\n      onNext(definitions);\n      if (!repairedExerciseNameUsers.has(uid)) {\n        repairedExerciseNameUsers.add(uid);\n        repairExerciseNameSnapshots(db, uid, definitions).catch((error) => console.error("Could not repair exercise names", error));\n      }',
+    '      logExerciseRepository("subscription snapshot", { uid, path, size: snapshot.size });\n      const definitions = snapshot.docs.map((item) => item.data()).sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));\n      onNext(definitions);\n      const repairSignature = definitions.map((exercise) => `${exercise.id}:${exercise.name || ""}`).join("|");\n      if (repairedExerciseNameSignatures.get(uid) !== repairSignature) {\n        repairedExerciseNameSignatures.set(uid, repairSignature);\n        repairExerciseNameSnapshots(db, uid, definitions).catch((error) => console.error("Could not repair exercise names/stats visibility", error));\n      }',
     id,
   );
   return next;
@@ -219,8 +267,8 @@ export function quickWorkoutExerciseHistoryBuildPlugin() {
     transform(code, id) {
       const cleanId = id.split('?')[0].replaceAll('\\\\', '/');
       if (cleanId.endsWith('/src/features/workout/WorkoutScreen.jsx')) return transformWorkoutScreen(code, id);
-      if (cleanId.endsWith('/src/features/plans/PlansScreen.jsx')) return transformPlansScreen(code);
-      if (cleanId.endsWith('/src/lib/domain/exerciseProgress.js')) return transformExerciseProgress(code);
+      if (cleanId.endsWith('/src/features/plans/PlansScreen.jsx')) return transformPlansScreen(code, id);
+      if (cleanId.endsWith('/src/lib/domain/exerciseProgress.js')) return transformExerciseProgress(code, id);
       if (cleanId.endsWith('/src/lib/firebase/planRepository.js')) return transformPlanRepository(code, id);
       return null;
     },

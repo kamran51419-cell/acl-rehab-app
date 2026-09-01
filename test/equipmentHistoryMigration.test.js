@@ -31,6 +31,38 @@ test("migration uses programme + session + exercise occurrence, not exercise glo
   assert.equal(result.updatedWorkouts.find((item) => item.id === "w2").exercises[0].equipmentType, "cable");
 });
 
+test("migration safely falls back to the unique base exercise within the exact session when an old occurrence id changed", () => {
+  const result = buildEquipmentHistoryMigration(plan, [
+    workout("legacy-id", "session-a", "2026-08-10", strength("old-programme-occurrence-id", "press", "Leg Press")),
+  ]);
+
+  assert.equal(result.workoutsChanged, 1);
+  assert.equal(result.unmatchedRecords, 0);
+  assert.equal(result.fallbackMatchedRecords, 1);
+  assert.equal(result.updatedWorkouts[0].exercises[0].equipmentType, "machine");
+});
+
+test("fallback refuses to guess when the same base exercise appears more than once in a session", () => {
+  const duplicatePlan = {
+    id: "plan-a",
+    sessions: [{
+      id: "session-a",
+      name: "Session A",
+      exercises: [
+        strength("press-first", "press", "Leg Press", "machine"),
+        strength("press-second", "press", "Leg Press", "cable"),
+      ],
+    }],
+  };
+  const result = buildEquipmentHistoryMigration(duplicatePlan, [
+    workout("ambiguous", "session-a", "2026-08-10", strength("old-id", "press", "Leg Press")),
+  ]);
+
+  assert.equal(result.workoutsChanged, 0);
+  assert.equal(result.unmatchedRecords, 1);
+  assert.equal(result.fallbackMatchedRecords, 0);
+});
+
 test("migration updates both sides of a left/right programme exercise as one occurrence", () => {
   const bilateral = {
     id: "w3",

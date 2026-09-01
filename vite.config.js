@@ -36,6 +36,7 @@ import { addExerciseUxFixBuildPlugin } from './src/addExerciseUxFixBuildPlugin.j
 import { quickWorkoutExerciseHistoryBuildPlugin } from './src/quickWorkoutExerciseHistoryBuildPlugin.js'
 import { sessionTextSelectionBuildPlugin } from './src/sessionTextSelectionBuildPlugin.js'
 import { statsImprovementPercentageBuildPlugin } from './src/statsImprovementPercentageBuildPlugin.js'
+import { statsSelectorPolishBuildPlugin } from './src/statsSelectorPolishBuildPlugin.js'
 import { inProgressWorkoutCleanupBuildPlugin } from './src/inProgressWorkoutCleanupBuildPlugin.js'
 
 export default defineConfig({
@@ -75,6 +76,7 @@ export default defineConfig({
     quickWorkoutExerciseHistoryBuildPlugin(),
     sessionTextSelectionBuildPlugin(),
     statsImprovementPercentageBuildPlugin(),
+    statsSelectorPolishBuildPlugin(),
     react(),
     tailwindcss(),
     VitePWA({

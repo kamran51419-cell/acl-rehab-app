@@ -27,6 +27,13 @@ function transformWorkoutScreen(code, id) {
     id,
   );
 
+  next = replaceRequired(
+    next,
+    '  const previousWeights = previousWeightsForExercise(completedWorkouts, template); const previousReps = previousRepsForExercise(completedWorkouts, template);\n  const fresh = createWorkoutExerciseSnapshot(template, previousWeights, previousReps);',
+    '  const fresh = hydrateExercisePreviousPerformance(createWorkoutExerciseSnapshot(template, {}, {}), completedWorkouts);',
+    id,
+  );
+
   const openSavedStart = next.indexOf('  const openSaved = useCallback(');
   const startProgramme = openSavedStart >= 0 ? next.indexOf('\n  const startProgramme', openSavedStart) : -1;
   if (openSavedStart < 0 || startProgramme < 0) {

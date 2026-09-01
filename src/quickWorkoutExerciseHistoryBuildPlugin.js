@@ -39,6 +39,25 @@ function transformWorkoutScreen(code, id) {
   return next;
 }
 
+function transformPlansScreen(code) {
+  return code
+    .replace('  syncProgrammeEquipmentHistory,\n', '')
+    .replace('      await syncProgrammeEquipmentHistory(db, user.uid, saved);\n', '')
+    .replace(
+      'Previous programme history follows this unless you changed that workout manually.',
+      'Default for new workouts. Completed workout history keeps the equipment used at the time.',
+    );
+}
+
+function transformExerciseProgress(code, id) {
+  return replaceRequired(
+    code,
+    'equipmentType: exercise.equipmentType || "standard", weight: set.weight,',
+    'equipmentType: date && String(date) < "2026-08-28" && exercise.equipmentSource !== "manual" ? "standard" : (exercise.equipmentType || "standard"), weight: set.weight,',
+    id,
+  );
+}
+
 export function quickWorkoutExerciseHistoryBuildPlugin() {
   return {
     name: 'quick-workout-exercise-history',
@@ -46,6 +65,8 @@ export function quickWorkoutExerciseHistoryBuildPlugin() {
     transform(code, id) {
       const cleanId = id.split('?')[0].replaceAll('\\\\', '/');
       if (cleanId.endsWith('/src/features/workout/WorkoutScreen.jsx')) return transformWorkoutScreen(code, id);
+      if (cleanId.endsWith('/src/features/programme/PlansScreen.jsx')) return transformPlansScreen(code);
+      if (cleanId.endsWith('/src/lib/domain/exerciseProgress.js')) return transformExerciseProgress(code, id);
       return null;
     },
   };

@@ -49,12 +49,10 @@ function transformPlansScreen(code) {
     );
 }
 
-function transformExerciseProgress(code, id) {
-  return replaceRequired(
-    code,
-    'equipmentType: exercise.equipmentType || "standard", weight: set.weight,',
+function transformExerciseProgress(code) {
+  return code.replace(
+    /equipmentType:\s*exercise\.equipmentType\s*\|\|\s*"standard",\s*weight:\s*set\.weight,/,
     'equipmentType: date && String(date) < "2026-08-28" && exercise.equipmentSource !== "manual" ? "standard" : (exercise.equipmentType || "standard"), weight: set.weight,',
-    id,
   );
 }
 
@@ -65,8 +63,8 @@ export function quickWorkoutExerciseHistoryBuildPlugin() {
     transform(code, id) {
       const cleanId = id.split('?')[0].replaceAll('\\\\', '/');
       if (cleanId.endsWith('/src/features/workout/WorkoutScreen.jsx')) return transformWorkoutScreen(code, id);
-      if (cleanId.endsWith('/src/features/programme/PlansScreen.jsx')) return transformPlansScreen(code);
-      if (cleanId.endsWith('/src/lib/domain/exerciseProgress.js')) return transformExerciseProgress(code, id);
+      if (cleanId.endsWith('/src/features/plans/PlansScreen.jsx')) return transformPlansScreen(code);
+      if (cleanId.endsWith('/src/lib/domain/exerciseProgress.js')) return transformExerciseProgress(code);
       return null;
     },
   };

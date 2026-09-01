@@ -64,3 +64,18 @@ test("Quick Workout hydration writes previous values onto displayed sets", () =>
   assert.equal(hydrated.exercises[0].recordedSets[0].previousReps, 7);
   assert.equal(hydrated.exercises[0].recordedSets[0].previousWeight, 95);
 });
+
+test("exercise added during a programme workout gets previous performance", () => {
+  const history = [completedWorkout("2026-08-31", weightedExercise({ id: "old-programme-copy", exerciseId: "exercise-leg-press", reps: 8, weight: 90 }))];
+  const existing = weightedExercise({ id: "programme-existing", exerciseId: "another-exercise", name: "Another exercise", reps: "", weight: "" });
+  const added = {
+    ...weightedExercise({ id: "added-mid-workout", exerciseId: "exercise-leg-press", reps: "", weight: "" }),
+    addedDuringWorkout: true,
+    recordedSets: [{ id: "added-set-1", setNumber: 1, actualReps: "", rawReps: "", weight: "", rawWeight: "" }],
+  };
+  const workout = { sourceType: "programme", exercises: [existing, added] };
+  const hydrated = hydrateQuickWorkoutPreviousPerformance(workout, history);
+  assert.equal(hydrated.exercises[0], existing);
+  assert.equal(hydrated.exercises[1].recordedSets[0].previousReps, 8);
+  assert.equal(hydrated.exercises[1].recordedSets[0].previousWeight, 90);
+});

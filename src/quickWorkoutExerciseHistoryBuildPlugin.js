@@ -1,3 +1,8 @@
+function replaceRequired(code, oldText, newText, id) {
+  if (!code.includes(oldText)) throw new Error(`Quick Workout exercise-history transform could not find expected source in ${id}`);
+  return code.replace(oldText, newText);
+}
+
 function hidePairedSideRemoveControls(code) {
   return code.replace(
     /(<ExerciseCard exercise=\{(?:left|right)\} index=\{[^}]+\} hideExerciseName \{\.\.\.props\})(?! oneOff=\{false\})/g,
@@ -7,7 +12,13 @@ function hidePairedSideRemoveControls(code) {
 
 function transformWorkoutScreen(code, id) {
   let next = hidePairedSideRemoveControls(code);
-  if (next.includes('withQuickPreviousPerformance')) return next;
+
+  next = replaceRequired(
+    next,
+    'import QuickWorkoutBuilder, { buildQuickWorkout } from "./QuickWorkoutBuilder";',
+    'import QuickWorkoutBuilder, { buildQuickWorkout } from "./QuickWorkoutBuilder";\nimport { hydrateQuickWorkoutPreviousPerformance } from "../../lib/domain/quickWorkoutHistory";',
+    id,
+  );
 
   const openSavedStart = next.indexOf('  const openSaved = useCallback(');
   const startProgramme = openSavedStart >= 0 ? next.indexOf('\n  const startProgramme', openSavedStart) : -1;
@@ -15,27 +26,16 @@ function transformWorkoutScreen(code, id) {
     throw new Error(`Quick Workout exercise-history transform could not find openSaved in ${id}`);
   }
 
-  const replacement = `  const withQuickPreviousPerformance = useCallback((saved) => {
-    if (!saved || saved.sourceType !== "one_off") return saved;
-    return {
-      ...saved,
-      exercises: (saved.exercises || []).map((exercise) => {
-        const previousWeights = previousWeightsForExercise(completedWorkouts, exercise);
-        const previousReps = previousRepsForExercise(completedWorkouts, exercise);
-        return {
-          ...exercise,
-          recordedSets: (exercise.recordedSets || []).map((set) => ({
-            ...set,
-            previousWeight: previousWeights[set.setNumber] ?? "",
-            previousReps: previousReps[set.setNumber] ?? "",
-          })),
-        };
-      }),
-    };
-  }, [completedWorkouts]);
-  const openSaved = useCallback((saved) => { setWorkout(normalizeWorkoutForDisplay(syncSavedWithProgramme(withQuickPreviousPerformance(saved)))); setBuilder(false); setOverviewDiscardConfirm(false); onIntentHandled(); }, [onIntentHandled, syncSavedWithProgramme, withQuickPreviousPerformance]);`;
-
+  const replacement = '  const openSaved = useCallback((saved) => { const withPrevious = hydrateQuickWorkoutPreviousPerformance(saved, completedWorkouts); setWorkout(normalizeWorkoutForDisplay(syncSavedWithProgramme(withPrevious))); setBuilder(false); setOverviewDiscardConfirm(false); onIntentHandled(); }, [completedWorkouts, onIntentHandled, syncSavedWithProgramme]);';
   next = next.slice(0, openSavedStart) + replacement + next.slice(startProgramme);
+
+  next = replaceRequired(
+    next,
+    'const list = ordered(workout.exercises);',
+    'const list = ordered(hydrateQuickWorkoutPreviousPerformance(workout, completedWorkouts).exercises);',
+    id,
+  );
+
   return next;
 }
 

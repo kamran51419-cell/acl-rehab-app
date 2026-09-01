@@ -21,21 +21,36 @@ function equipmentLabel(value) {
 }
 
 function migrationDefaults(plan) {
-  const defaults = new Map();
+  const byOccurrence = new Map();
+  const bySessionExercise = new Map();
   (plan?.sessions || []).forEach((session) => {
     (session.exercises || []).forEach((exercise) => {
       if (exercise?.exerciseType !== "strength" || !exercise?.id || !exercise?.exerciseId) return;
-      defaults.set(`${session.id}:${exercise.id}`, {
+      const info = {
         sessionId: session.id,
         sessionName: session.name || "Session",
         exerciseOccurrenceId: exercise.id,
         exerciseId: exercise.exerciseId,
         exerciseName: exercise.exerciseNameSnapshot || exercise.name || "Exercise",
         equipmentType: exercise.equipmentType || "standard",
-      });
+      };
+      byOccurrence.set(`${session.id}:${exercise.id}`, info);
+      const baseKey = `${session.id}:${exercise.exerciseId}`;
+      if (!bySessionExercise.has(baseKey)) bySessionExercise.set(baseKey, []);
+      bySessionExercise.get(baseKey).push(info);
     });
   });
-  return defaults;
+  return { byOccurrence, bySessionExercise };
+}
+
+function matchingDefault(defaults, workout, exercise) {
+  const occurrenceId = baseProgrammeExerciseId(exercise.id);
+  const exact = defaults.byOccurrence.get(`${workout.sessionId}:${occurrenceId}`);
+  if (exact && String(exact.exerciseId) === String(exercise.exerciseId)) return { info: exact, matchedByFallback: false };
+
+  const candidates = defaults.bySessionExercise.get(`${workout.sessionId}:${exercise.exerciseId}`) || [];
+  if (candidates.length === 1) return { info: candidates[0], matchedByFallback: true };
+  return { info: null, matchedByFallback: false };
 }
 
 export function buildEquipmentHistoryMigration(plan, workouts = []) {
@@ -46,6 +61,7 @@ export function buildEquipmentHistoryMigration(plan, workouts = []) {
   let occurrencesChanged = 0;
   let skippedManual = 0;
   let unmatchedRecords = 0;
+  let fallbackMatchedRecords = 0;
 
   (workouts || []).forEach((workout) => {
     const date = workoutDate(workout);
@@ -53,13 +69,21 @@ export function buildEquipmentHistoryMigration(plan, workouts = []) {
 
     let changed = false;
     const changedOccurrences = new Set();
+    const fallbackOccurrences = new Set();
     const exercises = (workout.exercises || []).map((exercise) => {
       if (!exercise?.exerciseId || exercise?.exerciseType !== "strength") return exercise;
-      const occurrenceId = baseProgrammeExerciseId(exercise.id);
-      const info = defaults.get(`${workout.sessionId}:${occurrenceId}`);
-      if (!info || String(info.exerciseId) !== String(exercise.exerciseId)) {
+      const match = matchingDefault(defaults, workout, exercise);
+      const info = match.info;
+      if (!info) {
         unmatchedRecords += 1;
         return exercise;
+      }
+      if (match.matchedByFallback) {
+        const fallbackKey = `${workout.id}:${info.exerciseOccurrenceId}`;
+        if (!fallbackOccurrences.has(fallbackKey)) {
+          fallbackOccurrences.add(fallbackKey);
+          fallbackMatchedRecords += 1;
+        }
       }
       if (exercise.equipmentSource === "manual") {
         skippedManual += 1;
@@ -72,10 +96,10 @@ export function buildEquipmentHistoryMigration(plan, workouts = []) {
 
       changed = true;
       exerciseRecordsChanged += 1;
-      changedOccurrences.add(occurrenceId);
-      const detailKey = `${workout.sessionId}:${occurrenceId}:${targetType}`;
+      changedOccurrences.add(info.exerciseOccurrenceId);
+      const detailKey = `${workout.sessionId}:${info.exerciseOccurrenceId}:${targetType}`;
       if (!detailCounts.has(detailKey)) detailCounts.set(detailKey, { ...info, equipmentLabel: equipmentLabel(targetType), occurrences: new Set() });
-      detailCounts.get(detailKey).occurrences.add(`${workout.id}:${occurrenceId}`);
+      detailCounts.get(detailKey).occurrences.add(`${workout.id}:${info.exerciseOccurrenceId}`);
       return { ...exercise, equipmentType: targetType, equipmentSource: "manual" };
     });
 
@@ -94,6 +118,7 @@ export function buildEquipmentHistoryMigration(plan, workouts = []) {
     occurrencesChanged,
     skippedManual,
     unmatchedRecords,
+    fallbackMatchedRecords,
     details: [...detailCounts.values()].map((detail) => ({
       sessionId: detail.sessionId,
       sessionName: detail.sessionName,

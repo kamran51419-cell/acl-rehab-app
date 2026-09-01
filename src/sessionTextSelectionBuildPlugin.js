@@ -5,19 +5,12 @@ export function sessionTextSelectionBuildPlugin() {
       const cleanId = id.split('?')[0].replaceAll('\\\\', '/')
       if (!cleanId.endsWith('/src/features/plans/PlansScreen.jsx')) return null
 
-      const dragHandlers = 'onPointerDown={(event) => { const card = event.currentTarget.closest("[draggable=\\"true\\"]"); if (card) card.draggable = false; }} onPointerUp={(event) => { const card = event.currentTarget.closest("[draggable=\\"true\\"]"); if (card) card.draggable = true; }} onPointerCancel={(event) => { const card = event.currentTarget.closest("[draggable=\\"true\\"]"); if (card) card.draggable = true; }} onBlur={(event) => { const card = event.currentTarget.closest("[draggable=\\"true\\"]"); if (card) card.draggable = true; }}'
+      const sessionDragStart = '            draggable\n            onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; setDraggingSession(sessionIndex); setDragOverSession(sessionIndex); }}'
+      if (!code.includes(sessionDragStart)) return code
 
-      let next = code.replace(
-        '<Field label="Session name"><Input value={session.name}',
-        `<Field label="Session name"><Input className="cursor-text" ${dragHandlers} value={session.name}`,
-      )
+      const safeSessionDragStart = '            draggable\n            onPointerDownCapture={(event) => { if (event.target.closest("input, textarea, select, button, [contenteditable=\\"true\\"]")) event.currentTarget.draggable = false; }}\n            onPointerUpCapture={(event) => { event.currentTarget.draggable = true; }}\n            onPointerCancelCapture={(event) => { event.currentTarget.draggable = true; }}\n            onFocusCapture={(event) => { if (event.target.closest("input, textarea, select")) event.currentTarget.draggable = false; }}\n            onBlurCapture={(event) => { const next = event.relatedTarget; if (!next || !event.currentTarget.contains(next) || !next.closest?.("input, textarea, select")) event.currentTarget.draggable = true; }}\n            onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; setDraggingSession(sessionIndex); setDragOverSession(sessionIndex); }}'
 
-      next = next.replace(
-        '<Field label="Notes"><Input value={session.notes || ""}',
-        `<Field label="Notes"><Input className="cursor-text" ${dragHandlers} value={session.notes || ""}`,
-      )
-
-      return next
+      return code.replace(sessionDragStart, safeSessionDragStart)
     },
   }
 }

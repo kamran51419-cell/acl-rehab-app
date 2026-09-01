@@ -33,35 +33,35 @@ export function statsImprovementPercentageBuildPlugin() {
       next = replaceRequired(
         next,
         '<p className="text-sm font-medium text-slate-600">Left & Right</p>',
-        '<div className="flex"><span className="inline-flex rounded-lg border border-slate-200 bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-600">Left & Right</span></div>',
+        '<div className="flex"><span className="inline-flex rounded-xl border border-blue-300 bg-blue-100 px-3 py-1.5 text-sm font-semibold text-blue-800 shadow-sm">Left & Right</span></div>',
         id,
       )
 
       next = replaceRequired(
         next,
         '<p className="text-sm font-medium text-slate-600">{SIDE_MODE_LABELS[availableModes[0]]}</p>',
-        '<div className="flex"><span className="inline-flex rounded-lg border border-slate-200 bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-600">{SIDE_MODE_LABELS[availableModes[0]]}</span></div>',
+        '<div className="flex"><span className="inline-flex rounded-xl border border-blue-300 bg-blue-100 px-3 py-1.5 text-sm font-semibold text-blue-800 shadow-sm">{SIDE_MODE_LABELS[availableModes[0]]}</span></div>',
         id,
       )
 
       next = replaceRequired(
         next,
         'equipmentTypes[0] && equipmentTypes[0] !== "standard" ? <p className="text-xs font-medium text-slate-500">{EQUIPMENT_LABELS[equipmentTypes[0]]}</p> : null;',
-        'equipmentTypes[0] && equipmentTypes[0] !== "standard" ? <div className="flex"><span className="inline-flex rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-700">{EQUIPMENT_LABELS[equipmentTypes[0]]}</span></div> : null;',
+        'equipmentTypes[0] && equipmentTypes[0] !== "standard" ? <div className="flex"><span className="inline-flex rounded-xl border border-blue-600 bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm">{EQUIPMENT_LABELS[equipmentTypes[0]]}</span></div> : null;',
         id,
       )
 
       next = replaceAllRequired(
         next,
         '<div className="flex flex-wrap gap-2">{equipmentTypes.map((type) => <Button key={type} size="sm" variant={equipment === type ? "primary" : "outline"} onClick={() => setEquipment(type)}>{EQUIPMENT_LABELS[type]}</Button>)}</div>',
-        '<div className="flex flex-wrap gap-2">{equipmentTypes.map((type) => <button type="button" key={type} className={`rounded-full border px-3 py-1.5 text-sm font-semibold transition ${equipment === type ? "border-blue-600 bg-blue-600 text-white shadow-sm" : "border-blue-200 bg-white text-blue-700 hover:bg-blue-50"}`} onClick={() => setEquipment(type)}>{EQUIPMENT_LABELS[type]}</button>)}</div>',
+        '<div className="flex flex-wrap gap-2">{equipmentTypes.map((type) => <button type="button" key={type} className={`rounded-xl border px-3 py-1.5 text-sm font-semibold transition ${equipment === type ? "border-blue-600 bg-blue-600 text-white shadow-sm" : "border-blue-200 bg-white text-blue-700 hover:bg-blue-50"}`} onClick={() => setEquipment(type)}>{EQUIPMENT_LABELS[type]}</button>)}</div>',
         id,
       )
 
       next = replaceAllRequired(
         next,
         '<div className="flex flex-wrap gap-2">{availableModes.map((item) => <Button key={item} variant={mode === item ? "primary" : "outline"} onClick={() => setMode(item)}>{SIDE_MODE_LABELS[item]}</Button>)}</div>',
-        '<div className="flex flex-wrap gap-2">{availableModes.map((item) => <button type="button" key={item} className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition ${mode === item ? "border-slate-300 bg-slate-100 text-slate-900" : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"}`} onClick={() => setMode(item)}>{SIDE_MODE_LABELS[item]}</button>)}</div>',
+        '<div className="flex flex-wrap gap-2">{availableModes.map((item) => <button type="button" key={item} className={`rounded-xl border px-3 py-1.5 text-sm font-semibold transition ${mode === item ? "border-blue-300 bg-blue-100 text-blue-800 shadow-sm" : "border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"}`} onClick={() => setMode(item)}>{SIDE_MODE_LABELS[item]}</button>)}</div>',
         id,
       )
 

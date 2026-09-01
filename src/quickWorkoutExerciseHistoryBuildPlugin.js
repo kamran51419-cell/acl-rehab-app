@@ -34,6 +34,48 @@ function transformWorkoutScreen(code, id) {
     id,
   );
 
+  next = replaceRequired(
+    next,
+    'const original = useRef(saved); const catchUp = mode === "catch_up";',
+    'const original = useRef(saved); const catchUp = mode === "catch_up"; const editorPreviousWorkouts = completedWorkouts.filter((item) => item.id !== saved.id);',
+    id,
+  );
+
+  next = replaceRequired(
+    next,
+    'const previousWeights = previousWeightsForExercise(completedWorkouts, base); const previousReps = previousRepsForExercise(completedWorkouts, base); setAdding({ ...createWorkoutExerciseSnapshot(base, previousWeights, previousReps), addedDuringWorkout: true });',
+    'setAdding({ ...hydrateExercisePreviousPerformance(createWorkoutExerciseSnapshot(base, {}, {}), editorPreviousWorkouts), addedDuringWorkout: true });',
+    id,
+  );
+
+  next = replaceRequired(
+    next,
+    '<ExerciseCard exercise={exercise} oneOff={false} index={index} total={draft.exercises.length} onChange={(...args) => changeWorkout(setDraft, ...args)}',
+    '<ExerciseCard exercise={hydrateExercisePreviousPerformance(exercise, editorPreviousWorkouts)} oneOff={false} index={index} total={draft.exercises.length} onChange={(...args) => changeWorkout(setDraft, ...args)}',
+    id,
+  );
+
+  next = replaceRequired(
+    next,
+    'onEquipment={(exerciseId, equipmentType) => setDraft((current) => setLinkedEquipment(current, exerciseId, equipmentType))}',
+    'onEquipment={(exerciseId, equipmentType) => setDraft((current) => { const changed = setLinkedEquipment(current, exerciseId, equipmentType); const ids = new Set(linkedExerciseIds(changed, exerciseId)); return { ...changed, exercises: changed.exercises.map((item) => ids.has(item.id) ? hydrateExercisePreviousPerformance(item, editorPreviousWorkouts) : item) }; })}',
+    id,
+  );
+
+  next = replaceRequired(
+    next,
+    'editWorkoutExerciseList({ ...current, exercises: [...current.exercises, adding] }, adding.id, edited, completedWorkouts)',
+    'editWorkoutExerciseList({ ...current, exercises: [...current.exercises, adding] }, adding.id, edited, editorPreviousWorkouts)',
+    id,
+  );
+
+  next = replaceRequired(
+    next,
+    'editWorkoutExerciseList(current, editing.id, edited, completedWorkouts)',
+    'editWorkoutExerciseList(current, editing.id, edited, editorPreviousWorkouts)',
+    id,
+  );
+
   const openSavedStart = next.indexOf('  const openSaved = useCallback(');
   const startProgramme = openSavedStart >= 0 ? next.indexOf('\n  const startProgramme', openSavedStart) : -1;
   if (openSavedStart < 0 || startProgramme < 0) {

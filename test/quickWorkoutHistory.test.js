@@ -108,3 +108,30 @@ test("changing equipment clears stale previous values when that equipment has no
   assert.equal(hydrated.exercises[0].recordedSets[0].previousReps, "");
   assert.equal(hydrated.exercises[0].recordedSets[0].previousWeight, "");
 });
+
+test("manual equipment change in programme workout clears stale previous values", () => {
+  const history = [completedWorkout("2026-08-31", weightedExercise({ id: "machine-copy", exerciseId: "exercise-leg-press", equipmentType: "machine", reps: 8, weight: 90 }))];
+  const exercise = {
+    ...weightedExercise({ id: "programme-leg-press", exerciseId: "exercise-leg-press", equipmentType: "cable", reps: "", weight: "" }),
+    equipmentSource: "manual",
+    recordedSets: [{ id: "set-1", setNumber: 1, previousReps: 8, previousWeight: 90, actualReps: "", rawReps: "", weight: "", rawWeight: "" }],
+  };
+  const hydrated = hydrateQuickWorkoutPreviousPerformance({ sourceType: "programme", exercises: [exercise] }, history);
+  assert.equal(hydrated.exercises[0].recordedSets[0].previousReps, "");
+  assert.equal(hydrated.exercises[0].recordedSets[0].previousWeight, "");
+});
+
+test("manual equipment change in programme workout loads matching equipment history", () => {
+  const history = [
+    completedWorkout("2026-08-31", weightedExercise({ id: "machine-copy", exerciseId: "exercise-leg-press", equipmentType: "machine", reps: 8, weight: 90 })),
+    completedWorkout("2026-08-30", weightedExercise({ id: "cable-copy", exerciseId: "exercise-leg-press", equipmentType: "cable", reps: 11, weight: 60 })),
+  ];
+  const exercise = {
+    ...weightedExercise({ id: "programme-leg-press", exerciseId: "exercise-leg-press", equipmentType: "cable", reps: "", weight: "" }),
+    equipmentSource: "manual",
+    recordedSets: [{ id: "set-1", setNumber: 1, previousReps: 8, previousWeight: 90, actualReps: "", rawReps: "", weight: "", rawWeight: "" }],
+  };
+  const hydrated = hydrateQuickWorkoutPreviousPerformance({ sourceType: "programme", exercises: [exercise] }, history);
+  assert.equal(hydrated.exercises[0].recordedSets[0].previousReps, 11);
+  assert.equal(hydrated.exercises[0].recordedSets[0].previousWeight, 60);
+});

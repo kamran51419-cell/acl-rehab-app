@@ -1,5 +1,7 @@
 import { resolveWorkoutExerciseSide } from "./workoutDisplay.js";
 
+export const EQUIPMENT_TRACKING_START_DATE = "2026-08-28";
+
 function normalizedName(value) {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
@@ -32,6 +34,12 @@ function valueMap(sets, getter) {
   return entries.length ? Object.fromEntries(entries) : {};
 }
 
+export function historicalEquipmentType(workout, exercise = {}) {
+  const workoutDate = String(exercise?.completedDate || workout?.date || workout?.workoutDate || "");
+  if (workoutDate && workoutDate < EQUIPMENT_TRACKING_START_DATE && exercise?.equipmentSource !== "manual") return "standard";
+  return exercise?.equipmentType || "standard";
+}
+
 function exerciseCandidates(workout, target) {
   const targetId = String(target?.exerciseId || "");
   const targetName = normalizedName(target?.exerciseNameSnapshot);
@@ -41,7 +49,7 @@ function exerciseCandidates(workout, target) {
   if (!candidates.length) return [];
 
   const targetEquipment = target?.equipmentType || "standard";
-  const equipmentCandidates = candidates.filter((exercise) => (exercise?.equipmentType || "standard") === targetEquipment);
+  const equipmentCandidates = candidates.filter((exercise) => historicalEquipmentType(workout, exercise) === targetEquipment);
   if (!equipmentCandidates.length) return [];
 
   const targetSide = resolveWorkoutExerciseSide(target);
@@ -66,19 +74,11 @@ export function quickPreviousPerformanceForExercise(workouts = [], target = {}) 
   return { weights: {}, reps: {} };
 }
 
-function shouldHydratePrevious(workout, exercise) {
-  return workout?.sourceType === "one_off" || exercise?.addedDuringWorkout === true || exercise?.equipmentSource === "manual";
-}
-
 export function hydrateQuickWorkoutPreviousPerformance(workout, completedWorkouts = []) {
   if (!workout) return workout;
-  const exercises = workout.exercises || [];
-  if (!exercises.some((exercise) => shouldHydratePrevious(workout, exercise))) return workout;
-
   return {
     ...workout,
-    exercises: exercises.map((exercise) => {
-      if (!shouldHydratePrevious(workout, exercise)) return exercise;
+    exercises: (workout.exercises || []).map((exercise) => {
       const previous = quickPreviousPerformanceForExercise(completedWorkouts, exercise);
       return {
         ...exercise,

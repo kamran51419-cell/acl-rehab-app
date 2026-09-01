@@ -27,6 +27,13 @@ export function statsSelectorPolishBuildPlugin() {
 
       next = replaceRequired(
         next,
+        'function StatCard({ label, value, detail }) {\n  return <div className="rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50/80 to-white p-4 shadow-sm">',
+        'function StatCard({ label, value, detail }) {\n  return <div className="rounded-2xl border border-blue-200 p-4 shadow-sm" style={{ background: "linear-gradient(135deg, #eff6ff 0%, #ffffff 100%)" }}>',
+        id,
+      )
+
+      next = replaceRequired(
+        next,
         'equipmentTypes[0] && equipmentTypes[0] !== "standard" ? <Button size="sm" variant="primary">{EQUIPMENT_LABELS[equipmentTypes[0]]}</Button> : null;',
         'equipmentTypes[0] && equipmentTypes[0] !== "standard" ? <div className="flex"><span className="inline-flex rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-700">{EQUIPMENT_LABELS[equipmentTypes[0]]}</span></div> : null;',
         id,

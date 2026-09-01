@@ -262,7 +262,7 @@ export async function updateInProgressWorkoutDocument(db, uid, workout, { run = 
   return written;
 }
 
-export async function finishWorkoutDocument(db, uid, workout, { timestamp = serverTimestamp(), completedAtValue = new Date().toISOString(), run = runTransaction, referenceFactory = workoutRef, readDocument = getDoc } = {}) {
+export async function finishWorkoutDocument(db, uid, workout, { timestamp = serverTimestamp(), completedAtValue = new Date().toISOString(), run = runTransaction, referenceFactory = workoutRef, readDocument = null } = {}) {
   const ref = referenceFactory(db, uid, workout.id);
   const persisted = stripUndefined({
     ...workout,
@@ -283,10 +283,13 @@ export async function finishWorkoutDocument(db, uid, workout, { timestamp = serv
     if (snapshot.exists() && (snapshot.data()?.status === "completed" || snapshot.data()?.completed === true)) return;
     transaction.set(ref, persisted, { merge: true });
   });
-  const verifiedSnapshot = await readDocument(ref);
-  if (!verifiedSnapshot.exists() || (verifiedSnapshot.data()?.status !== "completed" && verifiedSnapshot.data()?.completed !== true)) throw new Error("Completed workout could not be verified after saving.");
-  const verified = verifiedSnapshot.data();
-  const completed = { ...persisted, ...verified, completedAt: verified.completedAt || completedAtValue, updatedAt: verified.updatedAt || completedAtValue };
+  let completed = { ...persisted, completedAt: completedAtValue, updatedAt: completedAtValue };
+  if (readDocument) {
+    const verifiedSnapshot = await readDocument(ref);
+    if (!verifiedSnapshot.exists() || (verifiedSnapshot.data()?.status !== "completed" && verifiedSnapshot.data()?.completed !== true)) throw new Error("Completed workout could not be verified after saving.");
+    const verified = verifiedSnapshot.data();
+    completed = { ...persisted, ...verified, completedAt: verified.completedAt || completedAtValue, updatedAt: verified.updatedAt || completedAtValue };
+  }
   recentWorkoutSnapshots.delete(workoutCacheKey(uid, workout.id));
   return completed;
 }
